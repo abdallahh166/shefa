@@ -25,7 +25,7 @@ const navItems = [
 
 export const ClinicLayout = () => {
   const { clinicSlug } = useParams();
-  const { user, tenant, logout, hasPermission } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
