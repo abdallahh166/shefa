@@ -32,6 +32,10 @@ export const TutorialPage = () => {
   const navigate = useNavigate();
   const { t } = useI18n();
   const [expandedStep, setExpandedStep] = useState<number | null>(0);
+  const [selectedVideo, setSelectedVideo] = useState<{ title: string; url: string; description: string } | null>(null);
+
+  const mockVideoUrl = "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1"; // Placeholder demo video
+
 
   const gettingStartedSteps = [
     {
