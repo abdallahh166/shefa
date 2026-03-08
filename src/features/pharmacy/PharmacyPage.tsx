@@ -24,32 +24,32 @@ const DEMO_MEDS: Medication[] = [
   { id: "MED-006", name: "Ibuprofen 400mg", category: "NSAID", stock: 520, unit: "tablets", price: 6.50, status: "in_stock" },
 ];
 
+const statusKey = { in_stock: "inStock", low_stock: "lowStock", out_of_stock: "outOfStock" } as const;
 const statusVariant = { in_stock: "success", low_stock: "warning", out_of_stock: "destructive" } as const;
-const statusLabel = { in_stock: "In Stock", low_stock: "Low Stock", out_of_stock: "Out of Stock" } as const;
 
 export const PharmacyPage = () => {
   const { t } = useI18n();
 
   const columns: Column<Medication>[] = [
     { key: "id", header: "ID" },
-    { key: "name", header: "Medication", render: (m) => <span className="font-medium">{m.name}</span> },
-    { key: "category", header: "Category" },
-    { key: "stock", header: "Stock", render: (m) => `${m.stock} ${m.unit}` },
-    { key: "price", header: "Price", render: (m) => `$${m.price.toFixed(2)}` },
-    { key: "status", header: t("common.status"), render: (m) => <StatusBadge variant={statusVariant[m.status]}>{statusLabel[m.status]}</StatusBadge> },
+    { key: "name", header: t("pharmacy.medication"), render: (m) => <span className="font-medium">{m.name}</span> },
+    { key: "category", header: t("common.category") },
+    { key: "stock", header: t("common.stock"), render: (m) => `${m.stock} ${m.unit}` },
+    { key: "price", header: t("common.price"), render: (m) => `$${m.price.toFixed(2)}` },
+    { key: "status", header: t("common.status"), render: (m) => <StatusBadge variant={statusVariant[m.status]}>{t(`pharmacy.${statusKey[m.status]}`)}</StatusBadge> },
   ];
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="page-header">
-        <h1 className="page-title">{t("common.pharmacy")}</h1>
-        <Button><Plus className="h-4 w-4" /> Add Medication</Button>
+        <h1 className="page-title">{t("pharmacy.title")}</h1>
+        <Button><Plus className="h-4 w-4" /> {t("pharmacy.addMedication")}</Button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard title="Total Medications" value="124" icon={Pill} />
-        <StatCard title="Low Stock Items" value="8" icon={AlertTriangle} />
-        <StatCard title="Inventory Value" value="$34,580" icon={Package} />
+        <StatCard title={t("pharmacy.totalMedications")} value="124" icon={Pill} />
+        <StatCard title={t("pharmacy.lowStockItems")} value="8" icon={AlertTriangle} />
+        <StatCard title={t("pharmacy.inventoryValue")} value="$34,580" icon={Package} />
       </div>
 
       <DataTable columns={columns} data={DEMO_MEDS} keyExtractor={(m) => m.id} />

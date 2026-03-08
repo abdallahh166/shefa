@@ -41,11 +41,8 @@ const doctorPerformance = [
 ];
 
 const COLORS = [
-  "hsl(174, 62%, 34%)",
-  "hsl(210, 80%, 52%)",
-  "hsl(152, 60%, 40%)",
-  "hsl(38, 92%, 50%)",
-  "hsl(0, 72%, 51%)",
+  "hsl(174, 62%, 34%)", "hsl(210, 80%, 52%)", "hsl(152, 60%, 40%)",
+  "hsl(38, 92%, 50%)", "hsl(0, 72%, 51%)",
 ];
 
 type Tab = "revenue" | "patients" | "doctors";
@@ -55,15 +52,15 @@ export const ReportsPage = () => {
   const [activeTab, setActiveTab] = useState<Tab>("revenue");
 
   const tabItems: { key: Tab; label: string }[] = [
-    { key: "revenue", label: "Revenue" },
-    { key: "patients", label: "Patients" },
-    { key: "doctors", label: "Doctor Performance" },
+    { key: "revenue", label: t("reports.revenue") },
+    { key: "patients", label: t("common.patients") },
+    { key: "doctors", label: t("reports.doctorPerformance") },
   ];
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="page-header">
-        <h1 className="page-title">{t("common.reports")}</h1>
+        <h1 className="page-title">{t("reports.title")}</h1>
       </div>
 
       <div className="border-b flex gap-1">
@@ -84,7 +81,7 @@ export const ReportsPage = () => {
       {activeTab === "revenue" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-card rounded-lg border p-5">
-            <h3 className="font-semibold mb-4">Revenue vs Expenses</h3>
+            <h3 className="font-semibold mb-4">{t("reports.revenueVsExpenses")}</h3>
             <ResponsiveContainer width="100%" height={320}>
               <BarChart data={revenueData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 90%)" />
@@ -92,19 +89,17 @@ export const ReportsPage = () => {
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="revenue" fill="hsl(174, 62%, 34%)" radius={[4, 4, 0, 0]} name="Revenue" />
+                <Bar dataKey="revenue" fill="hsl(174, 62%, 34%)" radius={[4, 4, 0, 0]} name={t("reports.revenue")} />
                 <Bar dataKey="expenses" fill="hsl(210, 80%, 52%)" radius={[4, 4, 0, 0]} name="Expenses" />
               </BarChart>
             </ResponsiveContainer>
           </div>
           <div className="bg-card rounded-lg border p-5">
-            <h3 className="font-semibold mb-4">Revenue by Department</h3>
+            <h3 className="font-semibold mb-4">{t("reports.revenueByDepartment")}</h3>
             <ResponsiveContainer width="100%" height={320}>
               <PieChart>
                 <Pie data={departmentData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                  {departmentData.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                  ))}
+                  {departmentData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Tooltip />
               </PieChart>
@@ -115,7 +110,7 @@ export const ReportsPage = () => {
 
       {activeTab === "patients" && (
         <div className="bg-card rounded-lg border p-5">
-          <h3 className="font-semibold mb-4">Patient Growth</h3>
+          <h3 className="font-semibold mb-4">{t("reports.patientGrowth")}</h3>
           <ResponsiveContainer width="100%" height={350}>
             <LineChart data={patientGrowth}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 90%)" />
@@ -132,7 +127,7 @@ export const ReportsPage = () => {
         <div className="bg-card rounded-lg border overflow-hidden">
           <table className="data-table">
             <thead><tr className="bg-muted/50">
-              <th>Doctor</th><th>Patients</th><th>Appointments (Month)</th><th>Rating</th>
+              <th>{t("reports.doctor")}</th><th>{t("reports.patientsCount")}</th><th>{t("reports.appointmentsMonth")}</th><th>{t("reports.rating")}</th>
             </tr></thead>
             <tbody>
               {doctorPerformance.map((doc, i) => (
@@ -140,11 +135,7 @@ export const ReportsPage = () => {
                   <td className="font-medium">{doc.name}</td>
                   <td>{doc.patients}</td>
                   <td>{doc.appointments}</td>
-                  <td>
-                    <span className="inline-flex items-center gap-1">
-                      <span className="text-warning">★</span> {doc.rating}
-                    </span>
-                  </td>
+                  <td><span className="inline-flex items-center gap-1"><span className="text-warning">★</span> {doc.rating}</span></td>
                 </tr>
               ))}
             </tbody>

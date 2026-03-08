@@ -11,22 +11,22 @@ import { Building, Users, Bell, Palette } from "lucide-react";
 
 type Tab = "general" | "users" | "notifications" | "appearance";
 
-const tabs: { key: Tab; icon: any; label: string }[] = [
-  { key: "general", icon: Building, label: "General" },
-  { key: "users", icon: Users, label: "Users & Roles" },
-  { key: "notifications", icon: Bell, label: "Notifications" },
-  { key: "appearance", icon: Palette, label: "Appearance" },
-];
-
 export const SettingsPage = () => {
   const { t } = useI18n();
-  const { tenant } = useAuth();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("general");
+
+  const tabs: { key: Tab; icon: any; label: string }[] = [
+    { key: "general", icon: Building, label: t("settings.general") },
+    { key: "users", icon: Users, label: t("settings.usersRoles") },
+    { key: "notifications", icon: Bell, label: t("common.notifications") },
+    { key: "appearance", icon: Palette, label: t("settings.appearance") },
+  ];
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="page-header">
-        <h1 className="page-title">{t("common.settings")}</h1>
+        <h1 className="page-title">{t("settings.title")}</h1>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6">
@@ -49,31 +49,31 @@ export const SettingsPage = () => {
         <div className="flex-1 bg-card rounded-lg border p-6 max-w-2xl">
           {activeTab === "general" && (
             <div className="space-y-6">
-              <h3 className="font-semibold text-lg">Clinic Information</h3>
+              <h3 className="font-semibold text-lg">{t("settings.clinicInfo")}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Clinic Name</Label>
-                  <Input defaultValue={tenant?.name ?? ""} />
+                  <Label>{t("settings.clinicName")}</Label>
+                  <Input defaultValue={user?.tenantName ?? ""} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Slug</Label>
-                  <Input defaultValue={tenant?.slug ?? ""} disabled />
+                  <Label>{t("settings.slug")}</Label>
+                  <Input defaultValue={user?.tenantSlug ?? ""} disabled />
                 </div>
                 <div className="space-y-2">
-                  <Label>Phone</Label>
+                  <Label>{t("common.phone")}</Label>
                   <Input defaultValue="+966 11 234 5678" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Email</Label>
+                  <Label>{t("common.email")}</Label>
                   <Input defaultValue="info@democlini.com" />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Address</Label>
+                <Label>{t("settings.address")}</Label>
                 <Input defaultValue="123 King Fahd Road, Riyadh, Saudi Arabia" />
               </div>
               <div className="flex items-center gap-4">
-                <Label>Language</Label>
+                <Label>{t("common.language")}</Label>
                 <LanguageSwitcher />
               </div>
               <Button>{t("common.save")}</Button>
@@ -82,9 +82,9 @@ export const SettingsPage = () => {
 
           {activeTab === "users" && (
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Users & Roles</h3>
-              <p className="text-sm text-muted-foreground">Manage clinic staff and their permissions.</p>
-              <PermissionGuard permission="manage_users" fallback={<p className="text-muted-foreground">You don't have permission to manage users.</p>}>
+              <h3 className="font-semibold text-lg">{t("settings.usersRoles")}</h3>
+              <p className="text-sm text-muted-foreground">{t("settings.manageStaff")}</p>
+              <PermissionGuard permission="manage_users" fallback={<p className="text-muted-foreground">{t("settings.noPermission")}</p>}>
                 <div className="space-y-3">
                   {["Dr. Sarah Ahmed - Admin", "Dr. John Smith - Doctor", "Emily Davis - Receptionist", "Nurse Mary - Nurse", "Ahmed Ali - Accountant"].map((u, i) => (
                     <div key={i} className="flex items-center justify-between p-3 rounded-lg border">
@@ -99,10 +99,15 @@ export const SettingsPage = () => {
 
           {activeTab === "notifications" && (
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Notification Preferences</h3>
-              {["Appointment Reminders", "Lab Results Ready", "Billing Alerts", "System Updates"].map((pref, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-lg border">
-                  <span className="text-sm">{pref}</span>
+              <h3 className="font-semibold text-lg">{t("settings.notifPreferences")}</h3>
+              {[
+                { key: "appointmentReminders", label: t("settings.appointmentReminders") },
+                { key: "labResultsReady", label: t("settings.labResultsReady") },
+                { key: "billingAlerts", label: t("settings.billingAlerts") },
+                { key: "systemUpdates", label: t("settings.systemUpdates") },
+              ].map((pref) => (
+                <div key={pref.key} className="flex items-center justify-between p-3 rounded-lg border">
+                  <span className="text-sm">{pref.label}</span>
                   <input type="checkbox" defaultChecked className="h-4 w-4 rounded border-input accent-primary" />
                 </div>
               ))}
@@ -111,10 +116,9 @@ export const SettingsPage = () => {
 
           {activeTab === "appearance" && (
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Appearance</h3>
-              <p className="text-sm text-muted-foreground">Customize the look and feel of your clinic dashboard.</p>
+              <h3 className="font-semibold text-lg">{t("settings.appearance")}</h3>
               <div className="p-6 rounded-lg bg-muted/50 text-center text-muted-foreground">
-                Theme customization coming soon
+                {t("settings.themeCustomization")}
               </div>
             </div>
           )}
