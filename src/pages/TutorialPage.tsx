@@ -220,25 +220,47 @@ export const TutorialPage = () => {
           </h2>
           <div className="grid sm:grid-cols-2 gap-4">
             {features.map((feature, idx) => (
-              <div key={idx} className="bg-card rounded-xl border p-5 hover:shadow-sm transition-shadow">
-                <div className="flex items-start gap-3 mb-3">
-                  <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                    <feature.icon className="h-4.5 w-4.5" />
+              <div key={idx} className="bg-card rounded-xl border hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col group">
+                {/* Video Thumbnail */}
+                <div 
+                  className="relative aspect-video bg-muted border-b cursor-pointer overflow-hidden"
+                  onClick={() => setSelectedVideo({ title: feature.title, url: feature.demoUrl, description: feature.description })}
+                >
+                  <img 
+                    src={feature.thumbnail} 
+                    alt={`${feature.title} demo`} 
+                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-colors">
+                    <div className="h-12 w-12 rounded-full bg-background/90 backdrop-blur shadow-lg flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300">
+                      <Play className="h-5 w-5 text-primary ml-1" />
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground text-sm">{feature.title}</h3>
-                    <p className="text-sm text-muted-foreground mt-1">{feature.description}</p>
+                  <div className="absolute bottom-2 right-2 bg-black/70 backdrop-blur-sm text-white text-[10px] font-medium px-2 py-1 rounded-md">
+                    Watch demo
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5 ms-12">
-                  {feature.forRoles.map((role) => (
-                    <span
-                      key={role}
-                      className={cn("text-xs px-2 py-0.5 rounded-full font-medium", roleColors[role] ?? "bg-muted text-muted-foreground")}
-                    >
-                      {role}
-                    </span>
-                  ))}
+
+                <div className="p-5 flex-1 flex flex-col">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                      <feature.icon className="h-4.5 w-4.5" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-foreground text-sm">{feature.title}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">{feature.description}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mt-auto pt-4 border-t">
+                    {feature.forRoles.map((role) => (
+                      <span
+                        key={role}
+                        className={cn("text-xs px-2 py-0.5 rounded-full font-medium", roleColors[role] ?? "bg-muted text-muted-foreground")}
+                      >
+                        {role}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
             ))}
