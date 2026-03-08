@@ -344,6 +344,34 @@ export const TutorialPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Video Modal */}
+      <Dialog open={!!selectedVideo} onOpenChange={(open) => !open && setSelectedVideo(null)}>
+        <DialogContent className="sm:max-w-[800px] p-0 overflow-hidden bg-background">
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle className="text-xl flex items-center gap-2">
+              <Play className="h-5 w-5 text-primary" />
+              {selectedVideo?.title} {t("tutorial.gettingStartedGuide", "Demo")}
+            </DialogTitle>
+            <DialogDescription className="text-base mt-2">
+              {selectedVideo?.description}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-6 pt-4">
+            <div className="relative aspect-video rounded-xl overflow-hidden bg-muted border shadow-inner">
+              {selectedVideo && (
+                <iframe
+                  src={selectedVideo.url}
+                  title={`${selectedVideo.title} Video Walkthrough`}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="absolute inset-0 w-full h-full border-0"
+                ></iframe>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
