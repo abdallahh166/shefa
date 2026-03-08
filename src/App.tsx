@@ -8,8 +8,15 @@ import { ClinicLayout } from "./layouts/ClinicLayout";
 import { ProtectedRoute } from "./core/auth/ProtectedRoute";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { PatientsPage } from "./features/patients/PatientsPage";
+import { PatientDetailPage } from "./features/patients/PatientDetailPage";
 import { AppointmentsPage } from "./features/appointments/AppointmentsPage";
 import { DoctorsPage } from "./features/doctors/DoctorsPage";
+import { BillingPage } from "./features/billing/BillingPage";
+import { PharmacyPage } from "./features/pharmacy/PharmacyPage";
+import { LaboratoryPage } from "./features/laboratory/LaboratoryPage";
+import { InsurancePage } from "./features/insurance/InsurancePage";
+import { ReportsPage } from "./features/reports/ReportsPage";
+import { SettingsPage } from "./features/settings/SettingsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,8 +42,15 @@ const App = () => (
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="patients" element={<PatientsPage />} />
+            <Route path="patients/:patientId" element={<PatientDetailPage />} />
             <Route path="appointments" element={<AppointmentsPage />} />
             <Route path="doctors" element={<DoctorsPage />} />
+            <Route path="billing" element={<BillingPage />} />
+            <Route path="pharmacy" element={<PharmacyPage />} />
+            <Route path="laboratory" element={<LaboratoryPage />} />
+            <Route path="insurance" element={<InsurancePage />} />
+            <Route path="reports" element={<ReportsPage />} />
+            <Route path="settings" element={<SettingsPage />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />
