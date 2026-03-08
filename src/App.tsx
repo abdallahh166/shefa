@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
+import { TutorialPage } from "./pages/TutorialPage";
 import { ClinicLayout } from "./layouts/ClinicLayout";
 import { ProtectedRoute } from "./core/auth/ProtectedRoute";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
@@ -33,6 +34,7 @@ const App = () => (
           <Route path="/login" element={<LoginPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/tutorial" element={<TutorialPage />} />
           <Route path="/" element={<Navigate to="/login" replace />} />
 
           <Route
