@@ -2,10 +2,11 @@ import { NavLink, Outlet, useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/core/auth/authStore";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
+import { NotificationCenter } from "@/shared/components/NotificationCenter";
 import {
   LayoutDashboard, Users, CalendarDays, Stethoscope,
   Receipt, Pill, FlaskConical, Shield, BarChart3,
-  Settings, Bell, LogOut, Menu, X, Search,
+  Settings, LogOut, Menu, X, Search,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
