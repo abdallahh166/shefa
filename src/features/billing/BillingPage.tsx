@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { StatCard } from "@/shared/components/StatCard";
 import { StatusBadge } from "@/shared/components/StatusBadge";
@@ -5,40 +6,59 @@ import { DataTable, Column } from "@/shared/components/DataTable";
 import { Button } from "@/components/ui/button";
 import { PermissionGuard } from "@/core/auth/PermissionGuard";
 import { DollarSign, CreditCard, FileText, TrendingUp, Plus } from "lucide-react";
-import { useState } from "react";
 import { NewInvoiceModal } from "./NewInvoiceModal";
+import { useSupabaseTable } from "@/hooks/useSupabaseQuery";
+import { useAuth } from "@/core/auth/authStore";
+import { useQueryClient } from "@tanstack/react-query";
+import { Tables } from "@/integrations/supabase/types";
 
-interface Invoice {
-  id: string;
-  patient: string;
-  service: string;
-  amount: number;
-  date: string;
-  status: "paid" | "pending" | "overdue";
-}
+type Invoice = Tables<"invoices"> & { patients?: { full_name: string } | null };
 
-const DEMO_INVOICES: Invoice[] = [
-  { id: "INV-001", patient: "Mohammed Al-Rashid", service: "Cardiology Consultation", amount: 350, date: "2026-03-08", status: "paid" },
-  { id: "INV-002", patient: "Fatima Hassan", service: "Follow-up Visit", amount: 150, date: "2026-03-07", status: "paid" },
-  { id: "INV-003", patient: "Ali Mansour", service: "Lab Work - Complete Panel", amount: 520, date: "2026-03-06", status: "pending" },
-  { id: "INV-004", patient: "Noor Ibrahim", service: "Pediatric Check-up", amount: 200, date: "2026-03-05", status: "overdue" },
-  { id: "INV-005", patient: "Khalid Omar", service: "X-Ray + Consultation", amount: 480, date: "2026-03-04", status: "paid" },
-  { id: "INV-006", patient: "Sara Al-Fahad", service: "Dermatology Treatment", amount: 300, date: "2026-03-03", status: "pending" },
+const DEMO_INVOICES = [
+  { id: "1", invoice_code: "INV-001", patient_name: "Mohammed Al-Rashid", service: "Cardiology Consultation", amount: 350, invoice_date: "2026-03-08", status: "paid" },
+  { id: "2", invoice_code: "INV-002", patient_name: "Fatima Hassan", service: "Follow-up Visit", amount: 150, invoice_date: "2026-03-07", status: "paid" },
+  { id: "3", invoice_code: "INV-003", patient_name: "Ali Mansour", service: "Lab Work - Complete Panel", amount: 520, invoice_date: "2026-03-06", status: "pending" },
+  { id: "4", invoice_code: "INV-004", patient_name: "Noor Ibrahim", service: "Pediatric Check-up", amount: 200, invoice_date: "2026-03-05", status: "overdue" },
 ];
 
 const statusVariant = { paid: "success", pending: "warning", overdue: "destructive" } as const;
 
 export const BillingPage = () => {
   const { t } = useI18n();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const isDemo = user?.tenantId === "demo";
   const [showModal, setShowModal] = useState(false);
 
-  const columns: Column<Invoice>[] = [
-    { key: "id", header: t("billing.invoiceNumber"), render: (inv) => <span className="font-medium">{inv.id}</span> },
-    { key: "patient", header: t("appointments.patient") },
-    { key: "service", header: t("common.service") },
+  const { data: liveInvoices = [], isLoading } = useSupabaseTable<Invoice>("invoices", {
+    select: "*, patients(full_name)",
+    orderBy: { column: "created_at", ascending: false },
+  });
+
+  const { data: patients = [] } = useSupabaseTable<Tables<"patients">>("patients");
+
+  const displayData = isDemo
+    ? DEMO_INVOICES
+    : liveInvoices.map((inv) => ({
+        id: inv.id,
+        invoice_code: inv.invoice_code,
+        patient_name: inv.patients?.full_name ?? "—",
+        service: inv.service,
+        amount: Number(inv.amount),
+        invoice_date: inv.invoice_date,
+        status: inv.status,
+      }));
+
+  const totalRevenue = displayData.filter((i) => i.status === "paid").reduce((s, i) => s + i.amount, 0);
+  const pendingAmount = displayData.filter((i) => i.status === "pending" || i.status === "overdue").reduce((s, i) => s + i.amount, 0);
+
+  const columns: Column<typeof displayData[0]>[] = [
+    { key: "invoice_code", header: t("billing.invoiceNumber"), searchable: true, render: (inv) => <span className="font-medium">{inv.invoice_code}</span> },
+    { key: "patient_name", header: t("appointments.patient"), searchable: true },
+    { key: "service", header: t("common.service"), searchable: true },
     { key: "amount", header: t("common.amount"), render: (inv) => <span className="font-semibold">${inv.amount}</span> },
-    { key: "date", header: t("common.date") },
-    { key: "status", header: t("common.status"), render: (inv) => <StatusBadge variant={statusVariant[inv.status]}>{t(`billing.${inv.status}`)}</StatusBadge> },
+    { key: "invoice_date", header: t("common.date") },
+    { key: "status", header: t("common.status"), render: (inv) => <StatusBadge variant={(statusVariant as any)[inv.status] ?? "default"}>{inv.status}</StatusBadge> },
   ];
 
   return (
@@ -51,19 +71,19 @@ export const BillingPage = () => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title={t("billing.totalRevenue")} value="$48,250" icon={DollarSign} trend={{ value: 12, positive: true }} />
-        <StatCard title={t("billing.pendingPayments")} value="$3,420" icon={CreditCard} />
-        <StatCard title={t("billing.invoicesThisMonth")} value="86" icon={FileText} trend={{ value: 8, positive: true }} />
-        <StatCard title={t("billing.collectionRate")} value="94.2%" icon={TrendingUp} />
+        <StatCard title={t("billing.totalRevenue")} value={`$${totalRevenue.toLocaleString()}`} icon={DollarSign} />
+        <StatCard title={t("billing.pendingPayments")} value={`$${pendingAmount.toLocaleString()}`} icon={CreditCard} />
+        <StatCard title={t("billing.invoicesThisMonth")} value={String(displayData.length)} icon={FileText} />
+        <StatCard title={t("billing.collectionRate")} value={displayData.length ? `${Math.round((displayData.filter((i) => i.status === "paid").length / displayData.length) * 100)}%` : "—"} icon={TrendingUp} />
       </div>
 
-      <DataTable columns={columns} data={DEMO_INVOICES} keyExtractor={(inv) => inv.id} />
+      <DataTable columns={columns} data={displayData} keyExtractor={(inv) => inv.id} searchable isLoading={!isDemo && isLoading} />
 
       <NewInvoiceModal
         open={showModal}
         onClose={() => setShowModal(false)}
-        onSuccess={() => {}}
-        patients={[]}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["invoices"] })}
+        patients={patients.map((p) => ({ id: p.id, full_name: p.full_name }))}
       />
     </div>
   );
