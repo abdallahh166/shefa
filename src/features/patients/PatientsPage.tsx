@@ -30,6 +30,8 @@ const DEMO_PATIENTS: Patient[] = [
 
 export const PatientsPage = () => {
   const { t } = useI18n();
+  const navigate = useNavigate();
+  const { clinicSlug } = useParams();
   const [search, setSearch] = useState("");
 
   const filtered = DEMO_PATIENTS.filter((p) =>
