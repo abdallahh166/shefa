@@ -48,39 +48,25 @@ export const LoginPage = () => {
     }
     setLoading(true);
 
-    // Create tenant first
+    // Create tenant via secure function
     const slug = clinicName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    const { data: tenant, error: tenantErr } = await supabase
-      .from("tenants")
-      .insert({ name: clinicName, slug })
-      .select()
-      .single();
+    const { data: tenantId, error: tenantErr } = await supabase.rpc("create_tenant_and_signup", {
+      _name: clinicName,
+      _slug: slug,
+    });
 
-    if (tenantErr) {
-      // If RLS blocks, try signup with metadata
-      const { error: signupErr } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { full_name: fullName, role: "clinic_admin" },
-          emailRedirectTo: window.location.origin,
-        },
-      });
-      if (signupErr) {
-        toast({ title: "Signup failed", description: signupErr.message, variant: "destructive" });
-      } else {
-        toast({ title: "Check your email", description: "We sent you a confirmation link." });
-      }
-      setLoading(false);
-      return;
-    }
+    const tenantIdValue = tenantErr ? undefined : tenantId;
 
     // Sign up with tenant_id in metadata
     const { error: signupErr } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { full_name: fullName, tenant_id: tenant.id, role: "clinic_admin" },
+        data: {
+          full_name: fullName,
+          tenant_id: tenantIdValue,
+          role: "clinic_admin",
+        },
         emailRedirectTo: window.location.origin,
       },
     });
