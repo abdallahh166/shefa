@@ -351,7 +351,7 @@ export const TutorialPage = () => {
           <DialogHeader className="p-6 pb-0">
             <DialogTitle className="text-xl flex items-center gap-2">
               <Play className="h-5 w-5 text-primary" />
-              {selectedVideo?.title} {t("tutorial.gettingStartedGuide", "Demo")}
+              {selectedVideo?.title} Demo
             </DialogTitle>
             <DialogDescription className="text-base mt-2">
               {selectedVideo?.description}
