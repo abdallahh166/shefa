@@ -5,6 +5,8 @@ import { DataTable, Column } from "@/shared/components/DataTable";
 import { Button } from "@/components/ui/button";
 import { PermissionGuard } from "@/core/auth/PermissionGuard";
 import { DollarSign, CreditCard, FileText, TrendingUp, Plus } from "lucide-react";
+import { useState } from "react";
+import { NewInvoiceModal } from "./NewInvoiceModal";
 
 interface Invoice {
   id: string;
@@ -28,33 +30,41 @@ const statusVariant = { paid: "success", pending: "warning", overdue: "destructi
 
 export const BillingPage = () => {
   const { t } = useI18n();
+  const [showModal, setShowModal] = useState(false);
 
   const columns: Column<Invoice>[] = [
-    { key: "id", header: "Invoice #", render: (inv) => <span className="font-medium">{inv.id}</span> },
+    { key: "id", header: t("billing.invoiceNumber"), render: (inv) => <span className="font-medium">{inv.id}</span> },
     { key: "patient", header: t("appointments.patient") },
-    { key: "service", header: "Service" },
-    { key: "amount", header: "Amount", render: (inv) => <span className="font-semibold">${inv.amount}</span> },
+    { key: "service", header: t("common.service") },
+    { key: "amount", header: t("common.amount"), render: (inv) => <span className="font-semibold">${inv.amount}</span> },
     { key: "date", header: t("common.date") },
-    { key: "status", header: t("common.status"), render: (inv) => <StatusBadge variant={statusVariant[inv.status]}>{inv.status}</StatusBadge> },
+    { key: "status", header: t("common.status"), render: (inv) => <StatusBadge variant={statusVariant[inv.status]}>{t(`billing.${inv.status}`)}</StatusBadge> },
   ];
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="page-header">
-        <h1 className="page-title">{t("common.billing")}</h1>
+        <h1 className="page-title">{t("billing.title")}</h1>
         <PermissionGuard permission="manage_billing">
-          <Button><Plus className="h-4 w-4" /> New Invoice</Button>
+          <Button onClick={() => setShowModal(true)}><Plus className="h-4 w-4" /> {t("billing.newInvoice")}</Button>
         </PermissionGuard>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total Revenue" value="$48,250" icon={DollarSign} trend={{ value: 12, positive: true }} />
-        <StatCard title="Pending Payments" value="$3,420" icon={CreditCard} />
-        <StatCard title="Invoices This Month" value="86" icon={FileText} trend={{ value: 8, positive: true }} />
-        <StatCard title="Collection Rate" value="94.2%" icon={TrendingUp} />
+        <StatCard title={t("billing.totalRevenue")} value="$48,250" icon={DollarSign} trend={{ value: 12, positive: true }} />
+        <StatCard title={t("billing.pendingPayments")} value="$3,420" icon={CreditCard} />
+        <StatCard title={t("billing.invoicesThisMonth")} value="86" icon={FileText} trend={{ value: 8, positive: true }} />
+        <StatCard title={t("billing.collectionRate")} value="94.2%" icon={TrendingUp} />
       </div>
 
       <DataTable columns={columns} data={DEMO_INVOICES} keyExtractor={(inv) => inv.id} />
+
+      <NewInvoiceModal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        onSuccess={() => {}}
+        patients={[]}
+      />
     </div>
   );
 };

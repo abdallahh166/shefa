@@ -25,13 +25,13 @@ const navItems = [
 
 export const ClinicLayout = () => {
   const { clinicSlug } = useParams();
-  const { user, tenant, logout, hasPermission } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate("/login");
   };
 
@@ -52,7 +52,7 @@ export const ClinicLayout = () => {
           </div>
           <div>
             <h1 className="font-semibold text-sm text-sidebar-primary-foreground">{t("common.appName")}</h1>
-            <p className="text-xs text-sidebar-foreground/60 truncate max-w-[150px]">{tenant?.name}</p>
+            <p className="text-xs text-sidebar-foreground/60 truncate max-w-[150px]">{user?.tenantName}</p>
           </div>
         </div>
 

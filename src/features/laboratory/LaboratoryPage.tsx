@@ -30,26 +30,26 @@ export const LaboratoryPage = () => {
   const { t } = useI18n();
 
   const columns: Column<LabOrder>[] = [
-    { key: "id", header: "Order #", render: (l) => <span className="font-medium">{l.id}</span> },
+    { key: "id", header: t("laboratory.orderNumber"), render: (l) => <span className="font-medium">{l.id}</span> },
     { key: "patient", header: t("appointments.patient") },
-    { key: "test", header: "Test" },
-    { key: "orderedBy", header: "Ordered By" },
+    { key: "test", header: t("laboratory.test") },
+    { key: "orderedBy", header: t("laboratory.orderedBy") },
     { key: "date", header: t("common.date") },
-    { key: "status", header: t("common.status"), render: (l) => <StatusBadge variant={statusVariant[l.status]}>{l.status}</StatusBadge> },
-    { key: "result", header: "Result", render: (l) => l.result ? <span className="font-medium">{l.result}</span> : <span className="text-muted-foreground">—</span> },
+    { key: "status", header: t("common.status"), render: (l) => <StatusBadge variant={statusVariant[l.status]}>{l.status === "processing" ? t("laboratory.processing") : l.status === "pending" ? t("appointments.scheduled") : t("appointments.completed")}</StatusBadge> },
+    { key: "result", header: t("common.result"), render: (l) => l.result ? <span className="font-medium">{l.result}</span> : <span className="text-muted-foreground">—</span> },
   ];
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="page-header">
-        <h1 className="page-title">{t("common.laboratory")}</h1>
-        <Button><Plus className="h-4 w-4" /> New Lab Order</Button>
+        <h1 className="page-title">{t("laboratory.title")}</h1>
+        <Button><Plus className="h-4 w-4" /> {t("laboratory.newLabOrder")}</Button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard title="Pending Orders" value="12" icon={Clock} />
-        <StatCard title="Processing" value="8" icon={FlaskConical} />
-        <StatCard title="Completed Today" value="24" icon={CheckCircle} />
+        <StatCard title={t("laboratory.pendingOrders")} value="12" icon={Clock} />
+        <StatCard title={t("laboratory.processing")} value="8" icon={FlaskConical} />
+        <StatCard title={t("laboratory.completedToday")} value="24" icon={CheckCircle} />
       </div>
 
       <DataTable columns={columns} data={DEMO_LABS} keyExtractor={(l) => l.id} />
