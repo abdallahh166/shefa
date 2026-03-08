@@ -4,40 +4,43 @@ import { StatusBadge } from "@/shared/components/StatusBadge";
 import { StatCard } from "@/shared/components/StatCard";
 import { Button } from "@/components/ui/button";
 import { Pill, Package, AlertTriangle, Plus } from "lucide-react";
+import { useSupabaseTable } from "@/hooks/useSupabaseQuery";
+import { useAuth } from "@/core/auth/authStore";
+import { Tables } from "@/integrations/supabase/types";
 
-interface Medication {
-  id: string;
-  name: string;
-  category: string;
-  stock: number;
-  unit: string;
-  price: number;
-  status: "in_stock" | "low_stock" | "out_of_stock";
-}
+type Medication = Tables<"medications">;
 
-const DEMO_MEDS: Medication[] = [
-  { id: "MED-001", name: "Lisinopril 10mg", category: "Antihypertensive", stock: 450, unit: "tablets", price: 12.50, status: "in_stock" },
-  { id: "MED-002", name: "Metformin 500mg", category: "Antidiabetic", stock: 380, unit: "tablets", price: 8.00, status: "in_stock" },
-  { id: "MED-003", name: "Amoxicillin 500mg", category: "Antibiotic", stock: 25, unit: "capsules", price: 15.00, status: "low_stock" },
-  { id: "MED-004", name: "Omeprazole 20mg", category: "Proton Pump Inhibitor", stock: 200, unit: "capsules", price: 10.00, status: "in_stock" },
-  { id: "MED-005", name: "Atorvastatin 20mg", category: "Statin", stock: 0, unit: "tablets", price: 18.00, status: "out_of_stock" },
-  { id: "MED-006", name: "Ibuprofen 400mg", category: "NSAID", stock: 520, unit: "tablets", price: 6.50, status: "in_stock" },
+const DEMO_MEDS = [
+  { id: "1", name: "Lisinopril 10mg", category: "Antihypertensive", stock: 450, unit: "tablets", price: 12.5, status: "in_stock" },
+  { id: "2", name: "Metformin 500mg", category: "Antidiabetic", stock: 380, unit: "tablets", price: 8.0, status: "in_stock" },
+  { id: "3", name: "Amoxicillin 500mg", category: "Antibiotic", stock: 25, unit: "capsules", price: 15.0, status: "low_stock" },
+  { id: "4", name: "Omeprazole 20mg", category: "Proton Pump Inhibitor", stock: 200, unit: "capsules", price: 10.0, status: "in_stock" },
+  { id: "5", name: "Atorvastatin 20mg", category: "Statin", stock: 0, unit: "tablets", price: 18.0, status: "out_of_stock" },
 ];
 
-const statusKey = { in_stock: "inStock", low_stock: "lowStock", out_of_stock: "outOfStock" } as const;
-const statusVariant = { in_stock: "success", low_stock: "warning", out_of_stock: "destructive" } as const;
+const statusVariant: Record<string, "success" | "warning" | "destructive"> = { in_stock: "success", low_stock: "warning", out_of_stock: "destructive" };
 
 export const PharmacyPage = () => {
   const { t } = useI18n();
+  const { user } = useAuth();
+  const isDemo = user?.tenantId === "demo";
 
-  const columns: Column<Medication>[] = [
-    { key: "id", header: "ID" },
-    { key: "name", header: t("pharmacy.medication"), render: (m) => <span className="font-medium">{m.name}</span> },
-    { key: "category", header: t("common.category") },
+  const { data: liveMeds = [], isLoading } = useSupabaseTable<Medication>("medications");
+
+  const meds = isDemo ? DEMO_MEDS : liveMeds.map((m) => ({
+    id: m.id, name: m.name, category: m.category ?? "", stock: m.stock, unit: m.unit, price: Number(m.price), status: m.status,
+  }));
+
+  const columns: Column<typeof meds[0]>[] = [
+    { key: "name", header: t("pharmacy.medication"), searchable: true, render: (m) => <span className="font-medium">{m.name}</span> },
+    { key: "category", header: t("common.category"), searchable: true },
     { key: "stock", header: t("common.stock"), render: (m) => `${m.stock} ${m.unit}` },
     { key: "price", header: t("common.price"), render: (m) => `$${m.price.toFixed(2)}` },
-    { key: "status", header: t("common.status"), render: (m) => <StatusBadge variant={statusVariant[m.status]}>{t(`pharmacy.${statusKey[m.status]}`)}</StatusBadge> },
+    { key: "status", header: t("common.status"), render: (m) => <StatusBadge variant={statusVariant[m.status] ?? "default"}>{m.status.replace(/_/g, " ")}</StatusBadge> },
   ];
+
+  const lowStock = meds.filter((m) => m.status === "low_stock").length;
+  const totalValue = meds.reduce((s, m) => s + m.price * m.stock, 0);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -47,12 +50,12 @@ export const PharmacyPage = () => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard title={t("pharmacy.totalMedications")} value="124" icon={Pill} />
-        <StatCard title={t("pharmacy.lowStockItems")} value="8" icon={AlertTriangle} />
-        <StatCard title={t("pharmacy.inventoryValue")} value="$34,580" icon={Package} />
+        <StatCard title={t("pharmacy.totalMedications")} value={String(meds.length)} icon={Pill} />
+        <StatCard title={t("pharmacy.lowStockItems")} value={String(lowStock)} icon={AlertTriangle} />
+        <StatCard title={t("pharmacy.inventoryValue")} value={`$${totalValue.toLocaleString()}`} icon={Package} />
       </div>
 
-      <DataTable columns={columns} data={DEMO_MEDS} keyExtractor={(m) => m.id} />
+      <DataTable columns={columns} data={meds} keyExtractor={(m) => m.id} searchable isLoading={!isDemo && isLoading} />
     </div>
   );
 };

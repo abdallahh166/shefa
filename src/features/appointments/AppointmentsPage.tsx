@@ -1,48 +1,76 @@
+import { useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { DataTable, Column } from "@/shared/components/DataTable";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { PermissionGuard } from "@/core/auth/PermissionGuard";
 import { CalendarPlus } from "lucide-react";
+import { useSupabaseTable } from "@/hooks/useSupabaseQuery";
+import { useAuth } from "@/core/auth/authStore";
+import { NewAppointmentModal } from "./NewAppointmentModal";
+import { useQueryClient } from "@tanstack/react-query";
+import { Tables } from "@/integrations/supabase/types";
 
-interface Appointment {
-  id: string;
-  patient: string;
-  doctor: string;
-  dateTime: string;
-  type: "checkup" | "followUp" | "consultation" | "emergency";
-  status: "scheduled" | "completed" | "cancelled" | "inProgress";
-}
+type Appointment = Tables<"appointments"> & {
+  patients?: { full_name: string } | null;
+  doctors?: { full_name: string } | null;
+};
 
-const DEMO_APPOINTMENTS: Appointment[] = [
-  { id: "1", patient: "Mohammed Al-Rashid", doctor: "Dr. Sarah Ahmed", dateTime: "2026-03-08 09:00", type: "checkup", status: "completed" },
-  { id: "2", patient: "Fatima Hassan", doctor: "Dr. John Smith", dateTime: "2026-03-08 10:30", type: "followUp", status: "inProgress" },
-  { id: "3", patient: "Ali Mansour", doctor: "Dr. Sarah Ahmed", dateTime: "2026-03-08 11:00", type: "consultation", status: "scheduled" },
-  { id: "4", patient: "Noor Ibrahim", doctor: "Dr. Layla Khalid", dateTime: "2026-03-08 14:00", type: "checkup", status: "scheduled" },
-  { id: "5", patient: "Khalid Omar", doctor: "Dr. John Smith", dateTime: "2026-03-08 15:30", type: "emergency", status: "cancelled" },
-  { id: "6", patient: "Sara Al-Fahad", doctor: "Dr. Sarah Ahmed", dateTime: "2026-03-09 09:00", type: "followUp", status: "scheduled" },
+const DEMO_APPOINTMENTS = [
+  { id: "1", patient_name: "Mohammed Al-Rashid", doctor_name: "Dr. Sarah Ahmed", appointment_date: "2026-03-08 09:00", type: "checkup", status: "completed" },
+  { id: "2", patient_name: "Fatima Hassan", doctor_name: "Dr. John Smith", appointment_date: "2026-03-08 10:30", type: "follow_up", status: "in_progress" },
+  { id: "3", patient_name: "Ali Mansour", doctor_name: "Dr. Sarah Ahmed", appointment_date: "2026-03-08 11:00", type: "consultation", status: "scheduled" },
+  { id: "4", patient_name: "Noor Ibrahim", doctor_name: "Dr. Layla Khalid", appointment_date: "2026-03-08 14:00", type: "checkup", status: "scheduled" },
+  { id: "5", patient_name: "Khalid Omar", doctor_name: "Dr. John Smith", appointment_date: "2026-03-08 15:30", type: "emergency", status: "cancelled" },
 ];
 
-const statusVariant = { completed: "success", inProgress: "info", scheduled: "default", cancelled: "destructive" } as const;
-const typeVariant = { checkup: "default", followUp: "info", consultation: "success", emergency: "warning" } as const;
+const statusVariant = { completed: "success", in_progress: "info", scheduled: "default", cancelled: "destructive" } as const;
 
 export const AppointmentsPage = () => {
   const { t } = useI18n();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const isDemo = user?.tenantId === "demo";
+  const [showModal, setShowModal] = useState(false);
 
-  const columns: Column<Appointment>[] = [
-    { key: "patient", header: t("appointments.patient"), render: (a) => <span className="font-medium">{a.patient}</span> },
-    { key: "doctor", header: t("appointments.doctor") },
-    { key: "dateTime", header: t("appointments.dateTime") },
-    { key: "type", header: t("appointments.type"), render: (a) => <StatusBadge variant={typeVariant[a.type]}>{t(`appointments.${a.type}`)}</StatusBadge> },
-    { key: "status", header: t("common.status"), render: (a) => <StatusBadge variant={statusVariant[a.status]}>{t(`appointments.${a.status}`)}</StatusBadge> },
+  const { data: liveAppointments = [], isLoading } = useSupabaseTable<Appointment>("appointments", {
+    select: "*, patients(full_name), doctors(full_name)",
+    orderBy: { column: "appointment_date", ascending: false },
+  });
+
+  const { data: patients = [] } = useSupabaseTable<Tables<"patients">>("patients");
+  const { data: doctors = [] } = useSupabaseTable<Tables<"doctors">>("doctors");
+
+  const displayData = isDemo
+    ? DEMO_APPOINTMENTS
+    : liveAppointments.map((a) => ({
+        id: a.id,
+        patient_name: a.patients?.full_name ?? "—",
+        doctor_name: a.doctors?.full_name ?? "—",
+        appointment_date: a.appointment_date,
+        type: a.type,
+        status: a.status,
+      }));
+
+  const columns: Column<typeof displayData[0]>[] = [
+    { key: "patient_name", header: t("appointments.patient"), searchable: true, render: (a) => <span className="font-medium">{a.patient_name}</span> },
+    { key: "doctor_name", header: t("appointments.doctor"), searchable: true },
+    { key: "appointment_date", header: t("appointments.dateTime") },
+    { key: "type", header: t("appointments.type"), render: (a) => <StatusBadge variant="default">{a.type}</StatusBadge> },
+    { key: "status", header: t("common.status"), render: (a) => <StatusBadge variant={(statusVariant as any)[a.status] ?? "default"}>{a.status}</StatusBadge> },
   ];
+
+  const statusCounts = displayData.reduce((acc, a) => {
+    acc[a.status] = (acc[a.status] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="page-header">
         <h1 className="page-title">{t("appointments.title")}</h1>
         <PermissionGuard permission="manage_appointments">
-          <Button>
+          <Button onClick={() => setShowModal(true)}>
             <CalendarPlus className="h-4 w-4" />
             {t("appointments.newAppointment")}
           </Button>
@@ -50,18 +78,29 @@ export const AppointmentsPage = () => {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {(["scheduled", "inProgress", "completed", "cancelled"] as const).map((status) => {
-          const count = DEMO_APPOINTMENTS.filter((a) => a.status === status).length;
-          return (
-            <div key={status} className="stat-card text-center">
-              <p className="text-2xl font-bold">{count}</p>
-              <p className="text-sm text-muted-foreground">{t(`appointments.${status}`)}</p>
-            </div>
-          );
-        })}
+        {(["scheduled", "in_progress", "completed", "cancelled"] as const).map((status) => (
+          <div key={status} className="stat-card text-center">
+            <p className="text-2xl font-bold">{statusCounts[status] ?? 0}</p>
+            <p className="text-sm text-muted-foreground">{status.replace("_", " ")}</p>
+          </div>
+        ))}
       </div>
 
-      <DataTable columns={columns} data={DEMO_APPOINTMENTS} keyExtractor={(a) => a.id} />
+      <DataTable
+        columns={columns}
+        data={displayData}
+        keyExtractor={(a) => a.id}
+        searchable
+        isLoading={!isDemo && isLoading}
+      />
+
+      <NewAppointmentModal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["appointments"] })}
+        patients={patients.map((p) => ({ id: p.id, full_name: p.full_name }))}
+        doctors={doctors.map((d) => ({ id: d.id, full_name: d.full_name }))}
+      />
     </div>
   );
 };
