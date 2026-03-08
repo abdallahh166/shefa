@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Permission } from "./types";
+import { Permission } from "./authStore";
 import { useAuth } from "./authStore";
 
 interface PermissionGuardProps {
