@@ -20,7 +20,7 @@ const tabs: { key: Tab; icon: any; label: string }[] = [
 
 export const SettingsPage = () => {
   const { t } = useI18n();
-  const { tenant } = useAuth();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("general");
 
   return (
