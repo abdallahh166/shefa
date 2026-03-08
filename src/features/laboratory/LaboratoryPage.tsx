@@ -4,40 +4,53 @@ import { StatusBadge } from "@/shared/components/StatusBadge";
 import { StatCard } from "@/shared/components/StatCard";
 import { Button } from "@/components/ui/button";
 import { FlaskConical, Clock, CheckCircle, Plus } from "lucide-react";
+import { useSupabaseTable } from "@/hooks/useSupabaseQuery";
+import { useAuth } from "@/core/auth/authStore";
+import { Tables } from "@/integrations/supabase/types";
 
-interface LabOrder {
-  id: string;
-  patient: string;
-  test: string;
-  orderedBy: string;
-  date: string;
-  status: "pending" | "processing" | "completed";
-  result?: string;
-}
+type LabOrder = Tables<"lab_orders"> & {
+  patients?: { full_name: string } | null;
+  doctors?: { full_name: string } | null;
+};
 
-const DEMO_LABS: LabOrder[] = [
-  { id: "LAB-001", patient: "Mohammed Al-Rashid", test: "Complete Blood Count (CBC)", orderedBy: "Dr. Sarah Ahmed", date: "2026-03-08", status: "completed", result: "Normal" },
-  { id: "LAB-002", patient: "Fatima Hassan", test: "HbA1c", orderedBy: "Dr. Sarah Ahmed", date: "2026-03-08", status: "processing" },
-  { id: "LAB-003", patient: "Ali Mansour", test: "Lipid Panel", orderedBy: "Dr. John Smith", date: "2026-03-07", status: "completed", result: "Elevated LDL" },
-  { id: "LAB-004", patient: "Noor Ibrahim", test: "Thyroid Panel (TSH, T3, T4)", orderedBy: "Dr. Layla Khalid", date: "2026-03-07", status: "pending" },
-  { id: "LAB-005", patient: "Khalid Omar", test: "Urinalysis", orderedBy: "Dr. John Smith", date: "2026-03-06", status: "completed", result: "Normal" },
-  { id: "LAB-006", patient: "Sara Al-Fahad", test: "Liver Function Test", orderedBy: "Dr. Sarah Ahmed", date: "2026-03-06", status: "processing" },
+const DEMO_LABS = [
+  { id: "1", patient_name: "Mohammed Al-Rashid", test_name: "Complete Blood Count (CBC)", doctor_name: "Dr. Sarah Ahmed", order_date: "2026-03-08", status: "completed", result: "Normal" },
+  { id: "2", patient_name: "Fatima Hassan", test_name: "HbA1c", doctor_name: "Dr. Sarah Ahmed", order_date: "2026-03-08", status: "processing", result: null },
+  { id: "3", patient_name: "Ali Mansour", test_name: "Lipid Panel", doctor_name: "Dr. John Smith", order_date: "2026-03-07", status: "completed", result: "Elevated LDL" },
+  { id: "4", patient_name: "Noor Ibrahim", test_name: "Thyroid Panel", doctor_name: "Dr. Layla Khalid", order_date: "2026-03-07", status: "pending", result: null },
 ];
 
-const statusVariant = { pending: "default", processing: "warning", completed: "success" } as const;
+const statusVariant: Record<string, "default" | "warning" | "success"> = { pending: "default", processing: "warning", completed: "success" };
 
 export const LaboratoryPage = () => {
   const { t } = useI18n();
+  const { user } = useAuth();
+  const isDemo = user?.tenantId === "demo";
 
-  const columns: Column<LabOrder>[] = [
-    { key: "id", header: t("laboratory.orderNumber"), render: (l) => <span className="font-medium">{l.id}</span> },
-    { key: "patient", header: t("appointments.patient") },
-    { key: "test", header: t("laboratory.test") },
-    { key: "orderedBy", header: t("laboratory.orderedBy") },
-    { key: "date", header: t("common.date") },
-    { key: "status", header: t("common.status"), render: (l) => <StatusBadge variant={statusVariant[l.status]}>{l.status === "processing" ? t("laboratory.processing") : l.status === "pending" ? t("appointments.scheduled") : t("appointments.completed")}</StatusBadge> },
+  const { data: liveLabs = [], isLoading } = useSupabaseTable<LabOrder>("lab_orders", {
+    select: "*, patients(full_name), doctors(full_name)",
+    orderBy: { column: "order_date", ascending: false },
+  });
+
+  const displayData = isDemo
+    ? DEMO_LABS
+    : liveLabs.map((l) => ({
+        id: l.id, patient_name: l.patients?.full_name ?? "—", test_name: l.test_name,
+        doctor_name: l.doctors?.full_name ?? "—", order_date: l.order_date, status: l.status, result: l.result,
+      }));
+
+  const columns: Column<typeof displayData[0]>[] = [
+    { key: "patient_name", header: t("appointments.patient"), searchable: true },
+    { key: "test_name", header: t("laboratory.test"), searchable: true, render: (l) => <span className="font-medium">{l.test_name}</span> },
+    { key: "doctor_name", header: t("laboratory.orderedBy"), searchable: true },
+    { key: "order_date", header: t("common.date") },
+    { key: "status", header: t("common.status"), render: (l) => <StatusBadge variant={statusVariant[l.status] ?? "default"}>{l.status}</StatusBadge> },
     { key: "result", header: t("common.result"), render: (l) => l.result ? <span className="font-medium">{l.result}</span> : <span className="text-muted-foreground">—</span> },
   ];
+
+  const pending = displayData.filter((l) => l.status === "pending").length;
+  const processing = displayData.filter((l) => l.status === "processing").length;
+  const completed = displayData.filter((l) => l.status === "completed").length;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -47,12 +60,12 @@ export const LaboratoryPage = () => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard title={t("laboratory.pendingOrders")} value="12" icon={Clock} />
-        <StatCard title={t("laboratory.processing")} value="8" icon={FlaskConical} />
-        <StatCard title={t("laboratory.completedToday")} value="24" icon={CheckCircle} />
+        <StatCard title={t("laboratory.pendingOrders")} value={String(pending)} icon={Clock} />
+        <StatCard title={t("laboratory.processing")} value={String(processing)} icon={FlaskConical} />
+        <StatCard title={t("laboratory.completedToday")} value={String(completed)} icon={CheckCircle} />
       </div>
 
-      <DataTable columns={columns} data={DEMO_LABS} keyExtractor={(l) => l.id} />
+      <DataTable columns={columns} data={displayData} keyExtractor={(l) => l.id} searchable isLoading={!isDemo && isLoading} />
     </div>
   );
 };
