@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { DataTable, Column } from "@/shared/components/DataTable";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { PermissionGuard } from "@/core/auth/PermissionGuard";
-import { UserPlus, Search } from "lucide-react";
+import { UserPlus, Search, Eye } from "lucide-react";
 
 interface Patient {
   id: string;
@@ -29,6 +30,8 @@ const DEMO_PATIENTS: Patient[] = [
 
 export const PatientsPage = () => {
   const { t } = useI18n();
+  const navigate = useNavigate();
+  const { clinicSlug } = useParams();
   const [search, setSearch] = useState("");
 
   const filtered = DEMO_PATIENTS.filter((p) =>
@@ -63,6 +66,15 @@ export const PatientsPage = () => {
       ),
     },
     { key: "lastVisit", header: t("patients.lastVisit") },
+    {
+      key: "actions",
+      header: t("common.actions"),
+      render: (p) => (
+        <button onClick={() => navigate(`/tenant/${clinicSlug}/patients/${p.id}`)} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+          <Eye className="h-4 w-4" />
+        </button>
+      ),
+    },
   ];
 
   return (
