@@ -1,6 +1,7 @@
-import { ReactNode, useState, useMemo } from "react";
-import { Search } from "lucide-react";
+import { ReactNode, useState, useMemo, useCallback } from "react";
+import { Search, Download } from "lucide-react";
 import { useI18n } from "@/core/i18n/i18nStore";
+import { Button } from "@/components/ui/button";
 
 export interface Column<T> {
   key: string;
@@ -18,6 +19,7 @@ interface DataTableProps<T> {
   searchPlaceholder?: string;
   filterSlot?: ReactNode;
   isLoading?: boolean;
+  exportFileName?: string;
 }
 
 export function DataTable<T>({
@@ -29,6 +31,7 @@ export function DataTable<T>({
   searchPlaceholder,
   filterSlot,
   isLoading = false,
+  exportFileName,
 }: DataTableProps<T>) {
   const { t } = useI18n();
   const [search, setSearch] = useState("");
@@ -45,6 +48,26 @@ export function DataTable<T>({
       })
     );
   }, [data, search, searchable, columns]);
+
+  const exportCsv = useCallback(() => {
+    const headers = columns.filter((c) => c.key !== "actions").map((c) => c.header);
+    const keys = columns.filter((c) => c.key !== "actions").map((c) => c.key);
+    const rows = filtered.map((item) =>
+      keys.map((k) => {
+        const val = (item as any)[k];
+        const str = val == null ? "" : String(val);
+        return str.includes(",") || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
+      })
+    );
+    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${exportFileName || "export"}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [filtered, columns, exportFileName]);
 
   return (
     <div className="space-y-4">
@@ -63,6 +86,12 @@ export function DataTable<T>({
             </div>
           )}
           {filterSlot}
+          {data.length > 0 && (
+            <Button variant="outline" size="sm" onClick={exportCsv} className="ms-auto">
+              <Download className="h-4 w-4" />
+              CSV
+            </Button>
+          )}
         </div>
       )}
 
