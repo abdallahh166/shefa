@@ -73,6 +73,17 @@ export const PatientDetailPage = () => {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const isDemo = user?.tenantId === "demo";
 
+  const { data: tenant } = useQuery({
+    queryKey: ["tenant", user?.tenantId],
+    queryFn: async () => {
+      if (isDemo) return { name: "Demo Clinic", logo_url: null } as any;
+      const { data, error } = await supabase.from("tenants").select("name, logo_url").eq("id", user?.tenantId ?? "").single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.tenantId,
+  });
+
   const tabs: { key: Tab; icon: any; label: string }[] = [
     { key: "overview", icon: User, label: t("patients.overview") },
     { key: "appointments", icon: CalendarDays, label: t("common.appointments") },

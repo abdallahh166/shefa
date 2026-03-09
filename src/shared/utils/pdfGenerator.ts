@@ -119,6 +119,73 @@ export function generatePrescriptionPDF(prescription: any, patient: { full_name:
   doc.save(`prescription-${prescription.id}.pdf`);
 }
 
+type ReportLocale = "en" | "ar";
+
+const labels: Record<ReportLocale, Record<string, string>> = {
+  en: {
+    title: "Patient Report",
+    generatedOn: "Generated on",
+    patientInfo: "Patient Information",
+    name: "Name",
+    dob: "Date of Birth",
+    gender: "Gender",
+    bloodType: "Blood Type",
+    phone: "Phone",
+    email: "Email",
+    insurance: "Insurance",
+    status: "Status",
+    medicalHistory: "Medical History",
+    date: "Date",
+    type: "Type",
+    diagnosis: "Diagnosis",
+    doctor: "Doctor",
+    notes: "Notes",
+    prescriptions: "Prescriptions",
+    medication: "Medication",
+    dosage: "Dosage",
+    labOrders: "Laboratory Orders",
+    test: "Test",
+    result: "Result",
+    billing: "Billing & Invoices",
+    invoice: "Invoice #",
+    service: "Service",
+    amount: "Amount",
+    page: "Page",
+    of: "of",
+  },
+  ar: {
+    title: "تقرير المريض",
+    generatedOn: "تاريخ الإنشاء",
+    patientInfo: "معلومات المريض",
+    name: "الاسم",
+    dob: "تاريخ الميلاد",
+    gender: "الجنس",
+    bloodType: "فصيلة الدم",
+    phone: "الهاتف",
+    email: "البريد الإلكتروني",
+    insurance: "التأمين",
+    status: "الحالة",
+    medicalHistory: "السجل الطبي",
+    date: "التاريخ",
+    type: "النوع",
+    diagnosis: "التشخيص",
+    doctor: "الطبيب",
+    notes: "ملاحظات",
+    prescriptions: "الوصفات الطبية",
+    medication: "الدواء",
+    dosage: "الجرعة",
+    labOrders: "طلبات المختبر",
+    test: "الفحص",
+    result: "النتيجة",
+    billing: "الفواتير والمدفوعات",
+    invoice: "رقم الفاتورة",
+    service: "الخدمة",
+    amount: "المبلغ",
+    page: "صفحة",
+    of: "من",
+  },
+};
+
 interface PatientReportData {
   patient: {
     full_name: string;
@@ -134,10 +201,28 @@ interface PatientReportData {
   prescriptions: Array<{ medication: string; dosage: string; prescribed_date: string; status: string; doctors?: { full_name: string } | null }>;
   labOrders: Array<{ test_name: string; order_date: string; status: string; result?: string | null; doctors?: { full_name: string } | null }>;
   invoices: Array<{ invoice_code: string; service: string; amount: number; invoice_date: string; status: string }>;
+  clinic?: { name: string; logoUrl?: string | null };
+  locale?: ReportLocale;
 }
 
-export function generatePatientReportPDF(data: PatientReportData) {
-  const { patient, medicalRecords, prescriptions, labOrders, invoices } = data;
+async function loadImageAsBase64(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+export async function generatePatientReportPDF(data: PatientReportData) {
+  const { patient, medicalRecords, prescriptions, labOrders, invoices, clinic, locale: lang = "en" } = data;
+  const l = labels[lang];
   const doc = new jsPDF();
   const primaryColor: [number, number, number] = [41, 128, 115];
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -157,49 +242,72 @@ export function generatePatientReportPDF(data: PatientReportData) {
     doc.setTextColor(0);
   };
 
+  // ── Clinic Header with Logo ──
+  if (clinic) {
+    let logoLoaded = false;
+    if (clinic.logoUrl) {
+      const base64 = await loadImageAsBase64(clinic.logoUrl);
+      if (base64) {
+        try {
+          doc.addImage(base64, "PNG", 14, y, 18, 18);
+          logoLoaded = true;
+        } catch { /* skip logo */ }
+      }
+    }
+    const textX = logoLoaded ? 36 : 14;
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...primaryColor);
+    doc.text(clinic.name, textX, y + 8);
+    doc.setDrawColor(220, 220, 220);
+    y += 22;
+    doc.line(14, y, pageWidth - 14, y);
+    y += 6;
+  }
+
   // ── Title ──
   doc.setFontSize(22);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...primaryColor);
-  doc.text("Patient Report", 14, y + 6);
+  doc.text(l.title, 14, y + 6);
   y += 10;
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(100);
-  doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, y + 4);
+  doc.text(`${l.generatedOn} ${new Date().toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US")}`, 14, y + 4);
   y += 10;
 
   // ── Patient Info ──
-  addSectionTitle("Patient Information");
+  addSectionTitle(l.patientInfo);
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(50);
-  const info = [
-    ["Name", patient.full_name],
-    ["Date of Birth", patient.date_of_birth ? new Date(patient.date_of_birth + "T00:00:00").toLocaleDateString() : "—"],
-    ["Gender", patient.gender ?? "—"],
-    ["Blood Type", patient.blood_type ?? "—"],
-    ["Phone", patient.phone ?? "—"],
-    ["Email", patient.email ?? "—"],
-    ["Insurance", patient.insurance_provider ?? "—"],
-    ["Status", patient.status ?? "—"],
+  const info: [string, string][] = [
+    [l.name, patient.full_name],
+    [l.dob, patient.date_of_birth ? new Date(patient.date_of_birth + "T00:00:00").toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US") : "—"],
+    [l.gender, patient.gender ?? "—"],
+    [l.bloodType, patient.blood_type ?? "—"],
+    [l.phone, patient.phone ?? "—"],
+    [l.email, patient.email ?? "—"],
+    [l.insurance, patient.insurance_provider ?? "—"],
+    [l.status, patient.status ?? "—"],
   ];
   info.forEach(([label, value]) => {
     doc.setFont("helvetica", "bold");
     doc.text(`${label}:`, 14, y);
     doc.setFont("helvetica", "normal");
-    doc.text(value, 55, y);
+    doc.text(value, 60, y);
     y += 6;
   });
 
   // ── Medical History ──
   if (medicalRecords.length > 0) {
-    addSectionTitle("Medical History");
+    addSectionTitle(l.medicalHistory);
     (doc as any).autoTable({
       startY: y,
-      head: [["Date", "Type", "Diagnosis", "Doctor", "Notes"]],
+      head: [[l.date, l.type, l.diagnosis, l.doctor, l.notes]],
       body: medicalRecords.map((r) => [
-        new Date(r.record_date + "T00:00:00").toLocaleDateString(),
+        new Date(r.record_date + "T00:00:00").toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US"),
         r.record_type?.replace("_", " ") ?? "—",
         r.diagnosis ?? "—",
         r.doctors?.full_name ?? "—",
@@ -215,14 +323,14 @@ export function generatePatientReportPDF(data: PatientReportData) {
 
   // ── Prescriptions ──
   if (prescriptions.length > 0) {
-    addSectionTitle("Prescriptions");
+    addSectionTitle(l.prescriptions);
     (doc as any).autoTable({
       startY: y,
-      head: [["Medication", "Dosage", "Date", "Doctor", "Status"]],
+      head: [[l.medication, l.dosage, l.date, l.doctor, l.status]],
       body: prescriptions.map((rx) => [
         rx.medication,
         rx.dosage,
-        new Date(rx.prescribed_date + "T00:00:00").toLocaleDateString(),
+        new Date(rx.prescribed_date + "T00:00:00").toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US"),
         rx.doctors?.full_name ?? "—",
         rx.status,
       ]),
@@ -236,16 +344,16 @@ export function generatePatientReportPDF(data: PatientReportData) {
 
   // ── Lab Orders ──
   if (labOrders.length > 0) {
-    addSectionTitle("Laboratory Orders");
+    addSectionTitle(l.labOrders);
     (doc as any).autoTable({
       startY: y,
-      head: [["Test", "Date", "Doctor", "Status", "Result"]],
-      body: labOrders.map((l) => [
-        l.test_name,
-        new Date(l.order_date + "T00:00:00").toLocaleDateString(),
-        l.doctors?.full_name ?? "—",
-        l.status,
-        (l.result ?? "—").substring(0, 50),
+      head: [[l.test, l.date, l.doctor, l.status, l.result]],
+      body: labOrders.map((lo) => [
+        lo.test_name,
+        new Date(lo.order_date + "T00:00:00").toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US"),
+        lo.doctors?.full_name ?? "—",
+        lo.status,
+        (lo.result ?? "—").substring(0, 50),
       ]),
       theme: "grid",
       headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: "bold" },
@@ -257,15 +365,15 @@ export function generatePatientReportPDF(data: PatientReportData) {
 
   // ── Invoices ──
   if (invoices.length > 0) {
-    addSectionTitle("Billing & Invoices");
+    addSectionTitle(l.billing);
     (doc as any).autoTable({
       startY: y,
-      head: [["Invoice #", "Service", "Amount", "Date", "Status"]],
+      head: [[l.invoice, l.service, l.amount, l.date, l.status]],
       body: invoices.map((inv) => [
         inv.invoice_code,
         inv.service,
         `$${Number(inv.amount).toLocaleString()}`,
-        new Date(inv.invoice_date + "T00:00:00").toLocaleDateString(),
+        new Date(inv.invoice_date + "T00:00:00").toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US"),
         inv.status,
       ]),
       theme: "grid",
@@ -282,7 +390,7 @@ export function generatePatientReportPDF(data: PatientReportData) {
     doc.setFontSize(8);
     doc.setTextColor(150);
     doc.text(
-      `Page ${i} of ${pageCount}`,
+      `${l.page} ${i} ${l.of} ${pageCount}`,
       pageWidth / 2,
       doc.internal.pageSize.getHeight() - 10,
       { align: "center" }
