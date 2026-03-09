@@ -312,6 +312,9 @@ export const en = {
     updatePassword: "Update Password",
     addUser: "Add User",
     preferencesSaved: "Preferences saved",
+    auditLog: "Audit Log",
+    auditLogDesc: "Track important actions across your clinic.",
+    noAuditLogs: "No audit events recorded yet.",
   },
   auth: {
     login: "Sign In",
