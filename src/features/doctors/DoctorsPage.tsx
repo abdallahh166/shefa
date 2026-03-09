@@ -204,6 +204,24 @@ export const DoctorsPage = () => {
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
       />
+
+      {scheduleDoctor && (
+        <DoctorScheduleModal
+          open={!!scheduleDoctor}
+          onClose={() => setScheduleDoctor(null)}
+          doctorId={scheduleDoctor.id}
+          doctorName={scheduleDoctor.name}
+        />
+      )}
+    </div>
+  );
+};
+        confirmLabel={t("common.remove")}
+        variant="danger"
+        loading={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   );
 };
