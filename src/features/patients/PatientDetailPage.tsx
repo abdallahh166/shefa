@@ -210,7 +210,7 @@ export const PatientDetailPage = () => {
             </StatusBadge>
           </div>
           <p className="text-sm text-muted-foreground capitalize">
-            {patient.gender ? t(`patients.${patient.gender}`) : ""} · {patient.date_of_birth ? `${t("patients.dateOfBirth")}: ${formatDate(patient.date_of_birth, locale)}` : ""}
+            {patient.gender ? t(`patients.${patient.gender}`) : ""} · {patient.date_of_birth ? `${t("patients.dateOfBirth")}: ${formatDate(patient.date_of_birth, locale, "date", calendarType)}` : ""}
           </p>
         </div>
         <Button variant="outline" onClick={() => navigate(`/tenant/${clinicSlug}/appointments`)}>
