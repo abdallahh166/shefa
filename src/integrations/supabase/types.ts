@@ -562,6 +562,7 @@ export type Database = {
           id: string
           logo_url: string | null
           name: string
+          pending_owner_email: string | null
           phone: string | null
           slug: string
           updated_at: string
@@ -573,6 +574,7 @@ export type Database = {
           id?: string
           logo_url?: string | null
           name: string
+          pending_owner_email?: string | null
           phone?: string | null
           slug: string
           updated_at?: string
@@ -584,6 +586,7 @@ export type Database = {
           id?: string
           logo_url?: string | null
           name?: string
+          pending_owner_email?: string | null
           phone?: string | null
           slug?: string
           updated_at?: string
@@ -620,10 +623,12 @@ export type Database = {
         }
         Returns: undefined
       }
-      create_tenant_and_signup: {
-        Args: { _name: string; _slug: string }
-        Returns: string
-      }
+      create_tenant_and_signup:
+        | { Args: { _name: string; _slug: string }; Returns: string }
+        | {
+            Args: { _name: string; _owner_email: string; _slug: string }
+            Returns: string
+          }
       get_user_tenant_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
