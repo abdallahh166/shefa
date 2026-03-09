@@ -282,7 +282,7 @@ export const PatientDetailPage = () => {
                 <Receipt className="h-4 w-4 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">{t("patients.totalBilled")}</span>
               </div>
-              <p className="text-2xl font-bold text-foreground">${totalBilled.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-foreground">{formatCurrency(totalBilled, locale)}</p>
             </div>
             <div className="stat-card">
               <div className="flex items-center gap-2 mb-1">
