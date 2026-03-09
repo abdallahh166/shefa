@@ -22,6 +22,7 @@ type Tab = "general" | "users" | "notifications" | "appearance" | "security";
 export const SettingsPage = () => {
   const { t } = useI18n();
   const { user, logout } = useAuth();
+  const { enabled: darkMode, setEnabled: setDarkMode } = useDarkMode();
   const queryClient = useQueryClient();
   const isDemo = user?.tenantId === "demo";
   const [activeTab, setActiveTab] = useState<Tab>("general");
