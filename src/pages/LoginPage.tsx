@@ -32,7 +32,7 @@ export const LoginPage = () => {
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      toast({ title: "Login failed", description: error.message, variant: "destructive" });
+      toast({ title: t("auth.loginFailed"), description: error.message, variant: "destructive" });
       setLoading(false);
       return;
     }
@@ -43,13 +43,20 @@ export const LoginPage = () => {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName || !clinicName) {
-      toast({ title: "Missing fields", description: "Please fill all fields", variant: "destructive" });
+      toast({
+        title: t("common.missingFields"),
+        description: t("common.pleaseFillAllFields"),
+        variant: "destructive",
+      });
       return;
     }
     setLoading(true);
 
     // Create tenant via secure function
-    const slug = clinicName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const slug = clinicName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
     const { data: tenantId, error: tenantErr } = await supabase.rpc("create_tenant_and_signup", {
       _name: clinicName,
       _slug: slug,
@@ -72,9 +79,9 @@ export const LoginPage = () => {
     });
 
     if (signupErr) {
-      toast({ title: "Signup failed", description: signupErr.message, variant: "destructive" });
+      toast({ title: t("auth.signupFailed"), description: signupErr.message, variant: "destructive" });
     } else {
-      toast({ title: "Check your email", description: "We sent you a confirmation link." });
+      toast({ title: t("auth.checkEmail"), description: t("auth.confirmationSent") });
     }
     setLoading(false);
   };
@@ -100,12 +107,12 @@ export const LoginPage = () => {
         <div className="text-primary-foreground text-center px-12">
           <div className="h-16 w-16 rounded-2xl bg-primary-foreground/20 flex items-center justify-center text-3xl font-bold mx-auto mb-6">M</div>
           <h2 className="text-3xl font-bold mb-4">MedFlow</h2>
-          <p className="text-primary-foreground/80 text-lg">Enterprise Healthcare Management Platform</p>
+          <p className="text-primary-foreground/80 text-lg">{t("auth.heroSubtitle")}</p>
           <div className="mt-12 grid grid-cols-2 gap-4 text-sm text-primary-foreground/70">
-            <div className="bg-primary-foreground/10 rounded-lg p-4">Multi-Tenant Architecture</div>
-            <div className="bg-primary-foreground/10 rounded-lg p-4">RBAC Security</div>
-            <div className="bg-primary-foreground/10 rounded-lg p-4">EMR Integration</div>
-            <div className="bg-primary-foreground/10 rounded-lg p-4">Bilingual Support</div>
+            <div className="bg-primary-foreground/10 rounded-lg p-4">{t("auth.featureMultiTenant")}</div>
+            <div className="bg-primary-foreground/10 rounded-lg p-4">{t("auth.featureRbac")}</div>
+            <div className="bg-primary-foreground/10 rounded-lg p-4">{t("auth.featureEmr")}</div>
+            <div className="bg-primary-foreground/10 rounded-lg p-4">{t("auth.featureBilingual")}</div>
           </div>
         </div>
       </div>
@@ -119,10 +126,10 @@ export const LoginPage = () => {
 
           <div className="mb-8">
             <h1 className="text-2xl font-bold mb-2">
-              {mode === "login" ? t("auth.loginTitle") : "Create your clinic"}
+              {mode === "login" ? t("auth.loginTitle") : t("auth.createClinic")}
             </h1>
             <p className="text-muted-foreground">
-              {mode === "login" ? t("auth.loginSubtitle") : "Set up a new clinic account"}
+              {mode === "login" ? t("auth.loginSubtitle") : t("auth.setupNewClinic")}
             </p>
           </div>
 
@@ -130,11 +137,11 @@ export const LoginPage = () => {
             {mode === "signup" && (
               <>
                 <div className="space-y-2">
-                  <Label>Full Name</Label>
+                  <Label>{t("auth.fullName")}</Label>
                   <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Dr. John Smith" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Clinic Name</Label>
+                  <Label>{t("auth.clinicName")}</Label>
                   <Input value={clinicName} onChange={(e) => setClinicName(e.target.value)} placeholder="My Clinic" />
                 </div>
               </>
@@ -148,26 +155,33 @@ export const LoginPage = () => {
               <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "..." : mode === "login" ? t("auth.login") : "Create Account"}
+              {loading ? t("common.loading") : mode === "login" ? t("auth.login") : t("auth.createAccount")}
             </Button>
           </form>
 
           <div className="mt-3 text-end">
-            <button onClick={() => navigate("/forgot-password")} className="text-xs text-muted-foreground hover:text-primary hover:underline">
-              Forgot password?
+            <button
+              onClick={() => navigate("/forgot-password")}
+              className="text-xs text-muted-foreground hover:text-primary hover:underline"
+            >
+              {t("auth.forgotPassword")}
             </button>
           </div>
 
           <div className="mt-4 text-center text-sm">
             {mode === "login" ? (
               <p className="text-muted-foreground">
-                {t("auth.noAccount")}{" "}
-                <button onClick={() => setMode("signup")} className="text-primary font-medium hover:underline">{t("auth.register")}</button>
+                {t("auth.noAccount")} {" "}
+                <button onClick={() => setMode("signup")} className="text-primary font-medium hover:underline">
+                  {t("auth.register")}
+                </button>
               </p>
             ) : (
               <p className="text-muted-foreground">
-                Already have an account?{" "}
-                <button onClick={() => setMode("login")} className="text-primary font-medium hover:underline">{t("auth.login")}</button>
+                {t("auth.alreadyHaveAccount")} {" "}
+                <button onClick={() => setMode("login")} className="text-primary font-medium hover:underline">
+                  {t("auth.login")}
+                </button>
               </p>
             )}
           </div>
@@ -177,12 +191,12 @@ export const LoginPage = () => {
               onClick={() => navigate("/tutorial")}
               className="inline-flex items-center gap-1.5 text-sm text-primary font-medium hover:underline"
             >
-              📖 How to use MedFlow — Step by step guide
+              📖 {t("auth.howToUse")}
             </button>
           </div>
 
           <div className="mt-6">
-            <p className="text-xs text-muted-foreground mb-3">Quick demo login (no account needed):</p>
+            <p className="text-xs text-muted-foreground mb-3">{t("auth.demoLogin")}</p>
             <div className="space-y-2">
               {[
                 { name: "Dr. Sarah Ahmed", email: "admin@medflow.com", role: "clinic_admin" as Role },
@@ -201,7 +215,7 @@ export const LoginPage = () => {
                   </div>
                   <div>
                     <p className="text-sm font-medium">{u.name}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{u.role.replace("_", " ")}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{t(`roles.${u.role}`)}</p>
                   </div>
                 </button>
               ))}
