@@ -42,7 +42,17 @@ Deno.serve(async (req) => {
       .single();
 
     if (tenantErr || !tenant?.id) {
-      return new Response(JSON.stringify({ error: tenantErr?.message ?? "Failed to create clinic" }), {
+      let errorMessage = "Failed to create clinic";
+      
+      // Check for duplicate slug constraint violation
+      if (tenantErr?.message?.includes("slug") || tenantErr?.code === "23505") {
+        errorMessage = "A clinic with this name already exists. Please choose a different name.";
+      } else if (tenantErr?.code === "23505") {
+        // General duplicate key constraint
+        errorMessage = "This clinic already exists. Please use a different name.";
+      }
+      
+      return new Response(JSON.stringify({ error: errorMessage }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
