@@ -310,6 +310,9 @@ export const ar = {
     updatePassword: "تحديث كلمة المرور",
     addUser: "إضافة مستخدم",
     preferencesSaved: "تم حفظ التفضيلات",
+    auditLog: "سجل الأحداث",
+    auditLogDesc: "تتبع الإجراءات المهمة في عيادتك.",
+    noAuditLogs: "لا توجد أحداث مسجلة بعد.",
   },
   auth: {
     login: "تسجيل الدخول",
