@@ -62,11 +62,18 @@ export const LaboratoryPage = () => {
     if (result !== undefined) update.result = result;
     const { error } = await supabase.from("lab_orders").update(update).eq("id", id);
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Status updated" });
+      toast({ title: t("laboratory.statusUpdated") });
       queryClient.invalidateQueries({ queryKey: ["lab_orders"] });
     }
+  };
+
+  const getLabStatusLabel = (status: string) => {
+    if (status === "pending") return t("billing.pending");
+    if (status === "processing") return t("laboratory.processing");
+    if (status === "completed") return t("appointments.completed");
+    return status;
   };
 
   const columns: Column<typeof displayData[0]>[] = [
@@ -74,7 +81,7 @@ export const LaboratoryPage = () => {
     { key: "test_name", header: t("laboratory.test"), searchable: true, render: (l) => <span className="font-medium">{l.test_name}</span> },
     { key: "doctor_name", header: t("laboratory.orderedBy"), searchable: true },
     { key: "order_date", header: t("common.date") },
-    { key: "status", header: t("common.status"), render: (l) => <StatusBadge variant={statusVariant[l.status] ?? "default"}>{l.status}</StatusBadge> },
+    { key: "status", header: t("common.status"), render: (l) => <StatusBadge variant={statusVariant[l.status] ?? "default"}>{getLabStatusLabel(l.status)}</StatusBadge> },
     { key: "result", header: t("common.result"), render: (l) => l.result ? <span className="font-medium">{l.result}</span> : <span className="text-muted-foreground">—</span> },
     {
       key: "actions",
@@ -86,7 +93,7 @@ export const LaboratoryPage = () => {
               onClick={() => handleUpdateStatus(l.id, "processing")}
               className="px-2 py-1 text-xs rounded bg-warning/10 text-warning hover:bg-warning/20"
             >
-              Start
+              {t("common.start")}
             </button>
           )}
           {l.status === "processing" && (
@@ -94,7 +101,7 @@ export const LaboratoryPage = () => {
               onClick={() => handleUpdateStatus(l.id, "completed", "Normal")}
               className="px-2 py-1 text-xs rounded bg-success/10 text-success hover:bg-success/20"
             >
-              Complete
+              {t("common.complete")}
             </button>
           )}
         </div>
