@@ -14,7 +14,7 @@ import { NotificationsTab } from "./tabs/NotificationsTab";
 import { AppearanceTab } from "./tabs/AppearanceTab";
 import { AuditLogTab } from "./tabs/AuditLogTab";
 
-type Tab = "general" | "users" | "notifications" | "appearance" | "security";
+type Tab = "general" | "users" | "notifications" | "appearance" | "security" | "audit";
 
 export const SettingsPage = () => {
   const { t } = useI18n();
