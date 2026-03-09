@@ -60,11 +60,18 @@ export const InsurancePage = () => {
     if (isDemo) return;
     const { error } = await supabase.from("insurance_claims").update({ status: newStatus }).eq("id", id);
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: `Claim ${newStatus}` });
+      toast({ title: newStatus === "approved" ? t("insurance.approved") : t("insurance.rejected") });
       queryClient.invalidateQueries({ queryKey: ["insurance_claims"] });
     }
+  };
+
+  const getClaimStatusLabel = (status: string) => {
+    if (status === "approved") return t("insurance.approved");
+    if (status === "rejected") return t("insurance.rejected");
+    if (status === "pending") return t("billing.pending");
+    return status;
   };
 
   const columns: Column<typeof displayData[0]>[] = [
@@ -73,7 +80,7 @@ export const InsurancePage = () => {
     { key: "service", header: t("common.service"), searchable: true },
     { key: "amount", header: t("common.amount"), render: (c) => `$${c.amount}` },
     { key: "claim_date", header: t("common.date") },
-    { key: "status", header: t("common.status"), render: (c) => <StatusBadge variant={statusVariant[c.status] ?? "default"}>{c.status}</StatusBadge> },
+    { key: "status", header: t("common.status"), render: (c) => <StatusBadge variant={statusVariant[c.status] ?? "default"}>{getClaimStatusLabel(c.status)}</StatusBadge> },
     {
       key: "actions",
       header: t("common.actions"),
@@ -82,14 +89,14 @@ export const InsurancePage = () => {
           <button
             onClick={() => handleUpdateStatus(c.id, "approved")}
             className="p-1.5 rounded-md hover:bg-success/10 text-success"
-            title="Approve"
+            title={t("common.approve")}
           >
             <CheckCircle className="h-4 w-4" />
           </button>
           <button
             onClick={() => handleUpdateStatus(c.id, "rejected")}
             className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive"
-            title="Reject"
+            title={t("common.reject")}
           >
             <XCircle className="h-4 w-4" />
           </button>
