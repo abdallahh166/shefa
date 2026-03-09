@@ -87,6 +87,7 @@ export const ar = {
     toggleTheme: "تبديل مظهر التطبيق",
     compactView: "عرض مضغوط",
     comingSoon: "قريباً",
+    print: "طباعة",
   },
 
   roles: {
