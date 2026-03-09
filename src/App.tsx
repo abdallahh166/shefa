@@ -40,6 +40,14 @@ const App = () => (
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/tutorial" element={<TutorialPage />} />
           <Route path="/" element={<LandingPage />} />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute requiredPermission="super_admin">
+                <AdminDashboardPage />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/tenant/:clinicSlug"
