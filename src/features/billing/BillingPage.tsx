@@ -77,8 +77,8 @@ export const BillingPage = () => {
     { key: "invoice_code", header: t("billing.invoiceNumber"), searchable: true, render: (inv) => <span className="font-medium">{inv.invoice_code}</span> },
     { key: "patient_name", header: t("appointments.patient"), searchable: true },
     { key: "service", header: t("common.service"), searchable: true },
-    { key: "amount", header: t("common.amount"), render: (inv) => <span className="font-semibold">${inv.amount}</span> },
-    { key: "invoice_date", header: t("common.date") },
+    { key: "amount", header: t("common.amount"), render: (inv) => <span className="font-semibold">{formatCurrency(inv.amount, locale)}</span> },
+    { key: "invoice_date", header: t("common.date"), render: (inv) => formatDate(inv.invoice_date, locale) },
     { key: "status", header: t("common.status"), render: (inv) => <StatusBadge variant={(statusVariant as any)[inv.status] ?? "default"}>{getStatusLabel(inv.status)}</StatusBadge> },
     {
       key: "actions",
