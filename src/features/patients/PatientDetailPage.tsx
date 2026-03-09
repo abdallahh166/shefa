@@ -335,7 +335,7 @@ export const PatientDetailPage = () => {
 
         const AppointmentRow = ({ a }: { a: any }) => (
           <tr className="hover:bg-muted/30 transition-colors">
-            <td className="whitespace-nowrap text-muted-foreground">{formatDate(a.appointment_date, locale, "datetime")}</td>
+            <td className="whitespace-nowrap text-muted-foreground">{formatDate(a.appointment_date, locale, "datetime", calendarType)}</td>
             <td className="font-medium capitalize">{a.type?.replace("_", " ") ?? "—"}</td>
             <td>{a.doctors?.full_name ?? "—"}</td>
             <td>
