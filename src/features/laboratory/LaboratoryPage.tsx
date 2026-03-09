@@ -126,7 +126,11 @@ export const LaboratoryPage = () => {
         columns={columns} data={filtered} keyExtractor={(l) => l.id} searchable isLoading={!isDemo && isLoading}
         filterSlot={
           <StatusFilter
-            options={[{ value: "pending", label: "Pending" }, { value: "processing", label: "Processing" }, { value: "completed", label: "Completed" }]}
+            options={[
+              { value: "pending", label: t("billing.pending") },
+              { value: "processing", label: t("laboratory.processing") },
+              { value: "completed", label: t("appointments.completed") },
+            ]}
             selected={statusFilter}
             onChange={setStatusFilter}
           />
