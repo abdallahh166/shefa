@@ -69,7 +69,10 @@ const statusChipClass: Record<string, string> = {
 };
 
 export function AppointmentCalendar({ appointments, view, onViewChange, rescheduleEnabled, onReschedule }: Props) {
-  const { t, locale } = useI18n();
+  const { t, locale, calendarType } = useI18n();
+  const intlLocale = locale === "ar" ? "ar-SA" : "en-US";
+  const calendar = calendarType === "hijri" ? "islamic-umalqura" : "gregory";
+
   const [cursor, setCursor] = useState(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
