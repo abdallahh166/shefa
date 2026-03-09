@@ -125,8 +125,8 @@ export const ReportsPage = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title={t("billing.totalRevenue")} value={`$${totalRevenue.toLocaleString()}`} icon={DollarSign} />
         <StatCard title={t("dashboard.totalPatients")} value={String(totalPatients)} icon={Users} />
-        <StatCard title="Total Appointments" value={String(totalAppointments)} icon={CalendarDays} />
-        <StatCard title="Avg Doctor Rating" value={`${avgRating.toFixed(1)} ★`} icon={TrendingUp} />
+        <StatCard title={t("reports.totalAppointments")} value={String(totalAppointments)} icon={CalendarDays} />
+        <StatCard title={t("reports.avgDoctorRating")} value={`${avgRating.toFixed(1)} ★`} icon={TrendingUp} />
       </div>
 
       <div className="border-b flex gap-1">
@@ -151,7 +151,7 @@ export const ReportsPage = () => {
                 <Tooltip formatter={(v: any) => `$${Number(v).toLocaleString()}`} />
                 <Legend />
                 <Bar dataKey="revenue" fill="hsl(174, 62%, 34%)" radius={[4, 4, 0, 0]} name={t("reports.revenue")} />
-                <Bar dataKey="expenses" fill="hsl(210, 80%, 52%)" radius={[4, 4, 0, 0]} name="Pending/Overdue" />
+                <Bar dataKey="expenses" fill="hsl(210, 80%, 52%)" radius={[4, 4, 0, 0]} name={t("reports.pendingOverdue")} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -186,7 +186,7 @@ export const ReportsPage = () => {
               <XAxis dataKey="month" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} />
               <Tooltip />
-              <Area type="monotone" dataKey="patients" stroke="hsl(174, 62%, 34%)" fill="url(#patientGrad)" strokeWidth={3} dot={{ fill: "hsl(174, 62%, 34%)", r: 5 }} name="Patients" />
+              <Area type="monotone" dataKey="patients" stroke="hsl(174, 62%, 34%)" fill="url(#patientGrad)" strokeWidth={3} dot={{ fill: "hsl(174, 62%, 34%)", r: 5 }} name={t("common.patients")} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -195,11 +195,16 @@ export const ReportsPage = () => {
       {activeTab === "appointments" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-card rounded-lg border p-5">
-            <h3 className="font-semibold mb-4">Appointment Status Distribution</h3>
+            <h3 className="font-semibold mb-4">{t("reports.appointmentStatusDistribution")}</h3>
             {(() => {
               const statuses = ["scheduled", "in_progress", "completed", "cancelled"];
               const data = isDemo
-                ? [{ name: "Scheduled", value: 45 }, { name: "In Progress", value: 12 }, { name: "Completed", value: 110 }, { name: "Cancelled", value: 15 }]
+                ? [
+                    { name: t("appointments.scheduled"), value: 45 },
+                    { name: t("appointments.inProgress"), value: 12 },
+                    { name: t("appointments.completed"), value: 110 },
+                    { name: t("appointments.cancelled"), value: 15 },
+                  ]
                 : statuses.map((s) => ({ name: s.replace("_", " "), value: appointments.filter((a) => a.status === s).length }));
               return (
                 <ResponsiveContainer width="100%" height={300}>
@@ -208,14 +213,14 @@ export const ReportsPage = () => {
                     <XAxis type="number" tick={{ fontSize: 12 }} />
                     <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={90} />
                     <Tooltip />
-                    <Bar dataKey="value" fill="hsl(174, 62%, 34%)" radius={[0, 4, 4, 0]} name="Count" />
+                    <Bar dataKey="value" fill="hsl(174, 62%, 34%)" radius={[0, 4, 4, 0]} name={t("reports.count")} />
                   </BarChart>
                 </ResponsiveContainer>
               );
             })()}
           </div>
           <div className="bg-card rounded-lg border p-5">
-            <h3 className="font-semibold mb-4">By Type</h3>
+            <h3 className="font-semibold mb-4">{t("reports.byType")}</h3>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie data={appointmentTypes} cx="50%" cy="50%" innerRadius={50} outerRadius={85} dataKey="value">
@@ -234,8 +239,8 @@ export const ReportsPage = () => {
           <table className="data-table">
             <thead><tr className="bg-muted/50">
               <th>{t("reports.doctor")}</th>
-              <th>Appointments</th>
-              <th>Completion Rate</th>
+              <th>{t("reports.appointments")}</th>
+              <th>{t("reports.completionRate")}</th>
               <th>{t("reports.rating")}</th>
             </tr></thead>
             <tbody>
@@ -248,7 +253,7 @@ export const ReportsPage = () => {
                 </tr>
               ))}
               {doctorPerformance.length === 0 && (
-                <tr><td colSpan={4} className="text-center py-6 text-muted-foreground">No data</td></tr>
+                <tr><td colSpan={4} className="text-center py-6 text-muted-foreground">{t("common.noData")}</td></tr>
               )}
             </tbody>
           </table>

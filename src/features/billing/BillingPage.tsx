@@ -58,11 +58,18 @@ export const BillingPage = () => {
     if (isDemo) return;
     const { error } = await supabase.from("invoices").update({ status: "paid" }).eq("id", id);
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Invoice marked as paid" });
+      toast({ title: t("billing.invoiceMarkedPaid") });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
     }
+  };
+
+  const getStatusLabel = (status: string) => {
+    if (status === "paid") return t("billing.paid");
+    if (status === "pending") return t("billing.pending");
+    if (status === "overdue") return t("billing.overdue");
+    return status;
   };
 
   const columns: Column<typeof displayData[0]>[] = [
@@ -71,7 +78,7 @@ export const BillingPage = () => {
     { key: "service", header: t("common.service"), searchable: true },
     { key: "amount", header: t("common.amount"), render: (inv) => <span className="font-semibold">${inv.amount}</span> },
     { key: "invoice_date", header: t("common.date") },
-    { key: "status", header: t("common.status"), render: (inv) => <StatusBadge variant={(statusVariant as any)[inv.status] ?? "default"}>{inv.status}</StatusBadge> },
+    { key: "status", header: t("common.status"), render: (inv) => <StatusBadge variant={(statusVariant as any)[inv.status] ?? "default"}>{getStatusLabel(inv.status)}</StatusBadge> },
     {
       key: "actions",
       header: t("common.actions"),
@@ -79,7 +86,7 @@ export const BillingPage = () => {
         <button
           onClick={() => handleMarkPaid(inv.id)}
           className="p-1.5 rounded-md hover:bg-success/10 text-success"
-          title="Mark as Paid"
+          title={t("billing.markAsPaid")}
         >
           <CheckCircle className="h-4 w-4" />
         </button>
@@ -107,7 +114,11 @@ export const BillingPage = () => {
         columns={columns} data={filtered} keyExtractor={(inv) => inv.id} searchable isLoading={!isDemo && isLoading} exportFileName="invoices"
         filterSlot={
           <StatusFilter
-            options={[{ value: "paid", label: "Paid" }, { value: "pending", label: "Pending" }, { value: "overdue", label: "Overdue" }]}
+            options={[
+              { value: "paid", label: t("billing.paid") },
+              { value: "pending", label: t("billing.pending") },
+              { value: "overdue", label: t("billing.overdue") },
+            ]}
             selected={statusFilter}
             onChange={setStatusFilter}
           />
