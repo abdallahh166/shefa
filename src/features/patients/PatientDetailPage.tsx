@@ -636,11 +636,7 @@ export const PatientDetailPage = () => {
 
       {/* ── DOCUMENTS ── */}
       {activeTab === "documents" && (
-        <div className="bg-card rounded-lg border p-8 text-center">
-          <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-          <p className="text-muted-foreground">{t("patients.noDocuments")}</p>
-          <Button variant="outline" className="mt-4">{t("patients.uploadDocument")}</Button>
-        </div>
+        <PatientDocuments patientId={patientId ?? ""} isDemo={isDemo} />
       )}
     </div>
   );
