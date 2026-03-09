@@ -31,14 +31,6 @@ const DEMO_PRESCRIPTIONS = [
   { id: "RX-002", medication: "Metformin 500mg", dosage: "1 tablet twice daily", prescribed_date: "2026-02-10", doctors: { full_name: "Dr. Sarah Ahmed" }, status: "active" },
 ];
 
-const tabs: { key: Tab; icon: any; label: string }[] = [
-  { key: "overview", icon: User, label: "Overview" },
-  { key: "history", icon: Activity, label: "Medical History" },
-  { key: "prescriptions", icon: Pill, label: "Prescriptions" },
-  { key: "notes", icon: FileText, label: "Clinical Notes" },
-  { key: "documents", icon: FileText, label: "Documents" },
-];
-
 export const PatientDetailPage = () => {
   const { t } = useI18n();
   const { clinicSlug, patientId } = useParams();
@@ -46,6 +38,14 @@ export const PatientDetailPage = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const isDemo = user?.tenantId === "demo";
+
+  const tabs: { key: Tab; icon: any; label: string }[] = [
+    { key: "overview", icon: User, label: t("patients.overview") },
+    { key: "history", icon: Activity, label: t("patients.medicalHistory") },
+    { key: "prescriptions", icon: Pill, label: t("patients.prescriptions") },
+    { key: "notes", icon: FileText, label: t("patients.clinicalNotes") },
+    { key: "documents", icon: FileText, label: t("patients.documents") },
+  ];
 
   const { data: patient, isLoading: loadingPatient } = useQuery({
     queryKey: ["patient", patientId],
@@ -99,9 +99,9 @@ export const PatientDetailPage = () => {
   if (!patient) {
     return (
       <div className="text-center py-16">
-        <p className="text-muted-foreground">Patient not found</p>
+        <p className="text-muted-foreground">{t("patients.patientNotFound")}</p>
         <Button variant="outline" className="mt-4" onClick={() => navigate(`/tenant/${clinicSlug}/patients`)}>
-          Back to Patients
+          {t("patients.backToPatients")}
         </Button>
       </div>
     );
@@ -118,25 +118,25 @@ export const PatientDetailPage = () => {
           <div className="flex items-center gap-3">
             <h1 className="page-title">{patient.full_name}</h1>
             <StatusBadge variant={patient.status === "active" ? "success" : "default"}>
-              {patient.status}
+              {patient.status === "active" ? t("patients.active") : t("patients.inactive")}
             </StatusBadge>
           </div>
           <p className="text-sm text-muted-foreground capitalize">
-            {patient.gender} · {patient.date_of_birth ? `DOB: ${patient.date_of_birth}` : ""}
+            {patient.gender ? t(`patients.${patient.gender}`) : ""} · {patient.date_of_birth ? `${t("patients.dateOfBirth")}: ${patient.date_of_birth}` : ""}
           </p>
         </div>
         <Button variant="outline" onClick={() => navigate(`/tenant/${clinicSlug}/appointments`)}>
-          <Calendar className="h-4 w-4" /> Book Appointment
+          <Calendar className="h-4 w-4" /> {t("patients.bookAppointment")}
         </Button>
       </div>
 
       {/* Patient Info Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { icon: Droplets, label: "Blood Type", value: patient.blood_type ?? "—" },
-          { icon: Phone, label: "Phone", value: patient.phone ?? "—" },
-          { icon: Mail, label: "Email", value: patient.email ?? "—" },
-          { icon: Stethoscope, label: "Insurance", value: patient.insurance_provider ?? "—" },
+          { icon: Droplets, label: t("patients.bloodType"), value: patient.blood_type ?? "—" },
+          { icon: Phone, label: t("common.phone"), value: patient.phone ?? "—" },
+          { icon: Mail, label: t("common.email"), value: patient.email ?? "—" },
+          { icon: Stethoscope, label: t("patients.insuranceProvider"), value: patient.insurance_provider ?? "—" },
         ].map((item, i) => (
           <div key={i} className="stat-card">
             <div className="flex items-center gap-2 mb-1">
@@ -169,16 +169,16 @@ export const PatientDetailPage = () => {
       {activeTab === "overview" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-card rounded-lg border p-5">
-            <h3 className="font-semibold mb-4">Recent Diagnoses</h3>
+            <h3 className="font-semibold mb-4">{t("patients.recentDiagnoses")}</h3>
             {medicalRecords.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">No medical records yet</p>
+              <p className="text-sm text-muted-foreground text-center py-6">{t("patients.noMedicalRecordsYet")}</p>
             ) : (
               <div className="space-y-3">
                 {medicalRecords.slice(0, 3).map((h: any, i: number) => (
                   <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
                     <div className="h-2 w-2 rounded-full bg-primary mt-2 shrink-0" />
                     <div>
-                      <p className="text-sm font-medium">{h.diagnosis ?? "No diagnosis"}</p>
+                      <p className="text-sm font-medium">{h.diagnosis ?? t("patients.noDiagnosis")}</p>
                       <p className="text-xs text-muted-foreground">{h.record_date} · {h.doctors?.full_name ?? "—"}</p>
                     </div>
                   </div>
@@ -187,9 +187,9 @@ export const PatientDetailPage = () => {
             )}
           </div>
           <div className="bg-card rounded-lg border p-5">
-            <h3 className="font-semibold mb-4">Active Prescriptions</h3>
+            <h3 className="font-semibold mb-4">{t("patients.activePrescriptions")}</h3>
             {prescriptions.filter((p: any) => p.status === "active").length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">No active prescriptions</p>
+              <p className="text-sm text-muted-foreground text-center py-6">{t("patients.noActivePrescriptions")}</p>
             ) : (
               <div className="space-y-3">
                 {prescriptions.filter((p: any) => p.status === "active").map((rx: any) => (
@@ -210,11 +210,14 @@ export const PatientDetailPage = () => {
       {activeTab === "history" && (
         <div className="bg-card rounded-lg border overflow-hidden">
           {medicalRecords.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">No medical history found</div>
+            <div className="text-center py-12 text-muted-foreground">{t("patients.noMedicalHistoryFound")}</div>
           ) : (
             <table className="data-table">
               <thead><tr className="bg-muted/50">
-                <th>Date</th><th>Diagnosis</th><th>Doctor</th><th>Notes</th>
+                <th>{t("common.date")}</th>
+                <th>{t("common.result")}</th>
+                <th>{t("appointments.doctor")}</th>
+                <th>{t("appointments.notes")}</th>
               </tr></thead>
               <tbody>
                 {medicalRecords.map((h: any, i: number) => (
@@ -234,11 +237,15 @@ export const PatientDetailPage = () => {
       {activeTab === "prescriptions" && (
         <div className="bg-card rounded-lg border overflow-hidden">
           {prescriptions.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">No prescriptions found</div>
+            <div className="text-center py-12 text-muted-foreground">{t("patients.noPrescriptionsFound")}</div>
           ) : (
             <table className="data-table">
               <thead><tr className="bg-muted/50">
-                <th>Medication</th><th>Dosage</th><th>Doctor</th><th>Date</th><th>Status</th>
+                <th>{t("pharmacy.medication")}</th>
+                <th>{t("laboratory.test")}</th>
+                <th>{t("appointments.doctor")}</th>
+                <th>{t("common.date")}</th>
+                <th>{t("common.status")}</th>
               </tr></thead>
               <tbody>
                 {prescriptions.map((rx: any) => (
@@ -247,7 +254,11 @@ export const PatientDetailPage = () => {
                     <td>{rx.dosage}</td>
                     <td>{rx.doctors?.full_name ?? "—"}</td>
                     <td className="text-muted-foreground">{rx.prescribed_date}</td>
-                    <td><StatusBadge variant={rx.status === "active" ? "success" : "default"}>{rx.status}</StatusBadge></td>
+                    <td>
+                      <StatusBadge variant={rx.status === "active" ? "success" : "default"}>
+                        {rx.status === "active" ? t("patients.active") : t("patients.inactive")}
+                      </StatusBadge>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -259,7 +270,7 @@ export const PatientDetailPage = () => {
       {activeTab === "notes" && (
         <div className="space-y-4">
           {medicalRecords.length === 0 ? (
-            <div className="bg-card rounded-lg border p-8 text-center text-muted-foreground">No clinical notes found</div>
+            <div className="bg-card rounded-lg border p-8 text-center text-muted-foreground">{t("patients.noClinicalNotesFound")}</div>
           ) : (
             medicalRecords.map((note: any, i: number) => (
               <div key={i} className="bg-card rounded-lg border p-5">

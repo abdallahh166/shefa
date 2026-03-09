@@ -53,9 +53,9 @@ export const PharmacyPage = () => {
     setDeleting(true);
     const { error } = await supabase.from("medications").delete().eq("id", deleteId);
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Medication removed" });
+      toast({ title: t("pharmacy.medicationRemoved") });
       queryClient.invalidateQueries({ queryKey: ["medications"] });
     }
     setDeleting(false);
@@ -67,10 +67,17 @@ export const PharmacyPage = () => {
     const status = newStock === 0 ? "out_of_stock" : newStock < 50 ? "low_stock" : "in_stock";
     const { error } = await supabase.from("medications").update({ stock: newStock, status }).eq("id", id);
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     } else {
       queryClient.invalidateQueries({ queryKey: ["medications"] });
     }
+  };
+
+  const getMedStatusLabel = (status: string) => {
+    if (status === "in_stock") return t("pharmacy.inStock");
+    if (status === "low_stock") return t("pharmacy.lowStock");
+    if (status === "out_of_stock") return t("pharmacy.outOfStock");
+    return status;
   };
 
   const columns: Column<typeof meds[0]>[] = [
@@ -96,7 +103,7 @@ export const PharmacyPage = () => {
       )
     },
     { key: "price", header: t("common.price"), render: (m) => `$${m.price.toFixed(2)}` },
-    { key: "status", header: t("common.status"), render: (m) => <StatusBadge variant={statusVariant[m.status] ?? "default"}>{m.status.replace(/_/g, " ")}</StatusBadge> },
+    { key: "status", header: t("common.status"), render: (m) => <StatusBadge variant={statusVariant[m.status] ?? "default"}>{getMedStatusLabel(m.status)}</StatusBadge> },
     {
       key: "actions",
       header: t("common.actions"),
@@ -125,7 +132,11 @@ export const PharmacyPage = () => {
         columns={columns} data={filtered} keyExtractor={(m) => m.id} searchable isLoading={!isDemo && isLoading}
         filterSlot={
           <StatusFilter
-            options={[{ value: "in_stock", label: "In Stock" }, { value: "low_stock", label: "Low Stock" }, { value: "out_of_stock", label: "Out of Stock" }]}
+            options={[
+              { value: "in_stock", label: t("pharmacy.inStock") },
+              { value: "low_stock", label: t("pharmacy.lowStock") },
+              { value: "out_of_stock", label: t("pharmacy.outOfStock") },
+            ]}
             selected={statusFilter}
             onChange={setStatusFilter}
           />
@@ -140,9 +151,9 @@ export const PharmacyPage = () => {
 
       <ConfirmDialog
         open={!!deleteId}
-        title="Remove Medication"
-        message="Are you sure you want to remove this medication from inventory?"
-        confirmLabel="Remove"
+        title={t("pharmacy.removeMedicationTitle")}
+        message={t("pharmacy.removeMedicationMessage")}
+        confirmLabel={t("common.remove")}
         variant="danger"
         loading={deleting}
         onConfirm={handleDelete}
