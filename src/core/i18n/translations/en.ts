@@ -324,8 +324,10 @@ export const en = {
     alreadyHaveAccount: "Already have an account?",
     checkEmail: "Check your email",
     confirmationSent: "We sent you a confirmation link.",
-    demoLogin: "Quick demo login (no account needed):",
-
+    slugAvailable: "This clinic name is available!",
+    slugTaken: "This clinic name is already taken. Try a different name.",
+    slugChecking: "Checking availability...",
+    slugInvalid: "Name must produce a valid URL. Use letters or numbers.",
     loginFailed: "Login failed",
     signupFailed: "Signup failed",
     heroSubtitle: "Enterprise Healthcare Management Platform",
