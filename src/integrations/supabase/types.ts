@@ -788,6 +788,62 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          amount: number
+          billing_cycle: string
+          created_at: string
+          currency: string
+          expires_at: string | null
+          id: string
+          paymob_order_id: string | null
+          paymob_subscription_id: string | null
+          plan: string
+          started_at: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          billing_cycle?: string
+          created_at?: string
+          currency?: string
+          expires_at?: string | null
+          id?: string
+          paymob_order_id?: string | null
+          paymob_subscription_id?: string | null
+          plan?: string
+          started_at?: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          billing_cycle?: string
+          created_at?: string
+          currency?: string
+          expires_at?: string | null
+          id?: string
+          paymob_order_id?: string | null
+          paymob_subscription_id?: string | null
+          plan?: string
+          started_at?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           address: string | null
