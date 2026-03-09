@@ -14,6 +14,7 @@ import { NewClaimModal } from "./NewClaimModal";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { formatDate, formatCurrency } from "@/shared/utils/formatDate";
 
 type Claim = Tables<"insurance_claims"> & { patients?: { full_name: string } | null };
 
