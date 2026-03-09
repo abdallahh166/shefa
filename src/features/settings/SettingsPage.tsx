@@ -36,7 +36,6 @@ export const SettingsPage = () => {
   const [clinicAddress, setClinicAddress] = useState("");
 
   // Password change
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPasswords, setShowPasswords] = useState(false);
@@ -78,8 +77,8 @@ export const SettingsPage = () => {
   const handleSaveGeneral = async () => {
     if (isDemo) {
       toast({
-        title: "Demo mode",
-        description: "Settings cannot be saved in demo mode.",
+        title: t("common.demoMode"),
+        description: t("common.demoModeNoSave"),
         variant: "destructive",
       });
       return;
@@ -96,33 +95,32 @@ export const SettingsPage = () => {
       .eq("id", user?.tenantId ?? "");
 
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Saved", description: "Settings saved successfully" });
+      toast({ title: t("common.saved") });
     }
     setSaving(false);
   };
 
   const handleChangePassword = async () => {
     if (isDemo) {
-      toast({ title: "Demo mode", variant: "destructive" });
+      toast({ title: t("common.demoMode"), variant: "destructive" });
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast({ title: "Passwords don't match", variant: "destructive" });
+      toast({ title: t("common.passwordsDontMatch"), variant: "destructive" });
       return;
     }
     if (newPassword.length < 6) {
-      toast({ title: "Password must be at least 6 characters", variant: "destructive" });
+      toast({ title: t("common.passwordMinLength"), variant: "destructive" });
       return;
     }
     setChangingPassword(true);
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Password changed", description: "Your password has been updated." });
-      setCurrentPassword("");
+      toast({ title: t("auth.passwordUpdated"), description: t("auth.passwordUpdatedDesc") });
       setNewPassword("");
       setConfirmPassword("");
     }
@@ -132,7 +130,7 @@ export const SettingsPage = () => {
   const tabs: { key: Tab; icon: any; label: string }[] = [
     { key: "general", icon: Building, label: t("settings.general") },
     { key: "users", icon: Users, label: t("settings.usersRoles") },
-    { key: "security", icon: Shield, label: "Security" },
+    { key: "security", icon: Shield, label: t("settings.security") },
     { key: "notifications", icon: Bell, label: t("common.notifications") },
     { key: "appearance", icon: Palette, label: t("settings.appearance") },
   ];
@@ -206,7 +204,7 @@ export const SettingsPage = () => {
                 </div>
                 <PermissionGuard permission="manage_users">
                   <Button onClick={() => setShowAddUser(true)} size="sm">
-                    <UserPlus className="h-4 w-4" /> Add User
+                    <UserPlus className="h-4 w-4" /> {t("settings.addUser")}
                   </Button>
                 </PermissionGuard>
               </div>
@@ -244,7 +242,7 @@ export const SettingsPage = () => {
                       </div>
                     ))
                   ) : (
-                    <p className="text-muted-foreground text-sm py-4 text-center">No users found</p>
+                    <p className="text-muted-foreground text-sm py-4 text-center">{t("common.noUsersFound")}</p>
                   )}
                 </div>
               </PermissionGuard>
@@ -253,16 +251,16 @@ export const SettingsPage = () => {
 
           {activeTab === "security" && (
             <div className="space-y-6">
-              <h3 className="font-semibold text-lg">Change Password</h3>
+              <h3 className="font-semibold text-lg">{t("settings.changePassword")}</h3>
               <div className="space-y-4 max-w-sm">
                 <div className="space-y-2">
-                  <Label>New Password</Label>
+                  <Label>{t("settings.newPassword")}</Label>
                   <div className="relative">
                     <Input
                       type={showPasswords ? "text" : "password"}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Min 6 characters"
+                      placeholder={t("common.mustBeAtLeast6")}
                     />
                     <button
                       type="button"
@@ -274,24 +272,24 @@ export const SettingsPage = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Confirm New Password</Label>
+                  <Label>{t("settings.confirmPassword")}</Label>
                   <Input
                     type={showPasswords ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Repeat password"
+                    placeholder={t("settings.confirmPassword")}
                   />
                 </div>
                 <Button onClick={handleChangePassword} disabled={changingPassword || !newPassword}>
                   {changingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Update Password
+                  {t("settings.updatePassword")}
                 </Button>
               </div>
 
               <div className="border-t pt-6">
-                <h4 className="font-medium text-sm text-destructive mb-2">Danger Zone</h4>
+                <h4 className="font-medium text-sm text-destructive mb-2">{t("common.dangerZone")}</h4>
                 <Button variant="outline" className="text-destructive border-destructive/50" onClick={logout}>
-                  Sign Out
+                  {t("common.signOut")}
                 </Button>
               </div>
             </div>
@@ -316,7 +314,7 @@ export const SettingsPage = () => {
                   />
                 </div>
               ))}
-              <Button onClick={() => toast({ title: "Preferences saved" })}>Save Preferences</Button>
+              <Button onClick={() => toast({ title: t("common.preferencesSaved") })}>{t("common.save")}</Button>
             </div>
           )}
 
@@ -326,14 +324,14 @@ export const SettingsPage = () => {
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-3 rounded-lg border">
                   <div>
-                    <p className="text-sm font-medium">Dark Mode</p>
-                    <p className="text-xs text-muted-foreground">Toggle the app theme</p>
+                    <p className="text-sm font-medium">{t("common.darkMode")}</p>
+                    <p className="text-xs text-muted-foreground">{t("common.toggleTheme")}</p>
                   </div>
                   <Switch checked={darkMode} onCheckedChange={setDarkMode} />
                 </div>
                 <div className="flex items-center justify-between p-3 rounded-lg border">
-                  <span className="text-sm">Compact View</span>
-                  <span className="text-xs text-muted-foreground">Coming soon</span>
+                  <span className="text-sm">{t("common.compactView")}</span>
+                  <span className="text-xs text-muted-foreground">{t("common.comingSoon")}</span>
                 </div>
               </div>
             </div>
