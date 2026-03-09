@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useI18n } from "@/core/i18n/i18nStore";
 
 export type AppointmentCalendarView = "month" | "week";
 
@@ -60,8 +61,6 @@ function sameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-const weekdayShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
 const statusChipClass: Record<string, string> = {
   completed: "bg-success/15 text-success",
   in_progress: "bg-info/15 text-info",
@@ -69,18 +68,28 @@ const statusChipClass: Record<string, string> = {
   cancelled: "bg-destructive/10 text-destructive",
 };
 
-export function AppointmentCalendar({
-  appointments,
-  view,
-  onViewChange,
-  rescheduleEnabled,
-  onReschedule,
-}: Props) {
+export function AppointmentCalendar({ appointments, view, onViewChange, rescheduleEnabled, onReschedule }: Props) {
+  const { t, locale } = useI18n();
   const [cursor, setCursor] = useState(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     return now;
   });
+
+  const statusLabel = (s: string) => {
+    switch (s) {
+      case "scheduled":
+        return t("appointments.scheduled");
+      case "in_progress":
+        return t("appointments.inProgress");
+      case "completed":
+        return t("appointments.completed");
+      case "cancelled":
+        return t("appointments.cancelled");
+      default:
+        return s;
+    }
+  };
 
   const groupedByDay = useMemo(() => {
     const map = new Map<string, AppointmentCalendarItem[]>();
@@ -127,10 +136,20 @@ export function AppointmentCalendar({
     if (view === "week") {
       const start = startOfWeek(cursor);
       const end = addDays(start, 6);
-      return `${start.toLocaleDateString(undefined, { month: "short", day: "numeric" })} – ${end.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`;
+      return `${start.toLocaleDateString(locale, { month: "short", day: "numeric" })} – ${end.toLocaleDateString(locale, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })}`;
     }
-    return cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-  }, [cursor, view]);
+    return cursor.toLocaleDateString(locale, { month: "long", year: "numeric" });
+  }, [cursor, view, locale]);
+
+  const weekdayShort = useMemo(() => {
+    const fmt = new Intl.DateTimeFormat(locale, { weekday: "short" });
+    const baseSunday = new Date(2024, 0, 7); // Sunday
+    return Array.from({ length: 7 }, (_, i) => fmt.format(addDays(baseSunday, i)));
+  }, [locale]);
 
   const rangeDays = useMemo(() => {
     if (view === "week") {
@@ -179,13 +198,13 @@ export function AppointmentCalendar({
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handlePrev} aria-label="Previous">
+          <Button variant="outline" size="sm" onClick={handlePrev} aria-label={t("common.previous")}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Button variant="outline" size="sm" onClick={() => setCursor(new Date(today))}>
-            Today
+            {t("common.today")}
           </Button>
-          <Button variant="outline" size="sm" onClick={handleNext} aria-label="Next">
+          <Button variant="outline" size="sm" onClick={handleNext} aria-label={t("common.next")}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
@@ -193,26 +212,18 @@ export function AppointmentCalendar({
         <div className="flex items-center justify-between gap-3">
           <h3 className="font-semibold">{title}</h3>
           <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant={view === "month" ? "default" : "outline"}
-              onClick={() => onViewChange("month")}
-            >
-              Month
+            <Button size="sm" variant={view === "month" ? "default" : "outline"} onClick={() => onViewChange("month")}>
+              {t("common.month")}
             </Button>
-            <Button
-              size="sm"
-              variant={view === "week" ? "default" : "outline"}
-              onClick={() => onViewChange("week")}
-            >
-              Week
+            <Button size="sm" variant={view === "week" ? "default" : "outline"} onClick={() => onViewChange("week")}>
+              {t("common.week")}
             </Button>
           </div>
         </div>
       </div>
 
       <div className="rounded-lg border bg-card overflow-hidden">
-        <div className={cn("grid border-b bg-muted/30", view === "month" ? "grid-cols-7" : "grid-cols-7")}>
+        <div className={cn("grid border-b bg-muted/30", "grid-cols-7")}>
           {weekdayShort.map((d) => (
             <div key={d} className="px-3 py-2 text-xs font-medium text-muted-foreground">
               {d}
@@ -220,12 +231,7 @@ export function AppointmentCalendar({
           ))}
         </div>
 
-        <div
-          className={cn(
-            "grid",
-            view === "month" ? "grid-cols-7" : "grid-cols-7",
-          )}
-        >
+        <div className={cn("grid", "grid-cols-7")}>
           {rangeDays.map((day) => {
             const key = toLocalYMD(day);
             const dayAppointments = groupedByDay.get(key) ?? [];
@@ -251,18 +257,14 @@ export function AppointmentCalendar({
                 )}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className={cn("text-xs font-medium", isOutside && "text-muted-foreground")}>
-                    {day.getDate()}
-                  </span>
-                  {dayAppointments.length > 0 && (
-                    <span className="text-[10px] text-muted-foreground">{dayAppointments.length}</span>
-                  )}
+                  <span className={cn("text-xs font-medium", isOutside && "text-muted-foreground")}>{day.getDate()}</span>
+                  {dayAppointments.length > 0 && <span className="text-[10px] text-muted-foreground">{dayAppointments.length}</span>}
                 </div>
 
                 <div className="space-y-1">
                   {dayAppointments.slice(0, 3).map((a) => {
                     const dt = parseAppointmentDate(a.appointment_date);
-                    const time = Number.isNaN(dt.getTime()) ? "" : dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+                    const time = Number.isNaN(dt.getTime()) ? "" : dt.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
                     return (
                       <div
                         key={a.id}
@@ -277,7 +279,7 @@ export function AppointmentCalendar({
                           rescheduleEnabled && "cursor-grab active:cursor-grabbing",
                           statusChipClass[a.status] ?? "bg-muted text-foreground",
                         )}
-                        title={`${a.patient_name} • ${a.doctor_name}`}
+                        title={`${a.patient_name} • ${a.doctor_name} • ${statusLabel(a.status)}`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="truncate">{a.patient_name}</span>
@@ -287,9 +289,7 @@ export function AppointmentCalendar({
                     );
                   })}
                   {dayAppointments.length > 3 && (
-                    <div className="text-[10px] text-muted-foreground px-1">
-                      +{dayAppointments.length - 3} more
-                    </div>
+                    <div className="text-[10px] text-muted-foreground px-1">+{dayAppointments.length - 3} {t("appointments.more")}</div>
                   )}
                 </div>
               </div>
@@ -299,9 +299,7 @@ export function AppointmentCalendar({
       </div>
 
       {!rescheduleEnabled && (
-        <p className="text-xs text-muted-foreground">
-          Drag-to-reschedule is only available for users with appointment management access.
-        </p>
+        <p className="text-xs text-muted-foreground">{t("appointments.dragToRescheduleHint")}</p>
       )}
     </div>
   );

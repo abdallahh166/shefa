@@ -6,8 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
+import { useI18n } from "@/core/i18n/i18nStore";
 
 export const ForgotPasswordPage = () => {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,7 +23,7 @@ export const ForgotPasswordPage = () => {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     } else {
       setSent(true);
     }
@@ -40,32 +42,31 @@ export const ForgotPasswordPage = () => {
 
           {sent ? (
             <div className="space-y-4">
-              <h1 className="text-xl font-bold">Check your email</h1>
+              <h1 className="text-xl font-bold">{t("auth.checkEmail")}</h1>
               <p className="text-muted-foreground text-sm">
-                We sent a password reset link to <strong>{email}</strong>. Click the link in the email to reset your password.
+                {t("auth.resetEmailSentTo")} <strong>{email}</strong>. {t("auth.resetEmailSentInstructions")}
               </p>
-              <Button variant="outline" className="w-full" onClick={() => navigate("/login")}>
-                Back to login
+              <Button variant="outline" className="w-full" onClick={() => navigate("/login")}
+              >
+                {t("tutorial.backToLogin")}
               </Button>
             </div>
           ) : (
             <>
-              <h1 className="text-xl font-bold mb-2">Forgot your password?</h1>
-              <p className="text-muted-foreground text-sm mb-6">
-                Enter your email address and we'll send you a link to reset your password.
-              </p>
+              <h1 className="text-xl font-bold mb-2">{t("auth.forgotPassword")}</h1>
+              <p className="text-muted-foreground text-sm mb-6">{t("auth.forgotPasswordDesc")}</p>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Email</Label>
+                  <Label>{t("common.email")}</Label>
                   <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "..." : "Send reset link"}
+                  {loading ? t("common.loading") : t("auth.sendResetLink")}
                 </Button>
               </form>
               <div className="mt-4 text-center">
                 <button onClick={() => navigate("/login")} className="text-sm text-primary hover:underline">
-                  Back to login
+                  {t("tutorial.backToLogin")}
                 </button>
               </div>
             </>
