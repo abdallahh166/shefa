@@ -15,11 +15,43 @@ function slugify(value: string) {
 
 const SUFFIXES = ["clinic", "health", "med", "care", "plus"];
 
+// --- In-memory sliding-window rate limiter ---
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
+const RATE_LIMIT_MAX = 20; // max requests per IP per window
+
+const ipHits = new Map<string, number[]>();
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const hits = ipHits.get(ip) ?? [];
+  // Prune old entries
+  const recent = hits.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+  if (recent.length >= RATE_LIMIT_MAX) {
+    ipHits.set(ip, recent);
+    return true;
+  }
+  recent.push(now);
+  ipHits.set(ip, recent);
+  return false;
+}
+
+// Periodic cleanup to prevent memory leaks (every 5 min)
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, hits] of ipHits) {
+    const recent = hits.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+    if (recent.length === 0) {
+      ipHits.delete(ip);
+    } else {
+      ipHits.set(ip, recent);
+    }
+  }
+}, 5 * 60_000);
+
 async function findAvailableSlugs(
   adminClient: ReturnType<typeof createClient>,
   baseSlug: string,
 ): Promise<string[]> {
-  // Generate candidates: base-2, base-3, base-clinic, base-health, etc.
   const candidates: string[] = [];
   for (const suffix of SUFFIXES) {
     candidates.push(`${baseSlug}-${suffix}`);
@@ -28,7 +60,6 @@ async function findAvailableSlugs(
     candidates.push(`${baseSlug}-${i}`);
   }
 
-  // Batch check all candidates
   const { data: existing } = await adminClient
     .from("tenants")
     .select("slug")
@@ -41,6 +72,26 @@ async function findAvailableSlugs(
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Rate limit by client IP
+  const clientIp =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    req.headers.get("cf-connecting-ip") ??
+    "unknown";
+
+  if (isRateLimited(clientIp)) {
+    return new Response(
+      JSON.stringify({ error: "Too many requests. Please slow down." }),
+      {
+        status: 429,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Retry-After": "10",
+        },
+      },
+    );
   }
 
   try {
