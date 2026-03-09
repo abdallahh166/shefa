@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
 
     const { data: upcomingAppointments, error } = await supabase
       .from("appointments")
-      .select("id, appointment_date, tenant_id, patient_id, patients(full_name, user_id), doctors(full_name)")
+      .select("id, appointment_date, tenant_id, patient_id, patients(full_name, user_id, email), doctors(full_name)")
       .eq("status", "scheduled")
       .gte("appointment_date", now.toISOString())
       .lte("appointment_date", tomorrow.toISOString());
@@ -56,17 +56,44 @@ Deno.serve(async (req) => {
         timeStyle: "short",
       });
 
+      const bodyText = `You have an appointment with ${doctor?.full_name ?? "your doctor"} scheduled for ${appointmentTime}. Appointment ID: ${appt.id}`;
+
       const { error: notifError } = await supabase.from("notifications").insert({
         tenant_id: appt.tenant_id,
         user_id: patient.user_id,
         title: "Upcoming Appointment Reminder",
-        body: `You have an appointment with ${doctor?.full_name ?? "your doctor"} scheduled for ${appointmentTime}. Appointment ID: ${appt.id}`,
+        body: bodyText,
         type: "appointment_reminder",
         read: false,
       });
 
       if (!notifError) {
         notificationsCreated++;
+
+        // Send email via Resend if API key is present and patient has an email
+        const resendApiKey = Deno.env.get("RESEND_API_KEY");
+        if (resendApiKey && patient.email) {
+          try {
+            const res = await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${resendApiKey}`,
+              },
+              body: JSON.stringify({
+                from: "Clinic Notifications <onboarding@resend.dev>",
+                to: [patient.email],
+                subject: "Upcoming Appointment Reminder",
+                html: `<p>${bodyText}</p>`,
+              }),
+            });
+            if (!res.ok) {
+              console.error("Resend API error:", await res.text());
+            }
+          } catch (err) {
+            console.error("Failed to send email via Resend:", err);
+          }
+        }
       }
     }
 
