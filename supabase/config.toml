@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.register-clinic]
 verify_jwt = false
+
+[functions.check-slug]
+verify_jwt = false
