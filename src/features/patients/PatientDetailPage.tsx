@@ -137,6 +137,21 @@ export const PatientDetailPage = () => {
     enabled: !!patientId,
   });
 
+  const { data: patientAppointments = [] } = useQuery({
+    queryKey: ["patient_appointments", patientId],
+    queryFn: async () => {
+      if (isDemo) return DEMO_APPOINTMENTS as any[];
+      const { data, error } = await supabase
+        .from("appointments")
+        .select("*, doctors(full_name)")
+        .eq("patient_id", patientId ?? "")
+        .order("appointment_date", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!patientId,
+  });
+
   const { data: invoices = [] } = useQuery({
     queryKey: ["patient_invoices", patientId],
     queryFn: async () => {
