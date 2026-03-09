@@ -15,6 +15,7 @@ import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/shared/utils/formatDate";
 
 type Medication = Tables<"medications">;
 
