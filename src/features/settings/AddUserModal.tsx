@@ -69,7 +69,7 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
       if (form.role !== "doctor") {
         const { error: roleErr } = await supabase.rpc("admin_set_user_role", {
           _target_user_id: data.user.id,
-          _role: form.role,
+          _role: form.role as "clinic_admin" | "doctor" | "receptionist" | "nurse" | "accountant",
         });
         if (roleErr) {
           toast({ title: t("common.error"), description: roleErr.message, variant: "destructive" });
