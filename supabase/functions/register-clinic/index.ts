@@ -25,7 +25,6 @@ Deno.serve(async (req) => {
     );
 
     const { clinicName, fullName, email, password } = await req.json();
-
     if (!clinicName || !fullName || !email || !password) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
@@ -38,11 +37,7 @@ Deno.serve(async (req) => {
 
     const { data: tenant, error: tenantErr } = await adminClient
       .from("tenants")
-      .insert({
-        name: clinicName,
-        slug,
-        pending_owner_email: normalizedEmail,
-      })
+      .insert({ name: clinicName, slug, pending_owner_email: normalizedEmail })
       .select("id")
       .single();
 
@@ -76,9 +71,9 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Internal server error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: err instanceof Error ? err.message : "Internal server error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 });
