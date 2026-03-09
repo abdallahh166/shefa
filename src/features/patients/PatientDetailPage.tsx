@@ -73,6 +73,17 @@ export const PatientDetailPage = () => {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const isDemo = user?.tenantId === "demo";
 
+  const { data: tenant } = useQuery({
+    queryKey: ["tenant", user?.tenantId],
+    queryFn: async () => {
+      if (isDemo) return { name: "Demo Clinic", logo_url: null } as any;
+      const { data, error } = await supabase.from("tenants").select("name, logo_url").eq("id", user?.tenantId ?? "").single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.tenantId,
+  });
+
   const tabs: { key: Tab; icon: any; label: string }[] = [
     { key: "overview", icon: User, label: t("patients.overview") },
     { key: "appointments", icon: CalendarDays, label: t("common.appointments") },
@@ -217,7 +228,11 @@ export const PatientDetailPage = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => generatePatientReportPDF({ patient, medicalRecords, prescriptions, labOrders, invoices })}>
+          <Button variant="outline" onClick={() => generatePatientReportPDF({
+            patient, medicalRecords, prescriptions, labOrders, invoices,
+            clinic: tenant ? { name: tenant.name, logoUrl: tenant.logo_url } : undefined,
+            locale: locale as "en" | "ar",
+          })}>
             <Printer className="h-4 w-4" /> {t("patients.printReport")}
           </Button>
           <Button variant="outline" onClick={() => navigate(`/tenant/${clinicSlug}/appointments`)}>
