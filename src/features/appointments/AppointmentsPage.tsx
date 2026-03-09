@@ -33,8 +33,15 @@ const statusVariant = { completed: "success", in_progress: "info", scheduled: "d
 
 type ViewMode = "list" | "calendar";
 
+function parseLooseDate(raw: string) {
+  if (!raw) return new Date(NaN);
+  if (raw.includes("T")) return new Date(raw);
+  if (raw.includes(" ")) return new Date(raw.replace(" ", "T"));
+  return new Date(raw);
+}
+
 export const AppointmentsPage = () => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const isDemo = user?.tenantId === "demo";
@@ -54,6 +61,36 @@ export const AppointmentsPage = () => {
 
   const { data: patients = [] } = useSupabaseTable<Tables<"patients">>("patients");
   const { data: doctors = [] } = useSupabaseTable<Tables<"doctors">>("doctors");
+
+  const statusLabel = (s: string) => {
+    switch (s) {
+      case "scheduled":
+        return t("appointments.scheduled");
+      case "in_progress":
+        return t("appointments.inProgress");
+      case "completed":
+        return t("appointments.completed");
+      case "cancelled":
+        return t("appointments.cancelled");
+      default:
+        return s;
+    }
+  };
+
+  const typeLabel = (type: string) => {
+    switch (type) {
+      case "checkup":
+        return t("appointments.checkup");
+      case "follow_up":
+        return t("appointments.followUp");
+      case "consultation":
+        return t("appointments.consultation");
+      case "emergency":
+        return t("appointments.emergency");
+      default:
+        return type;
+    }
+  };
 
   const displayData: AppointmentCalendarItem[] = isDemo
     ? DEMO_APPOINTMENTS
@@ -83,9 +120,9 @@ export const AppointmentsPage = () => {
     if (isDemo) return;
     const { error } = await supabase.from("appointments").update({ status: newStatus }).eq("id", id);
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: `Appointment ${newStatus}` });
+      toast({ title: t("appointments.appointmentStatusUpdated"), description: statusLabel(newStatus) });
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
     }
   };
@@ -98,9 +135,9 @@ export const AppointmentsPage = () => {
       .eq("id", id);
 
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Appointment rescheduled" });
+      toast({ title: t("appointments.appointmentRescheduled") });
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
     }
   };
@@ -116,19 +153,22 @@ export const AppointmentsPage = () => {
     {
       key: "appointment_date",
       header: t("appointments.dateTime"),
-      render: (a) => new Date(a.appointment_date).toLocaleString(),
+      render: (a) => {
+        const d = parseLooseDate(a.appointment_date);
+        return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString(locale);
+      },
     },
     {
       key: "type",
       header: t("appointments.type"),
-      render: (a) => <StatusBadge variant="default">{a.type.replace("_", " ")}</StatusBadge>,
+      render: (a) => <StatusBadge variant="default">{typeLabel(a.type)}</StatusBadge>,
     },
     {
       key: "status",
       header: t("common.status"),
       render: (a) => (
         <StatusBadge variant={(statusVariant as any)[a.status] ?? "default"}>
-          {a.status.replace("_", " ")}
+          {statusLabel(a.status)}
         </StatusBadge>
       ),
     },
@@ -141,14 +181,14 @@ export const AppointmentsPage = () => {
             <button
               onClick={() => handleUpdateStatus(a.id, "in_progress")}
               className="p-1.5 rounded-md hover:bg-info/10 text-info"
-              title="Start"
+              title={t("common.start")}
             >
               <Play className="h-4 w-4" />
             </button>
             <button
               onClick={() => handleUpdateStatus(a.id, "cancelled")}
               className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive"
-              title="Cancel"
+              title={t("common.cancel")}
             >
               <XCircle className="h-4 w-4" />
             </button>
@@ -157,7 +197,7 @@ export const AppointmentsPage = () => {
           <button
             onClick={() => handleUpdateStatus(a.id, "completed")}
             className="p-1.5 rounded-md hover:bg-success/10 text-success"
-            title="Complete"
+            title={t("common.complete")}
           >
             <CheckCircle className="h-4 w-4" />
           </button>
@@ -170,19 +210,15 @@ export const AppointmentsPage = () => {
       <div className="page-header">
         <h1 className="page-title">{t("appointments.title")}</h1>
         <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant={viewMode === "list" ? "default" : "outline"}
-            onClick={() => setViewMode("list")}
-          >
-            <List className="h-4 w-4" /> List
+          <Button size="sm" variant={viewMode === "list" ? "default" : "outline"} onClick={() => setViewMode("list")}>
+            <List className="h-4 w-4" /> {t("common.list")}
           </Button>
           <Button
             size="sm"
             variant={viewMode === "calendar" ? "default" : "outline"}
             onClick={() => setViewMode("calendar")}
           >
-            <CalendarDays className="h-4 w-4" /> Calendar
+            <CalendarDays className="h-4 w-4" /> {t("common.calendar")}
           </Button>
 
           <PermissionGuard permission="manage_appointments">
@@ -202,7 +238,7 @@ export const AppointmentsPage = () => {
             onClick={() => setStatusFilter(statusFilter === status ? null : status)}
           >
             <p className="text-2xl font-bold">{statusCounts[status] ?? 0}</p>
-            <p className="text-sm text-muted-foreground capitalize">{status.replace("_", " ")}</p>
+            <p className="text-sm text-muted-foreground">{statusLabel(status)}</p>
           </div>
         ))}
       </div>
@@ -218,10 +254,10 @@ export const AppointmentsPage = () => {
           filterSlot={
             <StatusFilter
               options={[
-                { value: "scheduled", label: "Scheduled" },
-                { value: "in_progress", label: "In Progress" },
-                { value: "completed", label: "Completed" },
-                { value: "cancelled", label: "Cancelled" },
+                { value: "scheduled", label: statusLabel("scheduled") },
+                { value: "in_progress", label: statusLabel("in_progress") },
+                { value: "completed", label: statusLabel("completed") },
+                { value: "cancelled", label: statusLabel("cancelled") },
               ]}
               selected={statusFilter}
               onChange={setStatusFilter}
