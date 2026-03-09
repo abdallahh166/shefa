@@ -14,6 +14,7 @@ import { NewLabOrderModal } from "./NewLabOrderModal";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { formatDate } from "@/shared/utils/formatDate";
 
 type LabOrder = Tables<"lab_orders"> & {
   patients?: { full_name: string } | null;
