@@ -139,20 +139,30 @@ export function AppointmentCalendar({ appointments, view, onViewChange, reschedu
     if (view === "week") {
       const start = startOfWeek(cursor);
       const end = addDays(start, 6);
-      return `${start.toLocaleDateString(locale, { month: "short", day: "numeric" })} – ${end.toLocaleDateString(locale, {
+      return `${start.toLocaleDateString(intlLocale, {
+        calendar,
+        month: "short",
+        day: "numeric",
+      })} – ${end.toLocaleDateString(intlLocale, {
+        calendar,
         month: "short",
         day: "numeric",
         year: "numeric",
       })}`;
     }
-    return cursor.toLocaleDateString(locale, { month: "long", year: "numeric" });
-  }, [cursor, view, locale]);
+    return cursor.toLocaleDateString(intlLocale, { calendar, month: "long", year: "numeric" });
+  }, [cursor, view, intlLocale, calendar]);
 
   const weekdayShort = useMemo(() => {
-    const fmt = new Intl.DateTimeFormat(locale, { weekday: "short" });
+    const fmt = new Intl.DateTimeFormat(intlLocale, { calendar, weekday: "short" });
     const baseSunday = new Date(2024, 0, 7); // Sunday
     return Array.from({ length: 7 }, (_, i) => fmt.format(addDays(baseSunday, i)));
-  }, [locale]);
+  }, [intlLocale, calendar]);
+
+  const dayNumber = useMemo(() => {
+    const fmt = new Intl.DateTimeFormat(intlLocale, { calendar, day: "numeric" });
+    return (d: Date) => fmt.format(d);
+  }, [intlLocale, calendar]);
 
   const rangeDays = useMemo(() => {
     if (view === "week") {
