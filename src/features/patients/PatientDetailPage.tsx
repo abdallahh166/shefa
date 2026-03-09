@@ -44,11 +44,22 @@ const DEMO_INVOICES = [
   { id: "INV-003", invoice_code: "INV-003", service: "Follow-up Visit", amount: 120, invoice_date: "2026-03-06", status: "pending" },
 ];
 
+const DEMO_APPOINTMENTS = [
+  { id: "APT-001", appointment_date: "2026-03-15T10:00:00", type: "checkup", status: "scheduled", doctors: { full_name: "Dr. Sarah Ahmed" }, notes: "Regular blood pressure follow-up." },
+  { id: "APT-002", appointment_date: "2026-03-05T09:30:00", type: "consultation", status: "completed", doctors: { full_name: "Dr. Sarah Ahmed" }, notes: "Reviewed HbA1c results and adjusted medication." },
+  { id: "APT-003", appointment_date: "2026-02-10T11:00:00", type: "lab_review", status: "completed", doctors: { full_name: "Dr. Sarah Ahmed" }, notes: "Lab results reviewed. All within normal range." },
+  { id: "APT-004", appointment_date: "2026-01-20T14:00:00", type: "checkup", status: "completed", doctors: { full_name: "Dr. Sarah Ahmed" }, notes: "Routine checkup. No concerns." },
+  { id: "APT-005", appointment_date: "2026-03-22T10:30:00", type: "follow_up", status: "scheduled", doctors: { full_name: "Dr. Sarah Ahmed" }, notes: null },
+];
+
 const labStatusVariant: Record<string, "default" | "warning" | "success"> = {
   pending: "default", processing: "warning", completed: "success",
 };
 const invoiceStatusVariant: Record<string, "success" | "warning" | "destructive"> = {
   paid: "success", pending: "warning", overdue: "destructive",
+};
+const apptStatusVariant: Record<string, "default" | "warning" | "success" | "destructive"> = {
+  scheduled: "warning", completed: "success", cancelled: "destructive", in_progress: "default",
 };
 
 export const PatientDetailPage = () => {
