@@ -96,10 +96,20 @@ export const useAuth = create<AuthState>()(
       hasRole: (role) => get().user?.role === role,
       initialize: async () => {
         set({ isLoading: true });
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Auth timeout")), 8000)
+        );
         try {
-          const { data: { session } } = await supabase.auth.getSession();
+          const sessionResult = await Promise.race([
+            supabase.auth.getSession(),
+            timeout,
+          ]);
+          const session = (sessionResult as any).data?.session;
           if (session?.user) {
-            await loadUserProfile(session.user, set);
+            await Promise.race([
+              loadUserProfile(session.user, set),
+              timeout,
+            ]);
           } else {
             set({ user: null, supabaseUser: null, isAuthenticated: false });
           }
