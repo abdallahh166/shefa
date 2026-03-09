@@ -33,6 +33,7 @@ export const SettingsPage = () => {
   });
 
   const tabs: { key: Tab; icon: any; label: string }[] = [
+    { key: "profile", icon: User, label: t("settings.profile") },
     { key: "general", icon: Building, label: t("settings.general") },
     { key: "users", icon: Users, label: t("settings.usersRoles") },
     { key: "security", icon: Shield, label: t("settings.security") },
