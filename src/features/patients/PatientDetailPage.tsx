@@ -322,6 +322,100 @@ export const PatientDetailPage = () => {
         </div>
       )}
 
+      {/* ── APPOINTMENTS ── */}
+      {activeTab === "appointments" && (() => {
+        const now = new Date();
+        const upcoming = patientAppointments.filter((a: any) => new Date(a.appointment_date) >= now && a.status !== "cancelled");
+        const past = patientAppointments.filter((a: any) => new Date(a.appointment_date) < now || a.status === "completed" || a.status === "cancelled");
+
+        const getApptStatusLabel = (s: string) =>
+          s === "scheduled" ? t("appointments.scheduled") :
+          s === "completed" ? t("appointments.completed") :
+          s === "cancelled" ? t("appointments.cancelled") : s;
+
+        const AppointmentRow = ({ a }: { a: any }) => (
+          <tr className="hover:bg-muted/30 transition-colors">
+            <td className="whitespace-nowrap text-muted-foreground">{formatDate(a.appointment_date, locale, "datetime")}</td>
+            <td className="font-medium capitalize">{a.type?.replace("_", " ") ?? "—"}</td>
+            <td>{a.doctors?.full_name ?? "—"}</td>
+            <td>
+              <StatusBadge variant={apptStatusVariant[a.status] ?? "default"}>
+                {getApptStatusLabel(a.status)}
+              </StatusBadge>
+            </td>
+            <td className="text-sm text-muted-foreground max-w-xs truncate">{a.notes ?? "—"}</td>
+          </tr>
+        );
+
+        return (
+          <div className="space-y-6">
+            {/* Summary strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[
+                { icon: CalendarDays, label: t("common.appointments"), count: patientAppointments.length, cls: "text-primary" },
+                { icon: Clock, label: t("appointments.scheduled"), count: patientAppointments.filter((a: any) => a.status === "scheduled").length, cls: "text-yellow-500" },
+                { icon: CheckCircle2, label: t("appointments.completed"), count: patientAppointments.filter((a: any) => a.status === "completed").length, cls: "text-success" },
+                { icon: XCircle, label: t("appointments.cancelled"), count: patientAppointments.filter((a: any) => a.status === "cancelled").length, cls: "text-destructive" },
+              ].map((s, i) => (
+                <div key={i} className="stat-card text-center">
+                  <s.icon className={`h-5 w-5 mx-auto mb-1 ${s.cls}`} />
+                  <p className="text-2xl font-bold">{s.count}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Upcoming */}
+            <div>
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <Clock className="h-4 w-4 text-yellow-500" />
+                {t("appointments.upcomingAppointments")} ({upcoming.length})
+              </h3>
+              <div className="bg-card rounded-lg border overflow-hidden">
+                {upcoming.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">{t("appointments.noUpcomingAppointments")}</div>
+                ) : (
+                  <table className="data-table">
+                    <thead><tr className="bg-muted/50">
+                      <th>{t("common.date")}</th>
+                      <th>{t("appointments.type")}</th>
+                      <th>{t("appointments.doctor")}</th>
+                      <th>{t("common.status")}</th>
+                      <th>{t("appointments.notes")}</th>
+                    </tr></thead>
+                    <tbody>{upcoming.map((a: any) => <AppointmentRow key={a.id} a={a} />)}</tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            {/* Past */}
+            <div>
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                {t("appointments.pastAppointments")} ({past.length})
+              </h3>
+              <div className="bg-card rounded-lg border overflow-hidden">
+                {past.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">{t("appointments.noPastAppointments")}</div>
+                ) : (
+                  <table className="data-table">
+                    <thead><tr className="bg-muted/50">
+                      <th>{t("common.date")}</th>
+                      <th>{t("appointments.type")}</th>
+                      <th>{t("appointments.doctor")}</th>
+                      <th>{t("common.status")}</th>
+                      <th>{t("appointments.notes")}</th>
+                    </tr></thead>
+                    <tbody>{past.map((a: any) => <AppointmentRow key={a.id} a={a} />)}</tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── MEDICAL HISTORY ── */}
       {activeTab === "history" && (
         <div className="bg-card rounded-lg border overflow-hidden">
