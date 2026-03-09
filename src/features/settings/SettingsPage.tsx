@@ -37,6 +37,7 @@ export const SettingsPage = () => {
     { key: "security", icon: Shield, label: t("settings.security") },
     { key: "notifications", icon: Bell, label: t("common.notifications") },
     { key: "appearance", icon: Palette, label: t("settings.appearance") },
+    { key: "audit", icon: ScrollText, label: t("settings.auditLog") },
   ];
 
   return (
