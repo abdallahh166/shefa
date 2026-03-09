@@ -311,7 +311,7 @@ export const PatientDetailPage = () => {
               <tbody>
                 {medicalRecords.map((h: any, i: number) => (
                   <tr key={i} className="hover:bg-muted/30 transition-colors">
-                    <td className="text-muted-foreground whitespace-nowrap">{h.record_date}</td>
+                    <td className="text-muted-foreground whitespace-nowrap">{formatDate(h.record_date, locale)}</td>
                     <td className="font-medium">{h.diagnosis ?? "—"}</td>
                     <td>{h.doctors?.full_name ?? "—"}</td>
                     <td className="text-sm text-muted-foreground max-w-xs truncate">{h.notes}</td>
