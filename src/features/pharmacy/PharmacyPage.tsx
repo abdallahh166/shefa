@@ -103,7 +103,7 @@ export const PharmacyPage = () => {
       )
     },
     { key: "price", header: t("common.price"), render: (m) => `$${m.price.toFixed(2)}` },
-    { key: "status", header: t("common.status"), render: (m) => <StatusBadge variant={statusVariant[m.status] ?? "default"}>{m.status.replace(/_/g, " ")}</StatusBadge> },
+    { key: "status", header: t("common.status"), render: (m) => <StatusBadge variant={statusVariant[m.status] ?? "default"}>{getMedStatusLabel(m.status)}</StatusBadge> },
     {
       key: "actions",
       header: t("common.actions"),
