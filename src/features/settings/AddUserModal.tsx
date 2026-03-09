@@ -49,7 +49,7 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
 
     setLoading(true);
 
-    // Sign up new user with metadata
+    // Sign up new user with metadata (role is NOT trusted from metadata)
     const { data, error } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
@@ -57,7 +57,6 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
         data: {
           full_name: form.full_name,
           tenant_id: user?.tenantId,
-          role: form.role,
         },
         emailRedirectTo: window.location.origin,
       },
@@ -66,6 +65,16 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
     if (error) {
       toast({ title: t("common.error"), description: error.message, variant: "destructive" });
     } else if (data.user) {
+      // Use secure RPC to assign role (server-side admin check)
+      if (form.role !== "doctor") {
+        const { error: roleErr } = await supabase.rpc("admin_set_user_role", {
+          _target_user_id: data.user.id,
+          _role: form.role,
+        });
+        if (roleErr) {
+          toast({ title: t("common.error"), description: roleErr.message, variant: "destructive" });
+        }
+      }
       toast({
         title: t("settings.addUser"),
         description: t("auth.confirmationSent"),
