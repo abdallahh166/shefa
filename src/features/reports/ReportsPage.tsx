@@ -8,8 +8,9 @@ import {
 } from "recharts";
 import { useSupabaseTable } from "@/hooks/useSupabaseQuery";
 import { Tables } from "@/integrations/supabase/types";
-import { TrendingUp, Users, CalendarDays, DollarSign } from "lucide-react";
+import { TrendingUp, Users, CalendarDays, DollarSign, Download, Printer } from "lucide-react";
 import { StatCard } from "@/shared/components/StatCard";
+import { Button } from "@/components/ui/button";
 
 const COLORS = [
   "hsl(174, 62%, 34%)", "hsl(210, 80%, 52%)", "hsl(152, 60%, 40%)",
