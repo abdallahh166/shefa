@@ -216,9 +216,14 @@ export const PatientDetailPage = () => {
             {patient.gender ? t(`patients.${patient.gender}`) : ""} · {patient.date_of_birth ? `${t("patients.dateOfBirth")}: ${formatDate(patient.date_of_birth, locale, "date", calendarType)}` : ""}
           </p>
         </div>
-        <Button variant="outline" onClick={() => navigate(`/tenant/${clinicSlug}/appointments`)}>
-          <Calendar className="h-4 w-4" /> {t("patients.bookAppointment")}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => generatePatientReportPDF({ patient, medicalRecords, prescriptions, labOrders, invoices })}>
+            <Printer className="h-4 w-4" /> {t("patients.printReport")}
+          </Button>
+          <Button variant="outline" onClick={() => navigate(`/tenant/${clinicSlug}/appointments`)}>
+            <Calendar className="h-4 w-4" /> {t("patients.bookAppointment")}
+          </Button>
+        </div>
       </div>
 
       {/* Patient Info Cards */}
