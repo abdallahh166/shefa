@@ -263,15 +263,15 @@ export const PatientDetailPage = () => {
                 <p className="text-sm text-muted-foreground text-center py-6">{t("patients.noMedicalRecordsYet")}</p>
               ) : (
                 <div className="space-y-3">
-                  {medicalRecords.slice(0, 3).map((h: any, i: number) => (
-                    <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                      <div className="h-2 w-2 rounded-full bg-primary mt-2 shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium">{h.diagnosis ?? t("patients.noDiagnosis")}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(h.record_date, locale)} · {h.doctors?.full_name ?? "—"}</p>
+                    {medicalRecords.slice(0, 3).map((h: any, i: number) => (
+                      <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                        <div className="h-2 w-2 rounded-full bg-primary mt-2 shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium">{h.diagnosis ?? t("patients.noDiagnosis")}</p>
+                          <p className="text-xs text-muted-foreground">{formatDate(h.record_date, locale, "date", calendarType)} · {h.doctors?.full_name ?? "—"}</p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               )}
             </div>
