@@ -103,7 +103,7 @@ export const PharmacyPage = () => {
         </div>
       )
     },
-    { key: "price", header: t("common.price"), render: (m) => `$${m.price.toFixed(2)}` },
+    { key: "price", header: t("common.price"), render: (m) => formatCurrency(m.price, locale) },
     { key: "status", header: t("common.status"), render: (m) => <StatusBadge variant={statusVariant[m.status] ?? "default"}>{getMedStatusLabel(m.status)}</StatusBadge> },
     {
       key: "actions",
