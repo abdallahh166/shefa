@@ -22,7 +22,7 @@ export const SettingsPage = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isDemo = user?.tenantId === "demo";
-  const [activeTab, setActiveTab] = useState<Tab>("general");
+  const [activeTab, setActiveTab] = useState<Tab>("profile");
   const [showAddUser, setShowAddUser] = useState(false);
 
   const { data: profiles = [], refetch: refetchProfiles } = useSupabaseTable<
