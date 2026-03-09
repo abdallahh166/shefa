@@ -24,7 +24,7 @@ const DEMO_APPOINTMENTS = [
 ];
 
 export const DashboardPage = () => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { user } = useAuth();
   const isDemo = user?.tenantId === "demo";
 
