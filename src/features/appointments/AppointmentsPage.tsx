@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { PermissionGuard } from "@/core/auth/PermissionGuard";
 import { CalendarPlus, CheckCircle, XCircle, Play, CalendarDays, List } from "lucide-react";
 import { useSupabaseTable } from "@/hooks/useSupabaseQuery";
+import { formatDate } from "@/shared/utils/formatDate";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { useAuth } from "@/core/auth/authStore";
 import { NewAppointmentModal } from "./NewAppointmentModal";
