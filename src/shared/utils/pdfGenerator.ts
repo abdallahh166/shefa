@@ -1,5 +1,8 @@
 import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import autoTable, { applyPlugin } from "jspdf-autotable";
+
+// Ensure the plugin is attached in browser builds (avoids doc.autoTable undefined in some bundler setups).
+applyPlugin(jsPDF);
 
 interface TableColumn {
   header: string;
