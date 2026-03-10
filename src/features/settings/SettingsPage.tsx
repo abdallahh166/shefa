@@ -15,7 +15,7 @@ import { ProfileTab } from "./tabs/ProfileTab";
 import { SubscriptionTab } from "./tabs/SubscriptionTab";
 import { fetchProfilesWithRoles } from "@/shared/data/profiles";
 
-type Tab = "profile" | "general" | "users" | "notifications" | "appearance" | "security" | "audit";
+type Tab = "profile" | "general" | "users" | "notifications" | "appearance" | "security" | "audit" | "subscription";
 
 export const SettingsPage = () => {
   const { t } = useI18n();
