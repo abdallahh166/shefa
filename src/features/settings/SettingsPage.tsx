@@ -40,6 +40,7 @@ export const SettingsPage = () => {
     { key: "notifications", icon: Bell, label: t("common.notifications") },
     { key: "appearance", icon: Palette, label: t("settings.appearance") },
     { key: "audit", icon: ScrollText, label: t("settings.auditLog") },
+    { key: "subscription", icon: CreditCard, label: "الاشتراك" },
   ];
 
   return (
