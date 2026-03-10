@@ -324,7 +324,7 @@ export async function generatePatientReportPDF(data: PatientReportData) {
   // ── Prescriptions ──
   if (prescriptions.length > 0) {
     addSectionTitle(l.prescriptions);
-    const table = autoTable(doc, {
+    autoTable(doc, {
       startY: y,
       head: [[l.medication, l.dosage, l.date, l.doctor, l.status]],
       body: prescriptions.map((rx) => [
@@ -339,7 +339,7 @@ export async function generatePatientReportPDF(data: PatientReportData) {
       styles: { fontSize: 8, cellPadding: 2 },
       margin: { left: 14, right: 14 },
     });
-    y = table.finalY + 4;
+    y = (doc as any).lastAutoTable.finalY + 4;
   }
 
   // ── Lab Orders ──
