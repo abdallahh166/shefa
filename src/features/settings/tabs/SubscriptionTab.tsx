@@ -80,7 +80,7 @@ export const SubscriptionTab = () => {
 
             {daysRemaining > 0 && !isExpired && (
               <div className="flex items-center gap-3 text-sm">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <CheckCircle2 className="h-4 w-4 text-primary" />
                 <span className="text-muted-foreground">الأيام المتبقية:</span>
                 <span className="font-medium">{daysRemaining} يوم</span>
               </div>
@@ -88,8 +88,8 @@ export const SubscriptionTab = () => {
 
             {isTrialing && (
               <div className="flex items-center gap-3 text-sm">
-                <CreditCard className="h-4 w-4 text-blue-500" />
-                <span className="text-blue-600 font-medium">أنت في فترة تجريبية</span>
+                <CreditCard className="h-4 w-4 text-primary" />
+                <span className="text-primary font-medium">أنت في فترة تجريبية</span>
               </div>
             )}
           </div>
