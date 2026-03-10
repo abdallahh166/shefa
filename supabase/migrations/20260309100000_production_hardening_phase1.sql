@@ -272,11 +272,17 @@ REVOKE ALL ON FUNCTION public.schedule_appointment_reminders(text, text, text) F
 DO $$
 DECLARE
   _secret text := current_setting('app.settings.reminder_cron_secret', true);
+  _url text := current_setting('app.settings.reminder_function_url', true);
 BEGIN
-  IF _secret IS NOT NULL AND length(trim(_secret)) >= 16 THEN
+  -- Only auto-schedule when both the URL and secret are explicitly configured.
+  -- This avoids hard-coding a specific Supabase project URL into a migration.
+  IF
+    _secret IS NOT NULL AND length(trim(_secret)) >= 16
+    AND _url IS NOT NULL AND length(trim(_url)) > 0
+  THEN
     PERFORM public.schedule_appointment_reminders(
       '*/30 * * * *',
-      'https://sspayyqutfdjusqcaqwy.supabase.co/functions/v1/appointment-reminders',
+      _url,
       _secret
     );
   END IF;
