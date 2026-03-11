@@ -140,7 +140,7 @@ export const DoctorScheduleModal = ({ open, onClose, doctorId, doctorName }: Pro
                   className="w-28"
                   disabled={!row.is_active}
                 />
-                <span className="text-muted-foreground text-sm">-></span>
+                <span className="text-muted-foreground text-sm">-&gt;</span>
                 <Input
                   type="time"
                   value={row.end_time}
