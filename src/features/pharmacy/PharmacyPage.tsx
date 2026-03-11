@@ -89,7 +89,6 @@ export const PharmacyPage = () => {
         unit: m.unit,
         price: Number(m.price),
         status: m.status as MedicationRow["status"],
-        status: m.status,
       }));
 
   const demoFiltered = useMemo(() => {
