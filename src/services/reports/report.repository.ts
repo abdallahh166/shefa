@@ -82,7 +82,7 @@ export const reportRepository: ReportRepository = {
     return (data ?? []) as RevenueByServiceRow[];
   },
   async getDoctorPerformance(_tenantId) {
-    const { data, error } = await supabase.rpc("get_report_doctor_performance");
+    const { data, error } = await (supabase.rpc as any)("get_report_doctor_performance");
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load doctor performance report", {
         code: error.code,
