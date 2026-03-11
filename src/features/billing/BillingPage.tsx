@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { StatCard } from "@/shared/components/StatCard";
 import { StatusBadge } from "@/shared/components/StatusBadge";
@@ -18,13 +18,6 @@ import { patientService } from "@/services/patients/patient.service";
 import { queryKeys } from "@/services/queryKeys";
 import type { InvoiceWithPatient } from "@/domain/billing/billing.types";
 import type { Patient } from "@/domain/patient/patient.types";
-
-const DEMO_INVOICES = [
-  { id: "1", invoice_code: "INV-001", patient_name: "Mohammed Al-Rashid", service: "Cardiology Consultation", amount: 350, invoice_date: "2026-03-08", status: "paid" },
-  { id: "2", invoice_code: "INV-002", patient_name: "Fatima Hassan", service: "Follow-up Visit", amount: 150, invoice_date: "2026-03-07", status: "paid" },
-  { id: "3", invoice_code: "INV-003", patient_name: "Ali Mansour", service: "Lab Work - Complete Panel", amount: 520, invoice_date: "2026-03-06", status: "pending" },
-  { id: "4", invoice_code: "INV-004", patient_name: "Noor Ibrahim", service: "Pediatric Check-up", amount: 200, invoice_date: "2026-03-05", status: "overdue" },
-];
 
 const statusVariant = { paid: "success", pending: "warning", overdue: "destructive" } as const;
 
@@ -47,7 +40,6 @@ export const BillingPage = () => {
   const { t, locale } = useI18n();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const isDemo = user?.tenantId === "demo";
   const [showModal, setShowModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -71,13 +63,13 @@ export const BillingPage = () => {
       filters: statusFilter ? { status: statusFilter } : undefined,
       sort: { column: "created_at", ascending: false },
     }),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
   });
 
   const { data: patientPage } = useQuery({
     queryKey: queryKeys.patients.list({ tenantId: user?.tenantId, page: 1, pageSize: 500 }),
     queryFn: async () => patientService.listPaged({ page: 1, pageSize: 500, sort: { column: "full_name", ascending: true } }),
-    enabled: !!user?.tenantId && !isDemo,
+    enabled: !!user?.tenantId,
   });
 
   const patients: Patient[] = patientPage?.data ?? [];
@@ -95,70 +87,42 @@ export const BillingPage = () => {
 
   const { data: invoiceSummary = { total_count: 0, paid_count: 0, paid_amount: 0, pending_amount: 0 } } = useQuery({
     queryKey: queryKeys.billing.summary(user?.tenantId),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
     queryFn: async () => billingService.getSummary(),
   });
 
   const { data: invoicesThisMonth = 0 } = useQuery({
     queryKey: queryKeys.billing.monthCount(user?.tenantId, monthKey),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
     queryFn: async () => billingService.countInRange(monthStart, monthEnd),
   });
 
   const liveInvoices: InvoiceRow[] = listPage?.data ?? [];
   const totalInvoices = listPage?.count ?? 0;
 
-  const invoices: InvoiceDisplayRow[] = isDemo
-    ? DEMO_INVOICES
-    : liveInvoices.map((inv) => ({
-        id: inv.id,
-        invoice_code: inv.invoice_code,
-        patient_name: inv.patients?.full_name ?? "-",
-        service: inv.service,
-        amount: Number(inv.amount),
-        invoice_date: inv.invoice_date,
-        status: inv.status,
-      }));
+  const invoices: InvoiceDisplayRow[] = liveInvoices.map((inv) => ({
+    id: inv.id,
+    invoice_code: inv.invoice_code,
+    patient_name: inv.patients?.full_name ?? "-",
+    service: inv.service,
+    amount: Number(inv.amount),
+    invoice_date: inv.invoice_date,
+    status: inv.status,
+  }));
 
-  const demoFiltered = useMemo(() => {
-    if (!isDemo) return invoices;
-    const q = searchTerm.trim().toLowerCase();
-    return invoices.filter((i) => {
-      if (statusFilter && i.status !== statusFilter) return false;
-      if (!q) return true;
-      return (
-        i.invoice_code.toLowerCase().includes(q) ||
-        i.patient_name.toLowerCase().includes(q) ||
-        i.service.toLowerCase().includes(q) ||
-        i.status.toLowerCase().includes(q)
-      );
-    });
-  }, [invoices, isDemo, searchTerm, statusFilter]);
-
-  const pagedDemo = isDemo ? demoFiltered.slice((page - 1) * pageSize, page * pageSize) : invoices;
-  const total = isDemo ? demoFiltered.length : totalInvoices;
-
-  const demoPaidAmount = DEMO_INVOICES.filter((i) => i.status === "paid").reduce((s, i) => s + i.amount, 0);
-  const demoPendingAmount = DEMO_INVOICES.filter((i) => i.status === "pending" || i.status === "overdue").reduce((s, i) => s + i.amount, 0);
-  const demoPaidCount = DEMO_INVOICES.filter((i) => i.status === "paid").length;
-  const demoMonthCount = DEMO_INVOICES.filter((i) => {
-    const d = new Date(i.invoice_date);
-    return d >= monthStartDate && d < monthEndDate;
-  }).length;
-
-  const totalRevenue = isDemo ? demoPaidAmount : invoiceSummary.paid_amount;
-  const pendingAmount = isDemo ? demoPendingAmount : invoiceSummary.pending_amount;
-  const totalCount = isDemo ? DEMO_INVOICES.length : invoiceSummary.total_count;
-  const paidCount = isDemo ? demoPaidCount : invoiceSummary.paid_count;
+  const total = totalInvoices;
+  const totalRevenue = invoiceSummary.paid_amount;
+  const pendingAmount = invoiceSummary.pending_amount;
+  const totalCount = invoiceSummary.total_count;
+  const paidCount = invoiceSummary.paid_count;
   const collectionRate = totalCount ? Math.round((paidCount / totalCount) * 100) : 0;
-  const invoicesThisMonthValue = isDemo ? demoMonthCount : invoicesThisMonth;
+  const invoicesThisMonthValue = invoicesThisMonth;
 
   const invalidateInvoices = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.billing.root(user?.tenantId) });
   };
 
   const handleMarkPaid = async (id: string) => {
-    if (isDemo) return;
     try {
       await billingService.update(id, { status: "paid" });
       toast({ title: t("billing.invoiceMarkedPaid") });
@@ -216,13 +180,13 @@ export const BillingPage = () => {
 
       <DataTable
         columns={columns}
-        data={pagedDemo}
+        data={invoices}
         keyExtractor={(inv) => inv.id}
         searchable
         serverSearch
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
-        isLoading={!isDemo && isLoading}
+        isLoading={isLoading}
         exportFileName="invoices"
         pdfExport={{
           title: t("billing.title"),

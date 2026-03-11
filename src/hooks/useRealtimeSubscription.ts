@@ -12,7 +12,7 @@ export function useRealtimeSubscription(tables: RealtimeTable[]) {
   const tablesKey = [...new Set(tables)].sort().join("|");
 
   useEffect(() => {
-    if (!tenantId || tenantId === "demo") return;
+    if (!tenantId) return;
 
     const watchedTables = tablesKey.split("|").filter(Boolean) as RealtimeTable[];
     if (watchedTables.length === 0) return;

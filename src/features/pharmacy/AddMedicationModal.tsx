@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
-import { useAuth } from "@/core/auth/authStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,8 +21,6 @@ const CATEGORIES = [
 
 export const AddMedicationModal = ({ open, onClose, onSuccess }: AddMedicationModalProps) => {
   const { t } = useI18n();
-  const { user } = useAuth();
-  const isDemo = user?.tenantId === "demo";
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -39,10 +36,6 @@ export const AddMedicationModal = ({ open, onClose, onSuccess }: AddMedicationMo
     e.preventDefault();
     if (!form.name) {
       toast({ title: "Medication name required", variant: "destructive" });
-      return;
-    }
-    if (isDemo) {
-      toast({ title: t("common.demoMode"), description: t("common.demoModeNoSave"), variant: "destructive" });
       return;
     }
     setLoading(true);

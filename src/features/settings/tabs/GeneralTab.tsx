@@ -15,7 +15,6 @@ import { queryKeys } from "@/services/queryKeys";
 export const GeneralTab = () => {
   const { t, calendarType, setCalendarType } = useI18n();
   const { user } = useAuth();
-  const isDemo = user?.tenantId === "demo";
   const [saving, setSaving] = useState(false);
   const [clinicName, setClinicName] = useState(user?.tenantName ?? "");
   const [clinicPhone, setClinicPhone] = useState("");
@@ -24,7 +23,7 @@ export const GeneralTab = () => {
 
   const { data: tenant } = useQuery({
     queryKey: queryKeys.settings.tenant(user?.tenantId),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
     queryFn: () => tenantService.getCurrentTenant(),
   });
 
@@ -37,10 +36,6 @@ export const GeneralTab = () => {
   }, [tenant]);
 
   const handleSave = async () => {
-    if (isDemo) {
-      toast({ title: t("common.demoMode"), description: t("common.demoModeNoSave"), variant: "destructive" });
-      return;
-    }
     setSaving(true);
     try {
       await tenantService.updateCurrentTenant({

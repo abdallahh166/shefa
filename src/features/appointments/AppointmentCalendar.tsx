@@ -34,7 +34,7 @@ function toLocalYMD(d: Date) {
 }
 
 function parseAppointmentDate(raw: string): Date {
-  // Handles ISO, and "YYYY-MM-DD HH:mm" (demo)
+  // Handles ISO, and "YYYY-MM-DD HH:mm"
   if (!raw) return new Date(NaN);
   if (raw.includes("T")) return new Date(raw);
   if (raw.includes(" ")) return new Date(raw.replace(" ", "T"));

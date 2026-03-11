@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -16,81 +16,12 @@ import type { Doctor } from "@/domain/doctor/doctor.types";
 import { doctorService } from "@/services/doctors/doctor.service";
 import { queryKeys } from "@/services/queryKeys";
 
-const DEMO_DOCTORS: Doctor[] = [
-  {
-    id: "00000000-0000-0000-0000-000000000001",
-    tenant_id: "00000000-0000-0000-0000-000000000000",
-    user_id: null,
-    full_name: "Dr. Sarah Ahmed",
-    specialty: "Cardiology",
-    rating: 4.9,
-    status: "available",
-    email: "sarah@clinic.com",
-    phone: "+966 50 111 2222",
-    created_at: "2026-03-01T08:00:00Z",
-    updated_at: "2026-03-01T08:00:00Z",
-  },
-  {
-    id: "00000000-0000-0000-0000-000000000002",
-    tenant_id: "00000000-0000-0000-0000-000000000000",
-    user_id: null,
-    full_name: "Dr. John Smith",
-    specialty: "Orthopedics",
-    rating: 4.7,
-    status: "busy",
-    email: "john@clinic.com",
-    phone: "+966 50 333 4444",
-    created_at: "2026-03-02T08:00:00Z",
-    updated_at: "2026-03-02T08:00:00Z",
-  },
-  {
-    id: "00000000-0000-0000-0000-000000000003",
-    tenant_id: "00000000-0000-0000-0000-000000000000",
-    user_id: null,
-    full_name: "Dr. Layla Khalid",
-    specialty: "Pediatrics",
-    rating: 4.8,
-    status: "available",
-    email: "layla@clinic.com",
-    phone: "+966 50 555 6666",
-    created_at: "2026-03-03T08:00:00Z",
-    updated_at: "2026-03-03T08:00:00Z",
-  },
-  {
-    id: "00000000-0000-0000-0000-000000000004",
-    tenant_id: "00000000-0000-0000-0000-000000000000",
-    user_id: null,
-    full_name: "Dr. Omar Hassan",
-    specialty: "Dermatology",
-    rating: 4.6,
-    status: "on_leave",
-    email: "omar@clinic.com",
-    phone: "+966 50 777 8888",
-    created_at: "2026-03-04T08:00:00Z",
-    updated_at: "2026-03-04T08:00:00Z",
-  },
-  {
-    id: "00000000-0000-0000-0000-000000000005",
-    tenant_id: "00000000-0000-0000-0000-000000000000",
-    user_id: null,
-    full_name: "Dr. Amira Nasser",
-    specialty: "Neurology",
-    rating: 4.9,
-    status: "available",
-    email: "amira@clinic.com",
-    phone: "+966 50 999 0000",
-    created_at: "2026-03-05T08:00:00Z",
-    updated_at: "2026-03-05T08:00:00Z",
-  },
-];
-
 const statusVariant: Record<string, "success" | "warning" | "default"> = { available: "success", busy: "warning", on_leave: "default" };
 
 export const DoctorsPage = () => {
   const { t } = useI18n();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const isDemo = user?.tenantId === "demo";
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -114,36 +45,24 @@ export const DoctorsPage = () => {
       pageSize,
       search: searchTerm.trim() || undefined,
     }),
-    enabled: !!user?.tenantId && !isDemo,
+    enabled: !!user?.tenantId,
   });
 
-  const doctors = isDemo ? DEMO_DOCTORS : (doctorPage?.data ?? []);
-  const totalDoctors = isDemo ? DEMO_DOCTORS.length : (doctorPage?.count ?? 0);
+  const doctors = doctorPage?.data ?? [];
+  const totalDoctors = doctorPage?.count ?? 0;
 
   useEffect(() => {
     setPage(1);
   }, [searchTerm]);
 
-  const demoFiltered = useMemo(() => {
-    if (!isDemo) return doctors;
-    const q = searchTerm.trim().toLowerCase();
-    if (!q) return doctors;
-    return doctors.filter((d) =>
-      d.full_name.toLowerCase().includes(q) ||
-      d.specialty.toLowerCase().includes(q) ||
-      (d.email ?? "").toLowerCase().includes(q) ||
-      (d.phone ?? "").toLowerCase().includes(q)
-    );
-  }, [doctors, isDemo, searchTerm]);
-
-  const pagedDoctors = isDemo ? demoFiltered.slice((page - 1) * pageSize, page * pageSize) : doctors;
-  const total = isDemo ? demoFiltered.length : totalDoctors;
+  const pagedDoctors = doctors;
+  const total = totalDoctors;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const pageStart = total ? (page - 1) * pageSize + 1 : 0;
   const pageEnd = total ? Math.min(total, page * pageSize) : 0;
 
   const handleDelete = async () => {
-    if (!deleteId || isDemo) return;
+    if (!deleteId) return;
     setDeleting(true);
     try {
       await doctorService.remove(deleteId);
@@ -159,7 +78,6 @@ export const DoctorsPage = () => {
   };
 
   const handleStatusChange = async (id: string, newStatus: string) => {
-    if (isDemo) return;
     try {
       await doctorService.update(id, { status: newStatus as Doctor["status"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.doctors.root(user?.tenantId) });
@@ -198,7 +116,7 @@ export const DoctorsPage = () => {
         />
       </div>
 
-      {!isDemo && isLoading ? (
+      {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">
           <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2" />
           {t("common.loading")}
@@ -274,7 +192,7 @@ export const DoctorsPage = () => {
                 <div className="flex items-center justify-end text-sm mt-3 pt-3 border-t">
                   <div className="flex items-center gap-1">
                     <Star className="h-3.5 w-3.5 fill-warning text-warning" />
-                    <span className="font-medium">{doc.rating ?? "â€”"}</span>
+                    <span className="font-medium">{doc.rating ?? "-"}</span>
                   </div>
                 </div>
               </div>

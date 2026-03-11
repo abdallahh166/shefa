@@ -26,41 +26,6 @@ import { tenantService } from "@/services/settings/tenant.service";
 
 type Tab = "overview" | "history" | "prescriptions" | "notes" | "lab_orders" | "invoices" | "appointments" | "documents";
 
-const DEMO_PATIENT = {
-  id: "PT-001", full_name: "Mohammed Al-Rashid", date_of_birth: "1985-03-15", gender: "male",
-  blood_type: "A+", phone: "+966 50 123 4567", email: "m.rashid@email.com",
-  address: "123 King Fahd Rd, Riyadh", insurance_provider: "National Health Co.", status: "active",
-};
-
-const DEMO_MEDICAL_HISTORY = [
-  { id: "1", record_date: "2026-03-05", diagnosis: "Hypertension - Stage 1", doctors: { full_name: "Dr. Sarah Ahmed" }, notes: "BP 145/92. Started Lisinopril 10mg daily.", record_type: "progress_note" },
-  { id: "2", record_date: "2026-02-10", diagnosis: "Type 2 Diabetes - Controlled", doctors: { full_name: "Dr. Sarah Ahmed" }, notes: "HbA1c 6.8%. Continue Metformin 500mg BID.", record_type: "lab_review" },
-];
-
-const DEMO_PRESCRIPTIONS = [
-  { id: "RX-001", medication: "Lisinopril 10mg", dosage: "1 tablet daily", prescribed_date: "2026-03-05", doctors: { full_name: "Dr. Sarah Ahmed" }, status: "active" },
-  { id: "RX-002", medication: "Metformin 500mg", dosage: "1 tablet twice daily", prescribed_date: "2026-02-10", doctors: { full_name: "Dr. Sarah Ahmed" }, status: "active" },
-];
-
-const DEMO_LAB_ORDERS = [
-  { id: "LB-001", test_name: "Complete Blood Count (CBC)", doctors: { full_name: "Dr. Sarah Ahmed" }, order_date: "2026-03-05", status: "completed", result: "Normal ranges. WBC 6.5, RBC 4.8, HGB 14.2." },
-  { id: "LB-002", test_name: "HbA1c", doctors: { full_name: "Dr. Sarah Ahmed" }, order_date: "2026-02-10", status: "completed", result: "6.8% — Controlled." },
-  { id: "LB-003", test_name: "Lipid Panel", doctors: { full_name: "Dr. Sarah Ahmed" }, order_date: "2026-03-08", status: "processing", result: null },
-];
-
-const DEMO_INVOICES = [
-  { id: "INV-001", invoice_code: "INV-001", service: "Cardiology Consultation", amount: 350, invoice_date: "2026-03-08", status: "paid" },
-  { id: "INV-002", invoice_code: "INV-002", service: "Lab Work — CBC & HbA1c", amount: 180, invoice_date: "2026-02-10", status: "paid" },
-  { id: "INV-003", invoice_code: "INV-003", service: "Follow-up Visit", amount: 120, invoice_date: "2026-03-06", status: "pending" },
-];
-
-const DEMO_APPOINTMENTS = [
-  { id: "APT-001", appointment_date: "2026-03-15T10:00:00", type: "checkup", status: "scheduled", doctors: { full_name: "Dr. Sarah Ahmed" }, notes: "Regular blood pressure follow-up." },
-  { id: "APT-002", appointment_date: "2026-03-05T09:30:00", type: "consultation", status: "completed", doctors: { full_name: "Dr. Sarah Ahmed" }, notes: "Reviewed HbA1c results and adjusted medication." },
-  { id: "APT-003", appointment_date: "2026-02-10T11:00:00", type: "lab_review", status: "completed", doctors: { full_name: "Dr. Sarah Ahmed" }, notes: "Lab results reviewed. All within normal range." },
-  { id: "APT-004", appointment_date: "2026-01-20T14:00:00", type: "checkup", status: "completed", doctors: { full_name: "Dr. Sarah Ahmed" }, notes: "Routine checkup. No concerns." },
-  { id: "APT-005", appointment_date: "2026-03-22T10:30:00", type: "follow_up", status: "scheduled", doctors: { full_name: "Dr. Sarah Ahmed" }, notes: null },
-];
 
 const labStatusVariant: Record<string, "default" | "warning" | "success"> = {
   pending: "default", processing: "warning", completed: "success",
@@ -78,14 +43,10 @@ export const PatientDetailPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
-  const isDemo = user?.tenantId === "demo";
 
   const { data: tenant } = useQuery({
     queryKey: queryKeys.settings.tenant(user?.tenantId),
-    queryFn: async () => {
-      if (isDemo) return { name: "Demo Clinic", logo_url: null } as any;
-      return tenantService.getCurrentTenant();
-    },
+    queryFn: () => tenantService.getCurrentTenant(),
     enabled: !!user?.tenantId,
   });
 
@@ -103,61 +64,55 @@ export const PatientDetailPage = () => {
   const { data: patient, isLoading: loadingPatient } = useQuery({
     queryKey: queryKeys.patients.detail(patientId ?? "", user?.tenantId),
     queryFn: async () => {
-      if (isDemo) return DEMO_PATIENT as any;
       if (!patientId) return null;
       return patientService.getById(patientId);
     },
-    enabled: !!patientId && (!!user?.tenantId || isDemo),
+    enabled: !!patientId && !!user?.tenantId,
   });
 
   const { data: medicalRecords = [] } = useQuery({
     queryKey: queryKeys.patients.medicalRecords(patientId ?? "", user?.tenantId),
     queryFn: async () => {
-      if (isDemo) return DEMO_MEDICAL_HISTORY as any[];
       if (!patientId) return [];
       return medicalRecordsService.listByPatient(patientId);
     },
-    enabled: !!patientId && (!!user?.tenantId || isDemo),
+    enabled: !!patientId && !!user?.tenantId,
   });
 
   const { data: prescriptions = [] } = useQuery({
     queryKey: queryKeys.prescriptions.list({ tenantId: user?.tenantId, filters: { patient_id: patientId } }),
     queryFn: async () => {
-      if (isDemo) return DEMO_PRESCRIPTIONS as any[];
       if (!patientId) return [];
       return prescriptionService.listByPatient(patientId);
     },
-    enabled: !!patientId && (!!user?.tenantId || isDemo),
+    enabled: !!patientId && !!user?.tenantId,
   });
 
   const { data: labOrders = [] } = useQuery({
     queryKey: queryKeys.laboratory.list({ tenantId: user?.tenantId, filters: { patient_id: patientId } }),
     queryFn: async () => {
-      if (isDemo) return DEMO_LAB_ORDERS as any[];
       if (!patientId) return [];
       return labService.listByPatient(patientId);
     },
-    enabled: !!patientId && (!!user?.tenantId || isDemo),
+    enabled: !!patientId && !!user?.tenantId,
   });
 
   const { data: patientAppointments = [] } = useQuery({
     queryKey: queryKeys.appointments.list({ tenantId: user?.tenantId, filters: { patient_id: patientId } }),
     queryFn: async () => {
-      if (isDemo) return DEMO_APPOINTMENTS as any[];
       if (!patientId) return [];
       return appointmentService.listByPatient(patientId);
     },
-    enabled: !!patientId && (!!user?.tenantId || isDemo),
+    enabled: !!patientId && !!user?.tenantId,
   });
 
   const { data: invoices = [] } = useQuery({
     queryKey: queryKeys.billing.list({ tenantId: user?.tenantId, filters: { patient_id: patientId } }),
     queryFn: async () => {
-      if (isDemo) return DEMO_INVOICES as any[];
       if (!patientId) return [];
       return billingService.listByPatient(patientId);
     },
-    enabled: !!patientId && (!!user?.tenantId || isDemo),
+    enabled: !!patientId && !!user?.tenantId,
   });
 
   const getLabStatusLabel = (s: string) =>
@@ -633,7 +588,7 @@ export const PatientDetailPage = () => {
 
       {/* ── DOCUMENTS ── */}
       {activeTab === "documents" && (
-        <PatientDocuments patientId={patientId ?? ""} isDemo={isDemo} />
+        <PatientDocuments patientId={patientId ?? ""} />
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth, Role } from "@/core/auth/authStore";
+import { useAuth } from "@/core/auth/authStore";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
@@ -98,19 +98,6 @@ export const LoginPage = () => {
 
     toast({ title: t("auth.checkEmail"), description: t("auth.confirmationSent") });
     setLoading(false);
-  };
-
-  const demoLogin = (name: string, emailVal: string, role: Role) => {
-    useAuth.getState().setUser({
-      id: "demo-user",
-      name,
-      email: emailVal,
-      role,
-      tenantId: "demo",
-      tenantSlug: "demo-clinic",
-      tenantName: "MedFlow Demo Clinic",
-    });
-    navigate("/tenant/demo-clinic/dashboard");
   };
 
   const isSignupDisabled =
@@ -230,32 +217,6 @@ export const LoginPage = () => {
             </button>
           </div>
 
-          <div className="mt-6">
-            <p className="text-xs text-muted-foreground mb-3">{t("auth.demoLogin")}</p>
-            <div className="space-y-2">
-              {[
-                { name: "Dr. Sarah Ahmed", email: "admin@medflow.com", role: "clinic_admin" as Role },
-                { name: "Dr. John Smith", email: "doctor@medflow.com", role: "doctor" as Role },
-                { name: "Emily Davis", email: "receptionist@medflow.com", role: "receptionist" as Role },
-                { name: "Linda Carter", email: "nurse@medflow.com", role: "nurse" as Role },
-                { name: "James Wilson", email: "accountant@medflow.com", role: "accountant" as Role },
-              ].map((u) => (
-                <button
-                  key={u.email}
-                  onClick={() => demoLogin(u.name, u.email, u.role)}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors text-start"
-                >
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
-                    {u.name.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{u.name}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{t(`roles.${u.role}`)}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>

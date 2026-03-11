@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { StatCard } from "@/shared/components/StatCard";
 import { StatusBadge } from "@/shared/components/StatusBadge";
@@ -18,13 +18,6 @@ import { queryKeys } from "@/services/queryKeys";
 import type { InsuranceClaimWithPatient } from "@/domain/insurance/insurance.types";
 import type { Patient } from "@/domain/patient/patient.types";
 
-const DEMO_CLAIMS = [
-  { id: "1", patient_name: "Mohammed Al-Rashid", provider: "National Health Co.", service: "Cardiology Consultation", amount: 350, claim_date: "2026-03-08", status: "approved" },
-  { id: "2", patient_name: "Fatima Hassan", provider: "Gulf Insurance", service: "Follow-up Visit", amount: 150, claim_date: "2026-03-07", status: "pending" },
-  { id: "3", patient_name: "Ali Mansour", provider: "MedCare Plus", service: "Lab Work", amount: 520, claim_date: "2026-03-06", status: "approved" },
-  { id: "4", patient_name: "Noor Ibrahim", provider: "National Health Co.", service: "Pediatric Check-up", amount: 200, claim_date: "2026-03-05", status: "rejected" },
-];
-
 const statusVariant: Record<string, "success" | "warning" | "destructive"> = { approved: "success", pending: "warning", rejected: "destructive" };
 
 type ClaimRow = InsuranceClaimWithPatient;
@@ -43,7 +36,6 @@ export const InsurancePage = () => {
   const { t, locale, calendarType } = useI18n();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const isDemo = user?.tenantId === "demo";
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [page, setPage] = useState(1);
@@ -67,13 +59,13 @@ export const InsurancePage = () => {
       filters: statusFilter ? { status: statusFilter } : undefined,
       sort: { column: "claim_date", ascending: false },
     }),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
   });
 
   const { data: patientPage } = useQuery({
     queryKey: queryKeys.patients.list({ tenantId: user?.tenantId, page: 1, pageSize: 500 }),
     queryFn: async () => patientService.listPaged({ page: 1, pageSize: 500, sort: { column: "full_name", ascending: true } }),
-    enabled: !!user?.tenantId && !isDemo,
+    enabled: !!user?.tenantId,
   });
 
   const patients: Patient[] = patientPage?.data ?? [];
@@ -84,52 +76,28 @@ export const InsurancePage = () => {
 
   const { data: insuranceSummary = { total_count: 0, pending_count: 0, approved_count: 0, rejected_count: 0, providers_count: 0 } } = useQuery({
     queryKey: queryKeys.insurance.summary(user?.tenantId),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
     queryFn: async () => insuranceService.getSummary(),
   });
 
   const liveClaims: ClaimRow[] = listPage?.data ?? [];
   const totalClaims = listPage?.count ?? 0;
 
-  const claims: ClaimDisplayRow[] = isDemo
-    ? DEMO_CLAIMS
-    : liveClaims.map((c) => ({
-        id: c.id,
-        patient_name: c.patients?.full_name ?? "-",
-        provider: c.provider,
-        service: c.service,
-        amount: Number(c.amount),
-        claim_date: c.claim_date,
-        status: c.status,
-      }));
+  const claims: ClaimDisplayRow[] = liveClaims.map((c) => ({
+    id: c.id,
+    patient_name: c.patients?.full_name ?? "-",
+    provider: c.provider,
+    service: c.service,
+    amount: Number(c.amount),
+    claim_date: c.claim_date,
+    status: c.status,
+  }));
 
-  const demoFiltered = useMemo(() => {
-    if (!isDemo) return claims;
-    const q = searchTerm.trim().toLowerCase();
-    return claims.filter((c) => {
-      if (statusFilter && c.status !== statusFilter) return false;
-      if (!q) return true;
-      return (
-        c.patient_name.toLowerCase().includes(q) ||
-        c.provider.toLowerCase().includes(q) ||
-        c.service.toLowerCase().includes(q) ||
-        c.status.toLowerCase().includes(q)
-      );
-    });
-  }, [claims, isDemo, searchTerm, statusFilter]);
-
-  const pagedDemo = isDemo ? demoFiltered.slice((page - 1) * pageSize, page * pageSize) : claims;
-  const total = isDemo ? demoFiltered.length : totalClaims;
-
-  const demoProviderCount = new Set(DEMO_CLAIMS.map((c) => c.provider)).size;
-  const demoPending = DEMO_CLAIMS.filter((c) => c.status === "pending").length;
-  const demoApproved = DEMO_CLAIMS.filter((c) => c.status === "approved").length;
-  const demoTotal = DEMO_CLAIMS.length;
-
-  const pending = isDemo ? demoPending : insuranceSummary.pending_count;
-  const approved = isDemo ? demoApproved : insuranceSummary.approved_count;
-  const providerCount = isDemo ? demoProviderCount : insuranceSummary.providers_count;
-  const totalCount = isDemo ? demoTotal : insuranceSummary.total_count;
+  const total = totalClaims;
+  const pending = insuranceSummary.pending_count;
+  const approved = insuranceSummary.approved_count;
+  const providerCount = insuranceSummary.providers_count;
+  const totalCount = insuranceSummary.total_count;
   const rate = totalCount ? Math.round((approved / totalCount) * 100) : 0;
 
   const invalidateClaims = () => {
@@ -137,7 +105,6 @@ export const InsurancePage = () => {
   };
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
-    if (isDemo) return;
     try {
       await insuranceService.update(id, { status: newStatus as ClaimDisplayRow["status"] });
       toast({ title: newStatus === "approved" ? t("insurance.approved") : t("insurance.rejected") });
@@ -201,13 +168,13 @@ export const InsurancePage = () => {
 
       <DataTable
         columns={columns}
-        data={pagedDemo}
+        data={claims}
         keyExtractor={(c) => c.id}
         searchable
         serverSearch
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
-        isLoading={!isDemo && isLoading}
+        isLoading={isLoading}
         page={page}
         pageSize={pageSize}
         total={total}

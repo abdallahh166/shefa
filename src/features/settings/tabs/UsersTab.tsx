@@ -6,11 +6,10 @@ import type { ProfileWithRoles } from "@/domain/settings/profile.types";
 
 interface UsersTabProps {
   profiles: ProfileWithRoles[];
-  isDemo: boolean;
   onAddUser: () => void;
 }
 
-export const UsersTab = ({ profiles, isDemo, onAddUser }: UsersTabProps) => {
+export const UsersTab = ({ profiles, onAddUser }: UsersTabProps) => {
   const { t } = useI18n();
 
   return (
@@ -31,14 +30,7 @@ export const UsersTab = ({ profiles, isDemo, onAddUser }: UsersTabProps) => {
         fallback={<p className="text-muted-foreground">{t("settings.noPermission")}</p>}
       >
         <div className="space-y-3">
-          {isDemo ? (
-            ["Dr. Sarah Ahmed - Admin", "Dr. John Smith - Doctor", "Emily Davis - Receptionist"].map((u, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-lg border">
-                <span className="text-sm">{u}</span>
-                <Button variant="outline" size="sm">{t("common.edit")}</Button>
-              </div>
-            ))
-          ) : profiles.length > 0 ? (
+          {profiles.length > 0 ? (
             profiles.map((p) => (
               <div key={p.id} className="flex items-center justify-between p-3 rounded-lg border">
                 <div className="flex items-center gap-3">

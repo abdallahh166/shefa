@@ -17,15 +17,13 @@ const WARNING_BEFORE_MS = 60 * 1000; // Show warning 60s before logout
 const ACTIVITY_EVENTS = ["mousedown", "keydown", "touchstart", "scroll"] as const;
 
 export const SessionTimeout = () => {
-  const { isAuthenticated, logout, user } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
   const { t } = useI18n();
   const [showWarning, setShowWarning] = useState(false);
   const [countdown, setCountdown] = useState(60);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const warningRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const isDemo = user?.tenantId === "demo";
 
   const clearAllTimers = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -40,7 +38,7 @@ export const SessionTimeout = () => {
   }, [clearAllTimers, logout]);
 
   const resetTimers = useCallback(() => {
-    if (!isAuthenticated || isDemo) return;
+    if (!isAuthenticated) return;
 
     clearAllTimers();
     setShowWarning(false);
@@ -65,7 +63,7 @@ export const SessionTimeout = () => {
     timeoutRef.current = setTimeout(() => {
       handleLogout();
     }, IDLE_TIMEOUT_MS);
-  }, [isAuthenticated, isDemo, clearAllTimers, handleLogout]);
+  }, [isAuthenticated, clearAllTimers, handleLogout]);
 
   const handleContinue = useCallback(() => {
     setShowWarning(false);
@@ -73,7 +71,7 @@ export const SessionTimeout = () => {
   }, [resetTimers]);
 
   useEffect(() => {
-    if (!isAuthenticated || isDemo) return;
+    if (!isAuthenticated) return;
 
     resetTimers();
 
@@ -87,9 +85,9 @@ export const SessionTimeout = () => {
       clearAllTimers();
       ACTIVITY_EVENTS.forEach((evt) => window.removeEventListener(evt, onActivity));
     };
-  }, [isAuthenticated, isDemo, resetTimers, clearAllTimers, showWarning]);
+  }, [isAuthenticated, resetTimers, clearAllTimers, showWarning]);
 
-  if (!isAuthenticated || isDemo) return null;
+  if (!isAuthenticated) return null;
 
   return (
     <AlertDialog open={showWarning}>

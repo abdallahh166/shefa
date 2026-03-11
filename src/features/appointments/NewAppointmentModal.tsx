@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
-import { useAuth } from "@/core/auth/authStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,8 +18,6 @@ interface NewAppointmentModalProps {
 
 export const NewAppointmentModal = ({ open, onClose, onSuccess, patients, doctors }: NewAppointmentModalProps) => {
   const { t } = useI18n();
-  const { user } = useAuth();
-  const isDemo = user?.tenantId === "demo";
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     patient_id: "",
@@ -40,10 +37,6 @@ export const NewAppointmentModal = ({ open, onClose, onSuccess, patients, doctor
         description: t("common.pleaseFillAllRequiredFields"),
         variant: "destructive",
       });
-      return;
-    }
-    if (isDemo) {
-      toast({ title: t("common.demoMode"), description: t("common.demoModeNoSave"), variant: "destructive" });
       return;
     }
     setLoading(true);

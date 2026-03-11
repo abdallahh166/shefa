@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { DataTable, Column } from "@/shared/components/DataTable";
@@ -19,13 +19,6 @@ import type { Patient } from "@/domain/patient/patient.types";
 
 type PatientRow = Patient;
 
-const DEMO_PATIENTS: PatientRow[] = [
-  { id: "1", full_name: "Mohammed Al-Rashid", patient_code: "PT-001", gender: "male", date_of_birth: "1985-03-15", blood_type: "A+", phone: "+966 50 123 4567", status: "active", email: null, address: null, insurance_provider: null, tenant_id: "demo", created_at: "", updated_at: "" },
-  { id: "2", full_name: "Fatima Hassan", patient_code: "PT-002", gender: "female", date_of_birth: "1990-07-22", blood_type: "O-", phone: "+966 55 987 6543", status: "active", email: null, address: null, insurance_provider: null, tenant_id: "demo", created_at: "", updated_at: "" },
-  { id: "3", full_name: "Ali Mansour", patient_code: "PT-003", gender: "male", date_of_birth: "1978-11-30", blood_type: "B+", phone: "+966 53 456 7890", status: "active", email: null, address: null, insurance_provider: null, tenant_id: "demo", created_at: "", updated_at: "" },
-  { id: "4", full_name: "Noor Ibrahim", patient_code: "PT-004", gender: "female", date_of_birth: "1995-01-10", blood_type: "AB+", phone: "+966 54 321 0987", status: "inactive", email: null, address: null, insurance_provider: null, tenant_id: "demo", created_at: "", updated_at: "" },
-];
-
 export const PatientsPage = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -38,7 +31,6 @@ export const PatientsPage = () => {
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const pageSize = 25;
-  const isDemo = user?.tenantId === "demo";
   const canManage = hasPermission("manage_patients");
   const canDelete = hasRole("clinic_admin");
 
@@ -60,7 +52,7 @@ export const PatientsPage = () => {
         filters: statusFilter ? { status: statusFilter } : undefined,
         sort: { column: "created_at", ascending: false },
       }),
-    enabled: !!user?.tenantId && user?.tenantId !== "demo",
+    enabled: !!user?.tenantId,
   });
 
   const livePatients = liveResult?.data ?? [];
@@ -70,31 +62,10 @@ export const PatientsPage = () => {
     setPage(1);
   }, [statusFilter, searchTerm]);
 
-  const patients = isDemo ? DEMO_PATIENTS : livePatients;
-  const demoFiltered = useMemo(() => {
-    if (!isDemo) return patients;
-    const q = searchTerm.trim().toLowerCase();
-    return patients.filter((p) => {
-      if (statusFilter && p.status !== statusFilter) return false;
-      if (!q) return true;
-      return (
-        p.patient_code?.toLowerCase().includes(q) ||
-        p.full_name?.toLowerCase().includes(q) ||
-        (p.phone ?? "").toLowerCase().includes(q) ||
-        (p.email ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [patients, statusFilter, searchTerm, isDemo]);
-  const pagedDemo = isDemo
-    ? demoFiltered.slice((page - 1) * pageSize, page * pageSize)
-    : patients;
-  const total = isDemo ? demoFiltered.length : totalPatients;
+  const patients = livePatients;
+  const total = totalPatients;
 
   const handleBulkDelete = async (selectedIds: string[]) => {
-    if (isDemo) {
-      toast({ title: t("common.demoMode"), variant: "destructive" });
-      return;
-    }
     if (!canDelete) {
       toast({ title: t("settings.noPermission"), variant: "destructive" });
       return;
@@ -154,21 +125,21 @@ export const PatientsPage = () => {
 
       <DataTable
         columns={columns}
-        data={pagedDemo}
+        data={patients}
         keyExtractor={(p) => p.id}
         emptyMessage={t("common.noData")}
         searchable
         serverSearch
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
-        isLoading={!isDemo && isLoading}
+        isLoading={isLoading}
         exportFileName="patients"
         pdfExport={{ title: "Patient List", subtitle: `Generated on ${new Date().toLocaleDateString()}` }}
         page={page}
         pageSize={pageSize}
         total={total}
         onPageChange={setPage}
-        bulkActions={canDelete && !isDemo ? [
+        bulkActions={canDelete ? [
           {
             label: t("common.delete"),
             icon: <Trash2 className="h-4 w-4 me-1" />,

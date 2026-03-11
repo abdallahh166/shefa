@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useI18n } from "@/core/i18n/i18nStore";
-import { useAuth } from "@/core/auth/authStore";
 import { useSupabaseTable } from "@/hooks/useSupabaseQuery";
 import { Tables } from "@/integrations/supabase/types";
 import {
@@ -17,10 +16,8 @@ import { Users, CalendarDays, Stethoscope, Receipt, Search } from "lucide-react"
 export const GlobalSearch = () => {
   const [open, setOpen] = useState(false);
   const { t } = useI18n();
-  const { user } = useAuth();
   const navigate = useNavigate();
   const { clinicSlug } = useParams();
-  const isDemo = user?.tenantId === "demo";
 
   const { data: patients = [] } = useSupabaseTable<Tables<"patients">>("patients");
   const { data: doctors = [] } = useSupabaseTable<Tables<"doctors">>("doctors");

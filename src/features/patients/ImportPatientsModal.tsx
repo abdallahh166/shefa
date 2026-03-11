@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
-import { useAuth } from "@/core/auth/authStore";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -50,7 +49,6 @@ function parseCsvLine(line: string): string[] {
 
 export const ImportPatientsModal = ({ open, onClose, onSuccess }: Props) => {
   const { t } = useI18n();
-  const { user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -72,11 +70,7 @@ export const ImportPatientsModal = ({ open, onClose, onSuccess }: Props) => {
   };
 
   const handleImport = async () => {
-    if (!file || !user) return;
-    if (user.tenantId === "demo") {
-      toast({ title: t("common.demoMode"), variant: "destructive" });
-      return;
-    }
+    if (!file) return;
 
     setImporting(true);
     setResult(null);
