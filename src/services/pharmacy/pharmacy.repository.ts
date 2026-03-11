@@ -93,7 +93,7 @@ export const pharmacyRepository: PharmacyRepository = {
 
     const result = await supabase
       .from("medications")
-      .insert(payload)
+      .insert(payload as any)
       .select(MEDICATION_COLUMNS)
       .single();
 

@@ -158,7 +158,7 @@ export const insuranceRepository: InsuranceRepository = {
 
     const result = await supabase
       .from("insurance_claims")
-      .insert(payload)
+      .insert(payload as any)
       .select(CLAIM_COLUMNS)
       .single();
 

@@ -188,7 +188,7 @@ export const billingRepository: BillingRepository = {
 
     const result = await supabase
       .from("invoices")
-      .insert(payload)
+      .insert(payload as any)
       .select(INVOICE_COLUMNS)
       .single();
 
