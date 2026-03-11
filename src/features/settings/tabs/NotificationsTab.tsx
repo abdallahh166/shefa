@@ -26,19 +26,18 @@ const DEFAULTS: NotifPrefs = {
 export const NotificationsTab = () => {
   const { t } = useI18n();
   const { user } = useAuth();
-  const isDemo = user?.tenantId === "demo";
   const [prefs, setPrefs] = useState<NotifPrefs>(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const { data: loadedPrefs } = useQuery({
     queryKey: user?.id ? queryKeys.settings.notifications(user.id, user.tenantId) : ["settings", "notifications", "anon"],
-    enabled: !isDemo && !!user?.id,
+    enabled: !!user?.id,
     queryFn: () => notificationPreferencesService.getCurrentUserPreferences(user?.id ?? ""),
   });
 
   useEffect(() => {
-    if (isDemo || !user?.id) {
+    if (!user?.id) {
       setLoading(false);
       return;
     }
@@ -52,10 +51,10 @@ export const NotificationsTab = () => {
       });
       setLoading(false);
     }
-  }, [loadedPrefs, isDemo, user?.id]);
+  }, [loadedPrefs, user?.id]);
 
   const handleSave = async () => {
-    if (isDemo || !user?.id) return;
+    if (!user?.id) return;
     setSaving(true);
 
     try {

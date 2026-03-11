@@ -22,100 +22,59 @@ const COLORS = [
   "hsl(38, 92%, 50%)", "hsl(0, 72%, 51%)",
 ];
 
-const DEMO_REVENUE = [
-  { month: "Oct", revenue: 32000, expenses: 22000 },
-  { month: "Nov", revenue: 38000, expenses: 24000 },
-  { month: "Dec", revenue: 35000, expenses: 21000 },
-  { month: "Jan", revenue: 42000, expenses: 26000 },
-  { month: "Feb", revenue: 45000, expenses: 27000 },
-  { month: "Mar", revenue: 48250, expenses: 28000 },
-];
-
-const DEMO_PATIENT_GROWTH = [
-  { month: "Oct", patients: 980 }, { month: "Nov", patients: 1050 },
-  { month: "Dec", patients: 1090 }, { month: "Jan", patients: 1150 },
-  { month: "Feb", patients: 1220 }, { month: "Mar", patients: 1284 },
-];
-
-const DEMO_APPOINTMENT_TYPES = [
-  { name: "Checkup", value: 42 }, { name: "Follow-up", value: 28 },
-  { name: "Consultation", value: 20 }, { name: "Emergency", value: 10 },
-];
-
 type Tab = "revenue" | "patients" | "doctors" | "appointments";
 
 export const ReportsPage = () => {
   const { t } = useI18n();
   const { user } = useAuth();
-  const isDemo = user?.tenantId === "demo";
   const [activeTab, setActiveTab] = useState<Tab>("revenue");
 
   const { data: overview } = useQuery({
     queryKey: queryKeys.reports.overview(user?.tenantId),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
     queryFn: () => reportService.getOverview(),
   });
 
   const { data: revenueData = [] } = useQuery({
     queryKey: queryKeys.reports.revenueByMonth(user?.tenantId),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
     queryFn: () => reportService.getRevenueByMonth(6),
   });
 
   const { data: patientGrowth = [] } = useQuery({
     queryKey: queryKeys.reports.patientGrowth(user?.tenantId),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
     queryFn: () => reportService.getPatientGrowth(6),
   });
 
   const { data: appointmentTypes = [] } = useQuery({
     queryKey: queryKeys.reports.appointmentTypes(user?.tenantId),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
     queryFn: () => reportService.getAppointmentTypes(),
   });
 
   const { data: revenueByService = [] } = useQuery({
     queryKey: queryKeys.reports.revenueByService(user?.tenantId),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
     queryFn: () => reportService.getRevenueByService(6),
   });
 
   const { data: doctorPerformance = [] } = useQuery({
     queryKey: queryKeys.reports.doctorPerformance(user?.tenantId),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
     queryFn: () => reportService.getDoctorPerformance(),
   });
 
   const { data: appointmentStatusCounts = { scheduled: 0, in_progress: 0, completed: 0, cancelled: 0 } } = useQuery({
     queryKey: queryKeys.reports.appointmentStatuses(user?.tenantId),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
     queryFn: () => reportService.getAppointmentStatusCounts(),
   });
 
-  const effectiveRevenueData = isDemo ? DEMO_REVENUE : revenueData;
-  const effectivePatientGrowth = isDemo ? DEMO_PATIENT_GROWTH : patientGrowth;
-  const effectiveAppointmentTypes = isDemo ? DEMO_APPOINTMENT_TYPES : appointmentTypes;
-  const effectiveRevenueByService = isDemo
-    ? [
-        { name: "Consultation", value: 38 },
-        { name: "Lab", value: 24 },
-        { name: "Pharmacy", value: 20 },
-        { name: "Procedures", value: 18 },
-      ]
-    : revenueByService;
-
-  const effectiveDoctorPerformance = isDemo
-    ? [
-        { name: "Dr. Sarah Ahmed", appointments: 38, rating: 4.9, completedRate: "94%", trend: true },
-        { name: "Dr. John Smith", appointments: 29, rating: 4.7, completedRate: "89%", trend: false },
-        { name: "Dr. Layla Khalid", appointments: 42, rating: 4.8, completedRate: "91%", trend: true },
-      ]
-    : doctorPerformance;
-
-  const totalRevenue = isDemo ? 240750 : overview?.total_revenue ?? 0;
-  const totalPatients = isDemo ? 1284 : overview?.total_patients ?? 0;
-  const totalAppointments = isDemo ? 182 : overview?.total_appointments ?? 0;
-  const avgRating = isDemo ? 4.8 : overview?.avg_doctor_rating ?? 0;
+  const totalRevenue = overview?.total_revenue ?? 0;
+  const totalPatients = overview?.total_patients ?? 0;
+  const totalAppointments = overview?.total_appointments ?? 0;
+  const avgRating = overview?.avg_doctor_rating ?? 0;
 
   const tabItems: { key: Tab; icon: any; label: string }[] = [
     { key: "revenue", icon: DollarSign, label: t("reports.revenue") },
@@ -127,13 +86,13 @@ export const ReportsPage = () => {
   const exportReportCsv = () => {
     let csv = "";
     if (activeTab === "revenue") {
-      csv = "Month,Revenue,Pending/Overdue\n" + effectiveRevenueData.map((r) => `${r.month},${r.revenue},${r.expenses}`).join("\n");
+      csv = "Month,Revenue,Pending/Overdue\n" + revenueData.map((r) => `${r.month},${r.revenue},${r.expenses}`).join("\n");
     } else if (activeTab === "patients") {
-      csv = "Month,Patients\n" + effectivePatientGrowth.map((p) => `${p.month},${p.patients}`).join("\n");
+      csv = "Month,Patients\n" + patientGrowth.map((p) => `${p.month},${p.patients}`).join("\n");
     } else if (activeTab === "appointments") {
-      csv = "Type,Count\n" + effectiveAppointmentTypes.map((a) => `${a.name},${a.value}`).join("\n");
+      csv = "Type,Count\n" + appointmentTypes.map((a) => `${a.name},${a.value}`).join("\n");
     } else if (activeTab === "doctors") {
-      csv = "Doctor,Appointments,Completion Rate,Rating\n" + effectiveDoctorPerformance.map((d) => `${d.name},${d.appointments},${d.completedRate},${d.rating}`).join("\n");
+      csv = "Doctor,Appointments,Completion Rate,Rating\n" + doctorPerformance.map((d) => `${d.name},${d.appointments},${d.completedRate},${d.rating}`).join("\n");
     }
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -154,7 +113,7 @@ export const ReportsPage = () => {
           { header: "Revenue", dataKey: "revenue" },
           { header: "Pending/Overdue", dataKey: "expenses" },
         ],
-        data: effectiveRevenueData.map((r) => ({ ...r, revenue: `$${r.revenue.toLocaleString()}`, expenses: `$${r.expenses.toLocaleString()}` })),
+        data: revenueData.map((r) => ({ ...r, revenue: `$${r.revenue.toLocaleString()}`, expenses: `$${r.expenses.toLocaleString()}` })),
         filename: `revenue-report-${new Date().toISOString().slice(0, 10)}.pdf`,
       });
     } else if (activeTab === "doctors") {
@@ -166,7 +125,7 @@ export const ReportsPage = () => {
           { header: "Completion Rate", dataKey: "completedRate" },
           { header: "Rating", dataKey: "rating" },
         ],
-        data: effectiveDoctorPerformance,
+        data: doctorPerformance,
         filename: `doctor-report-${new Date().toISOString().slice(0, 10)}.pdf`,
       });
     } else if (activeTab === "patients") {
@@ -176,7 +135,7 @@ export const ReportsPage = () => {
           { header: "Month", dataKey: "month" },
           { header: "Total Patients", dataKey: "patients" },
         ],
-        data: effectivePatientGrowth,
+        data: patientGrowth,
         filename: `patient-growth-${new Date().toISOString().slice(0, 10)}.pdf`,
       });
     } else {
@@ -186,7 +145,7 @@ export const ReportsPage = () => {
           { header: "Type", dataKey: "name" },
           { header: "Count", dataKey: "value" },
         ],
-        data: effectiveAppointmentTypes,
+        data: appointmentTypes,
         filename: `appointment-types-${new Date().toISOString().slice(0, 10)}.pdf`,
       });
     }
@@ -213,8 +172,8 @@ export const ReportsPage = () => {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title={t("billing.totalRevenue")} value={`$${totalRevenue.toLocaleString()}`} icon={DollarSign} accent="warning" trend={isDemo ? { value: 12.5, positive: true } : undefined} />
-        <StatCard title={t("dashboard.totalPatients")} value={String(totalPatients)} icon={Users} accent="primary" trend={isDemo ? { value: 5.2, positive: true } : undefined} />
+        <StatCard title={t("billing.totalRevenue")} value={`$${totalRevenue.toLocaleString()}`} icon={DollarSign} accent="warning" />
+        <StatCard title={t("dashboard.totalPatients")} value={String(totalPatients)} icon={Users} accent="primary" />
         <StatCard title={t("reports.totalAppointments")} value={String(totalAppointments)} icon={CalendarDays} accent="info" />
         <StatCard title={t("reports.avgDoctorRating")} value={`${avgRating.toFixed(1)} *`} icon={TrendingUp} accent="success" />
       </div>
@@ -243,7 +202,7 @@ export const ReportsPage = () => {
               </h3>
             </div>
             <ResponsiveContainer width="100%" height={340}>
-              <BarChart data={effectiveRevenueData} barGap={4}>
+              <BarChart data={revenueData} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 90%)" vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
@@ -258,10 +217,10 @@ export const ReportsPage = () => {
             <h3 className="font-semibold mb-6">{t("reports.revenueByDepartment") || "Revenue by Service"}</h3>
             <ResponsiveContainer width="100%" height={340}>
               <PieChart>
-                <Pie data={effectiveRevenueByService} cx="50%" cy="50%" innerRadius={60} outerRadius={95} dataKey="value" paddingAngle={3}
+                <Pie data={revenueByService} cx="50%" cy="50%" innerRadius={60} outerRadius={95} dataKey="value" paddingAngle={3}
                   label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   labelLine={false}>
-                  {effectiveRevenueByService.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  {revenueByService.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Tooltip />
               </PieChart>
@@ -277,7 +236,7 @@ export const ReportsPage = () => {
             {t("reports.patientGrowth")}
           </h3>
           <ResponsiveContainer width="100%" height={380}>
-            <AreaChart data={effectivePatientGrowth}>
+            <AreaChart data={patientGrowth}>
               <defs>
                 <linearGradient id="patientGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="hsl(174, 62%, 34%)" stopOpacity={0.2} />
@@ -301,14 +260,17 @@ export const ReportsPage = () => {
             {(() => {
               const statuses = ["scheduled", "in_progress", "completed", "cancelled"];
               const statusColors = ["hsl(38, 92%, 50%)", "hsl(210, 80%, 52%)", "hsl(152, 60%, 40%)", "hsl(0, 72%, 51%)"];
-              const data = isDemo
-                ? [
-                    { name: t("appointments.scheduled"), value: 45, fill: statusColors[0] },
-                    { name: t("appointments.inProgress"), value: 12, fill: statusColors[1] },
-                    { name: t("appointments.completed"), value: 110, fill: statusColors[2] },
-                    { name: t("appointments.cancelled"), value: 15, fill: statusColors[3] },
-                  ]
-                : statuses.map((s, i) => ({ name: s.replace("_", " "), value: appointmentStatusCounts[s as keyof typeof appointmentStatusCounts] ?? 0, fill: statusColors[i] }));
+              const statusLabels: Record<string, string> = {
+                scheduled: t("appointments.scheduled"),
+                in_progress: t("appointments.inProgress"),
+                completed: t("appointments.completed"),
+                cancelled: t("appointments.cancelled"),
+              };
+              const data = statuses.map((s, i) => ({
+                name: statusLabels[s] ?? s,
+                value: appointmentStatusCounts[s as keyof typeof appointmentStatusCounts] ?? 0,
+                fill: statusColors[i],
+              }));
               return (
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart data={data} layout="vertical" barSize={24}>
@@ -328,8 +290,8 @@ export const ReportsPage = () => {
             <h3 className="font-semibold mb-6">{t("reports.byType")}</h3>
             <ResponsiveContainer width="100%" height={320}>
               <PieChart>
-                <Pie data={effectiveAppointmentTypes} cx="50%" cy="50%" innerRadius={55} outerRadius={90} dataKey="value" paddingAngle={3}>
-                  {effectiveAppointmentTypes.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                <Pie data={appointmentTypes} cx="50%" cy="50%" innerRadius={55} outerRadius={90} dataKey="value" paddingAngle={3}>
+                  {appointmentTypes.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Tooltip />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
@@ -355,7 +317,7 @@ export const ReportsPage = () => {
               </tr>
             </thead>
             <tbody>
-              {effectiveDoctorPerformance.map((doc, i) => (
+              {doctorPerformance.map((doc, i) => (
                 <tr key={i} className="hover:bg-muted/20 transition-colors">
                   <td>
                     <div className="flex items-center gap-3">
@@ -392,7 +354,7 @@ export const ReportsPage = () => {
                   </td>
                 </tr>
               ))}
-              {effectiveDoctorPerformance.length === 0 && (
+              {doctorPerformance.length === 0 && (
                 <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">{t("common.noData")}</td></tr>
               )}
             </tbody>

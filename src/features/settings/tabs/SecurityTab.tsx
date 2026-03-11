@@ -10,18 +10,13 @@ import { securityService } from "@/services/settings/security.service";
 
 export const SecurityTab = () => {
   const { t } = useI18n();
-  const { user, logout } = useAuth();
-  const isDemo = user?.tenantId === "demo";
+  const { logout } = useAuth();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPasswords, setShowPasswords] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
 
   const handleChangePassword = async () => {
-    if (isDemo) {
-      toast({ title: t("common.demoMode"), variant: "destructive" });
-      return;
-    }
     if (newPassword !== confirmPassword) {
       toast({ title: t("common.passwordsDontMatch"), variant: "destructive" });
       return;

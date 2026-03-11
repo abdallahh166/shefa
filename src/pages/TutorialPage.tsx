@@ -310,9 +310,6 @@ export const TutorialPage = () => {
               <Button onClick={() => navigate("/login")} size="lg">
                 {t("tutorial.goToLogin")}
               </Button>
-              <Button variant="outline" size="lg" onClick={() => navigate("/login")}>
-                {t("tutorial.tryDemo")}
-              </Button>
             </div>
           </div>
         </div>

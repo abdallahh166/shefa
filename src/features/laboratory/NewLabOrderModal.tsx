@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
-import { useAuth } from "@/core/auth/authStore";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { X } from "lucide-react";
@@ -32,8 +31,6 @@ const TEST_OPTIONS = [
 
 export const NewLabOrderModal = ({ open, onClose, onSuccess, patients, doctors }: NewLabOrderModalProps) => {
   const { t } = useI18n();
-  const { user } = useAuth();
-  const isDemo = user?.tenantId === "demo";
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     patient_id: "",
@@ -47,10 +44,6 @@ export const NewLabOrderModal = ({ open, onClose, onSuccess, patients, doctors }
     e.preventDefault();
     if (!form.patient_id || !form.doctor_id || !form.test_name) {
       toast({ title: t("common.missingFields"), description: t("common.pleaseFillAllRequiredFields"), variant: "destructive" });
-      return;
-    }
-    if (isDemo) {
-      toast({ title: t("common.demoMode"), description: t("common.demoModeNoSave"), variant: "destructive" });
       return;
     }
     setLoading(true);

@@ -31,8 +31,7 @@ export function useSupabaseTable<T = unknown>(
         .from(table)
         .select(select);
 
-      // Only filter by tenant for real (non-demo) users
-      if (tenantId && tenantId !== "demo") {
+      if (tenantId) {
         query = query.eq("tenant_id", tenantId);
       }
 
@@ -44,7 +43,7 @@ export function useSupabaseTable<T = unknown>(
       if (error) throw error;
       return (data ?? []) as T[];
     },
-    enabled: (options?.enabled ?? true) && !!tenantId && tenantId !== "demo",
+    enabled: (options?.enabled ?? true) && !!tenantId,
   });
 }
 
@@ -85,7 +84,7 @@ export function useSupabaseTablePaged<T = unknown>(
         .from(table)
         .select(select, { count: "exact" });
 
-      if (tenantId && tenantId !== "demo") {
+      if (tenantId) {
         dbQuery = dbQuery.eq("tenant_id", tenantId);
       }
 
@@ -115,7 +114,7 @@ export function useSupabaseTablePaged<T = unknown>(
       if (error) throw error;
       return { data: (data ?? []) as T[], count: count ?? 0 };
     },
-    enabled: (options?.enabled ?? true) && !!tenantId && tenantId !== "demo",
+    enabled: (options?.enabled ?? true) && !!tenantId,
   });
 
   return {

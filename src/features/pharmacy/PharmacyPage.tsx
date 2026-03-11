@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { DataTable, Column } from "@/shared/components/DataTable";
 import { StatusBadge } from "@/shared/components/StatusBadge";
@@ -17,14 +17,6 @@ import { pharmacyService } from "@/services/pharmacy/pharmacy.service";
 import { queryKeys } from "@/services/queryKeys";
 import type { Medication } from "@/domain/pharmacy/medication.types";
 
-const DEMO_MEDS = [
-  { id: "1", name: "Lisinopril 10mg", category: "Antihypertensive", stock: 450, unit: "tablets", price: 12.5, status: "in_stock" },
-  { id: "2", name: "Metformin 500mg", category: "Antidiabetic", stock: 380, unit: "tablets", price: 8.0, status: "in_stock" },
-  { id: "3", name: "Amoxicillin 500mg", category: "Antibiotic", stock: 25, unit: "capsules", price: 15.0, status: "low_stock" },
-  { id: "4", name: "Omeprazole 20mg", category: "Proton Pump Inhibitor", stock: 200, unit: "capsules", price: 10.0, status: "in_stock" },
-  { id: "5", name: "Atorvastatin 20mg", category: "Statin", stock: 0, unit: "tablets", price: 18.0, status: "out_of_stock" },
-];
-
 const statusVariant: Record<string, "success" | "warning" | "destructive"> = {
   in_stock: "success",
   low_stock: "warning",
@@ -37,7 +29,6 @@ export const PharmacyPage = () => {
   const { t, locale } = useI18n();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const isDemo = user?.tenantId === "demo";
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -63,7 +54,7 @@ export const PharmacyPage = () => {
       filters: statusFilter ? { status: statusFilter } : undefined,
       sort: { column: "created_at", ascending: false },
     }),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
   });
 
   useEffect(() => {
@@ -72,56 +63,34 @@ export const PharmacyPage = () => {
 
   const { data: medicationSummary = { total_count: 0, low_stock_count: 0, inventory_value: 0 } } = useQuery({
     queryKey: queryKeys.pharmacy.summary(user?.tenantId),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
     queryFn: async () => pharmacyService.getSummary(),
   });
 
   const liveMeds = listPage?.data ?? [];
   const totalMeds = listPage?.count ?? 0;
 
-  const meds: MedicationRow[] = isDemo
-    ? DEMO_MEDS
-    : liveMeds.map((m) => ({
-        id: m.id,
-        name: m.name,
-        category: m.category ?? "",
-        stock: m.stock,
-        unit: m.unit,
-        price: Number(m.price),
-        status: m.status,
-      }));
+  const meds: MedicationRow[] = liveMeds.map((m) => ({
+    id: m.id,
+    name: m.name,
+    category: m.category ?? "",
+    stock: m.stock,
+    unit: m.unit,
+    price: Number(m.price),
+    status: m.status,
+  }));
 
-  const demoFiltered = useMemo(() => {
-    if (!isDemo) return meds;
-    const q = searchTerm.trim().toLowerCase();
-    return meds.filter((m) => {
-      if (statusFilter && m.status !== statusFilter) return false;
-      if (!q) return true;
-      return (
-        m.name.toLowerCase().includes(q) ||
-        (m.category ?? "").toLowerCase().includes(q) ||
-        m.status.toLowerCase().includes(q)
-      );
-    });
-  }, [isDemo, meds, searchTerm, statusFilter]);
-
-  const pagedDemo = isDemo ? demoFiltered.slice((page - 1) * pageSize, page * pageSize) : meds;
-  const total = isDemo ? demoFiltered.length : totalMeds;
-
-  const demoTotalCount = DEMO_MEDS.length;
-  const demoLowStock = DEMO_MEDS.filter((m) => m.status === "low_stock").length;
-  const demoInventoryValue = DEMO_MEDS.reduce((s, m) => s + m.price * m.stock, 0);
-
-  const totalCount = isDemo ? demoTotalCount : medicationSummary.total_count;
-  const lowStockCount = isDemo ? demoLowStock : medicationSummary.low_stock_count;
-  const inventoryValue = isDemo ? demoInventoryValue : medicationSummary.inventory_value;
+  const total = totalMeds;
+  const totalCount = medicationSummary.total_count;
+  const lowStockCount = medicationSummary.low_stock_count;
+  const inventoryValue = medicationSummary.inventory_value;
 
   const invalidateMedications = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.pharmacy.root(user?.tenantId) });
   };
 
   const handleDelete = async () => {
-    if (!deleteId || isDemo) return;
+    if (!deleteId) return;
     setDeleting(true);
     try {
       await pharmacyService.remove(deleteId);
@@ -137,7 +106,6 @@ export const PharmacyPage = () => {
   };
 
   const handleUpdateStock = async (id: string, newStock: number) => {
-    if (isDemo) return;
     const status = newStock === 0 ? "out_of_stock" : newStock < 50 ? "low_stock" : "in_stock";
     try {
       await pharmacyService.update(id, { stock: newStock, status });
@@ -205,13 +173,13 @@ export const PharmacyPage = () => {
 
       <DataTable
         columns={columns}
-        data={pagedDemo}
+        data={meds}
         keyExtractor={(m) => m.id}
         searchable
         serverSearch
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
-        isLoading={!isDemo && isLoading}
+        isLoading={isLoading}
         page={page}
         pageSize={pageSize}
         total={total}

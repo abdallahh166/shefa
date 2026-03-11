@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
-import { useAuth } from "@/core/auth/authStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +15,6 @@ interface AddPatientModalProps {
 
 export const AddPatientModal = ({ open, onClose, onSuccess }: AddPatientModalProps) => {
   const { t } = useI18n();
-  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     full_name: "",
@@ -37,12 +35,6 @@ export const AddPatientModal = ({ open, onClose, onSuccess }: AddPatientModalPro
       return;
     }
     setLoading(true);
-
-    if (user?.tenantId === "demo") {
-      toast({ title: t("common.demoMode"), variant: "destructive" });
-      setLoading(false);
-      return;
-    }
 
     try {
       await patientService.create({

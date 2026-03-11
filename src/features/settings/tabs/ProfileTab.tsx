@@ -13,7 +13,6 @@ import { profileStorage } from "@/services/settings/profile.storage";
 export const ProfileTab = () => {
   const { t } = useI18n();
   const { user, setUser, supabaseUser } = useAuth();
-  const isDemo = user?.tenantId === "demo";
   const [uploading, setUploading] = useState(false);
   const [fullName, setFullName] = useState(user?.name ?? "");
   const [saving, setSaving] = useState(false);
@@ -21,7 +20,7 @@ export const ProfileTab = () => {
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user || isDemo) return;
+    if (!file || !user) return;
 
     if (file.size > 2 * 1024 * 1024) {
       toast({ title: t("settings.avatarTooLarge"), variant: "destructive" });
@@ -43,7 +42,7 @@ export const ProfileTab = () => {
   };
 
   const handleRemoveAvatar = async () => {
-    if (!user || isDemo) return;
+    if (!user) return;
     setUploading(true);
 
     try {
@@ -60,7 +59,7 @@ export const ProfileTab = () => {
   };
 
   const handleSaveName = async () => {
-    if (!user || isDemo) return;
+    if (!user) return;
     setSaving(true);
     try {
       await profileService.updateProfile(user.id, { full_name: fullName });
@@ -98,7 +97,7 @@ export const ProfileTab = () => {
               variant="outline"
               size="sm"
               onClick={() => fileRef.current?.click()}
-              disabled={uploading || isDemo}
+              disabled={uploading}
             >
               <Camera className="h-4 w-4" />
               {t("settings.uploadAvatar")}
@@ -108,7 +107,7 @@ export const ProfileTab = () => {
                 variant="outline"
                 size="sm"
                 onClick={handleRemoveAvatar}
-                disabled={uploading || isDemo}
+                disabled={uploading}
                 className="text-destructive"
               >
                 <Trash2 className="h-4 w-4" />
@@ -135,7 +134,7 @@ export const ProfileTab = () => {
         {t("common.email")}: {user?.email}
       </div>
 
-      <Button onClick={handleSaveName} disabled={saving || isDemo}>
+      <Button onClick={handleSaveName} disabled={saving}>
         {saving && <Loader2 className="h-4 w-4 animate-spin" />}
         {t("common.save")}
       </Button>

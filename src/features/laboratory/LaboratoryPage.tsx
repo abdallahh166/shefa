@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { DataTable, Column } from "@/shared/components/DataTable";
 import { StatusBadge } from "@/shared/components/StatusBadge";
@@ -20,13 +20,6 @@ import type { LabOrderWithPatientDoctor } from "@/domain/lab/lab.types";
 import type { Patient } from "@/domain/patient/patient.types";
 import type { Doctor } from "@/domain/doctor/doctor.types";
 
-const DEMO_LABS = [
-  { id: "1", patient_name: "Mohammed Al-Rashid", test_name: "Complete Blood Count (CBC)", doctor_name: "Dr. Sarah Ahmed", order_date: "2026-03-08", status: "completed", result: "Normal" },
-  { id: "2", patient_name: "Fatima Hassan", test_name: "HbA1c", doctor_name: "Dr. Sarah Ahmed", order_date: "2026-03-08", status: "processing", result: null },
-  { id: "3", patient_name: "Ali Mansour", test_name: "Lipid Panel", doctor_name: "Dr. John Smith", order_date: "2026-03-07", status: "completed", result: "Elevated LDL" },
-  { id: "4", patient_name: "Noor Ibrahim", test_name: "Thyroid Panel", doctor_name: "Dr. Layla Khalid", order_date: "2026-03-07", status: "pending", result: null },
-];
-
 const statusVariant: Record<string, "default" | "warning" | "success"> = { pending: "default", processing: "warning", completed: "success" };
 
 type LabOrderRow = LabOrderWithPatientDoctor;
@@ -45,7 +38,6 @@ export const LaboratoryPage = () => {
   const { t, locale, calendarType } = useI18n();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const isDemo = user?.tenantId === "demo";
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [page, setPage] = useState(1);
@@ -69,19 +61,19 @@ export const LaboratoryPage = () => {
       filters: statusFilter ? { status: statusFilter } : undefined,
       sort: { column: "order_date", ascending: false },
     }),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
   });
 
   const { data: patientPage } = useQuery({
     queryKey: queryKeys.patients.list({ tenantId: user?.tenantId, page: 1, pageSize: 500 }),
     queryFn: async () => patientService.listPaged({ page: 1, pageSize: 500, sort: { column: "full_name", ascending: true } }),
-    enabled: !!user?.tenantId && !isDemo,
+    enabled: !!user?.tenantId,
   });
 
   const { data: doctorPage } = useQuery({
     queryKey: queryKeys.doctors.list({ tenantId: user?.tenantId, page: 1, pageSize: 500 }),
     queryFn: async () => doctorService.listPaged({ page: 1, pageSize: 500, sort: { column: "full_name", ascending: true } }),
-    enabled: !!user?.tenantId && !isDemo,
+    enabled: !!user?.tenantId,
   });
 
   const patients: Patient[] = patientPage?.data ?? [];
@@ -93,59 +85,30 @@ export const LaboratoryPage = () => {
 
   const { data: statusCounts = { pending: 0, processing: 0, completed: 0 } } = useQuery({
     queryKey: queryKeys.laboratory.summary(user?.tenantId),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
     queryFn: async () => labService.countByStatus(),
   });
-
-  const demoStatusCounts = DEMO_LABS.reduce(
-    (acc, l) => {
-      acc[l.status] = (acc[l.status] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>,
-  );
-  const effectiveStatusCounts = isDemo ? demoStatusCounts : statusCounts;
 
   const liveLabs: LabOrderRow[] = listPage?.data ?? [];
   const totalLabs = listPage?.count ?? 0;
 
-  const displayData: LabDisplayRow[] = isDemo
-    ? DEMO_LABS
-    : liveLabs.map((l) => ({
-        id: l.id,
-        patient_name: l.patients?.full_name ?? "-",
-        test_name: l.test_name,
-        doctor_name: l.doctors?.full_name ?? "-",
-        order_date: l.order_date,
-        status: l.status,
-        result: l.result ?? null,
-      }));
+  const displayData: LabDisplayRow[] = liveLabs.map((l) => ({
+    id: l.id,
+    patient_name: l.patients?.full_name ?? "-",
+    test_name: l.test_name,
+    doctor_name: l.doctors?.full_name ?? "-",
+    order_date: l.order_date,
+    status: l.status,
+    result: l.result ?? null,
+  }));
 
-  const demoFiltered = useMemo(() => {
-    if (!isDemo) return displayData;
-    const q = searchTerm.trim().toLowerCase();
-    return displayData.filter((l) => {
-      if (statusFilter && l.status !== statusFilter) return false;
-      if (!q) return true;
-      return (
-        l.patient_name.toLowerCase().includes(q) ||
-        l.doctor_name.toLowerCase().includes(q) ||
-        l.test_name.toLowerCase().includes(q) ||
-        l.status.toLowerCase().includes(q) ||
-        (l.result ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [displayData, isDemo, searchTerm, statusFilter]);
-
-  const pagedDemo = isDemo ? demoFiltered.slice((page - 1) * pageSize, page * pageSize) : displayData;
-  const total = isDemo ? demoFiltered.length : totalLabs;
+  const total = totalLabs;
 
   const invalidateLabs = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.laboratory.root(user?.tenantId) });
   };
 
   const handleUpdateStatus = async (id: string, newStatus: string, result?: string) => {
-    if (isDemo) return;
     const update: any = { status: newStatus };
     if (result !== undefined) update.result = result;
     try {
@@ -206,20 +169,20 @@ export const LaboratoryPage = () => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard title={t("laboratory.pendingOrders")} value={String(effectiveStatusCounts.pending ?? 0)} icon={Clock} />
-        <StatCard title={t("laboratory.processing")} value={String(effectiveStatusCounts.processing ?? 0)} icon={FlaskConical} />
-        <StatCard title={t("laboratory.completedToday")} value={String(effectiveStatusCounts.completed ?? 0)} icon={CheckCircle} />
+        <StatCard title={t("laboratory.pendingOrders")} value={String(statusCounts.pending ?? 0)} icon={Clock} />
+        <StatCard title={t("laboratory.processing")} value={String(statusCounts.processing ?? 0)} icon={FlaskConical} />
+        <StatCard title={t("laboratory.completedToday")} value={String(statusCounts.completed ?? 0)} icon={CheckCircle} />
       </div>
 
       <DataTable
         columns={columns}
-        data={pagedDemo}
+        data={displayData}
         keyExtractor={(l) => l.id}
         searchable
         serverSearch
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
-        isLoading={!isDemo && isLoading}
+        isLoading={isLoading}
         page={page}
         pageSize={pageSize}
         total={total}

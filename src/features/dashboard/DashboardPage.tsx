@@ -32,24 +32,6 @@ const COLORS = [
   "hsl(38, 92%, 50%)", "hsl(0, 72%, 51%)",
 ];
 
-const DEMO_APPOINTMENTS = [
-  { id: "1", patient: "Mohammed Al-Rashid", doctor: "Dr. Sarah Ahmed", time: "09:00 AM", status: "completed" },
-  { id: "2", patient: "Fatima Hassan", doctor: "Dr. John Smith", time: "10:30 AM", status: "in_progress" },
-  { id: "3", patient: "Ali Mansour", doctor: "Dr. Sarah Ahmed", time: "11:00 AM", status: "scheduled" },
-  { id: "4", patient: "Noor Ibrahim", doctor: "Dr. Layla Khalid", time: "02:00 PM", status: "scheduled" },
-];
-
-const DEMO_REVENUE_TREND = [
-  { month: "Oct", revenue: 32000 }, { month: "Nov", revenue: 38000 },
-  { month: "Dec", revenue: 35000 }, { month: "Jan", revenue: 42000 },
-  { month: "Feb", revenue: 45000 }, { month: "Mar", revenue: 48250 },
-];
-
-const DEMO_APPT_TYPES = [
-  { name: "Checkup", value: 42 }, { name: "Follow-up", value: 28 },
-  { name: "Consultation", value: 20 }, { name: "Emergency", value: 10 },
-];
-
 function getDateRangeStart(range: DateRange): Date | null {
   const now = new Date();
   switch (range) {
@@ -63,7 +45,6 @@ function getDateRangeStart(range: DateRange): Date | null {
 export const DashboardPage = () => {
   const { t, locale, calendarType } = useI18n();
   const { user } = useAuth();
-  const isDemo = user?.tenantId === "demo";
   const [dateRange, setDateRange] = useState<DateRange>("month");
 
   const { data: patients = [] } = useSupabaseTable<Tables<"patients">>("patients");
@@ -86,26 +67,22 @@ export const DashboardPage = () => {
     return invoices.filter((i) => new Date(i.invoice_date) >= rangeStart);
   }, [invoices, rangeStart]);
 
-  const totalPatients = isDemo ? "1,284" : String(patients.length);
-  const periodAppointments = isDemo ? "24" : String(filteredAppointments.length);
-  const activeDoctors = isDemo ? "18" : String(doctors.filter((d) => d.status === "available").length);
-  const revenue = isDemo
-    ? formatCurrency(48250, locale)
-    : formatCurrency(filteredInvoices.filter((i) => i.status === "paid").reduce((s, i) => s + Number(i.amount), 0), locale);
+  const totalPatients = String(patients.length);
+  const periodAppointments = String(filteredAppointments.length);
+  const activeDoctors = String(doctors.filter((d) => d.status === "available").length);
+  const revenue = formatCurrency(
+    filteredInvoices.filter((i) => i.status === "paid").reduce((s, i) => s + Number(i.amount), 0),
+    locale,
+  );
 
-  const recentList = isDemo
-    ? DEMO_APPOINTMENTS
-    : filteredAppointments.slice(0, 5).map((a) => ({
-        id: a.id,
-        patient: a.patients?.full_name ?? "—",
-        doctor: a.doctors?.full_name ?? "—",
-        time: formatDate(a.appointment_date, locale, "time", calendarType),
-        status: a.status,
-      }));
-
-  const revenueTrend = useMemo(() => {
-    if (isDemo) return DEMO_REVENUE_TREND;
-    const months: Record<string, number> = {};
+  const recentList = filteredAppointments.slice(0, 5).map((a) => ({
+  id: a.id,
+  patient: a.patients?.full_name ?? "-",
+  doctor: a.doctors?.full_name ?? "-",
+  time: formatDate(a.appointment_date, locale, "time", calendarType),
+  status: a.status,
+}));
+  const revenueTrend = useMemo(() => {    const months: Record<string, number> = {};
     invoices.forEach((inv) => {
       if (inv.status === "paid") {
         const key = new Date(inv.invoice_date).toLocaleString("en", { month: "short" });
@@ -113,14 +90,12 @@ export const DashboardPage = () => {
       }
     });
     return Object.entries(months).map(([month, revenue]) => ({ month, revenue }));
-  }, [invoices, isDemo]);
+  }, [invoices]);
 
-  const apptTypes = useMemo(() => {
-    if (isDemo) return DEMO_APPT_TYPES;
-    const types: Record<string, number> = {};
+  const apptTypes = useMemo(() => {    const types: Record<string, number> = {};
     appointments.forEach((a) => { types[a.type] = (types[a.type] || 0) + 1; });
     return Object.entries(types).map(([name, value]) => ({ name: name.replace("_", " "), value }));
-  }, [appointments, isDemo]);
+  }, [appointments]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -143,10 +118,10 @@ export const DashboardPage = () => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title={t("dashboard.totalPatients")} value={totalPatients} icon={Users} accent="primary" trend={isDemo ? { value: 5.2, positive: true } : undefined} />
-        <StatCard title={t("dashboard.periodAppointments")} value={periodAppointments} icon={CalendarDays} accent="info" trend={isDemo ? { value: 12, positive: true } : undefined} />
+        <StatCard title={t("dashboard.totalPatients")} value={totalPatients} icon={Users} accent="primary" />
+        <StatCard title={t("dashboard.periodAppointments")} value={periodAppointments} icon={CalendarDays} accent="info" />
         <StatCard title={t("dashboard.activeDoctors")} value={activeDoctors} icon={Stethoscope} accent="success" />
-        <StatCard title={t("dashboard.periodRevenue")} value={revenue} icon={DollarSign} accent="warning" trend={isDemo ? { value: 7.1, positive: true } : undefined} />
+        <StatCard title={t("dashboard.periodRevenue")} value={revenue} icon={DollarSign} accent="warning" />
       </div>
 
       {/* Charts Row */}
@@ -238,3 +213,4 @@ export const DashboardPage = () => {
     </div>
   );
 };
+

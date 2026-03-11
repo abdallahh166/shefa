@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { useAuth } from "@/core/auth/authStore";
 import { doctorService } from "@/services/doctors/doctor.service";
 
 interface AddDoctorModalProps {
@@ -21,8 +20,6 @@ const SPECIALTIES = [
 
 export const AddDoctorModal = ({ open, onClose, onSuccess }: AddDoctorModalProps) => {
   const { t } = useI18n();
-  const { user } = useAuth();
-  const isDemo = user?.tenantId === "demo";
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     full_name: "",
@@ -38,10 +35,6 @@ export const AddDoctorModal = ({ open, onClose, onSuccess }: AddDoctorModalProps
     e.preventDefault();
     if (!form.full_name || !form.specialty) {
       toast({ title: "Name and specialty required", variant: "destructive" });
-      return;
-    }
-    if (isDemo) {
-      toast({ title: t("common.demoMode"), description: t("common.demoModeNoSave"), variant: "destructive" });
       return;
     }
     setLoading(true);

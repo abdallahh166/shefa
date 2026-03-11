@@ -57,7 +57,6 @@ export const DoctorScheduleModal = ({ open, onClose, doctorId, doctorName }: Pro
   const queryClient = useQueryClient();
   const [schedule, setSchedule] = useState<ScheduleRow[]>(DEFAULT_SCHEDULE);
   const [saving, setSaving] = useState(false);
-  const isDemo = user?.tenantId === "demo";
 
   const { data: scheduleData, isLoading } = useQuery({
     queryKey: queryKeys.doctors.schedules(doctorId, user?.tenantId),
@@ -73,19 +72,13 @@ export const DoctorScheduleModal = ({ open, onClose, doctorId, doctorName }: Pro
       }));
       return mergeSchedule(mapped);
     },
-    enabled: open && !!doctorId && !!user?.tenantId && !isDemo,
+    enabled: open && !!doctorId && !!user?.tenantId,
   });
 
   useEffect(() => {
     if (!open) return;
-    if (isDemo) {
-      setSchedule(DEFAULT_SCHEDULE);
-      return;
-    }
-    if (scheduleData) {
-      setSchedule(scheduleData);
-    }
-  }, [open, isDemo, scheduleData]);
+    if (scheduleData) setSchedule(scheduleData);
+  }, [open, scheduleData]);
 
   const updateRow = (dayIdx: number, field: keyof ScheduleRow, value: any) => {
     setSchedule((prev) =>
@@ -94,7 +87,7 @@ export const DoctorScheduleModal = ({ open, onClose, doctorId, doctorName }: Pro
   };
 
   const handleSave = async () => {
-    if (!user || !doctorId || isDemo) return;
+    if (!user || !doctorId) return;
     setSaving(true);
 
     try {
@@ -124,10 +117,10 @@ export const DoctorScheduleModal = ({ open, onClose, doctorId, doctorName }: Pro
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{doctorName} — {t("doctors.schedule")}</DialogTitle>
+          <DialogTitle>{doctorName} - {t("doctors.schedule")}</DialogTitle>
         </DialogHeader>
 
-        {(!isDemo && isLoading) ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
@@ -147,7 +140,7 @@ export const DoctorScheduleModal = ({ open, onClose, doctorId, doctorName }: Pro
                   className="w-28"
                   disabled={!row.is_active}
                 />
-                <span className="text-muted-foreground text-sm">→</span>
+                <span className="text-muted-foreground text-sm">-></span>
                 <Input
                   type="time"
                   value={row.end_time}

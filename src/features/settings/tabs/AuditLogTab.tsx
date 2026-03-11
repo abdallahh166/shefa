@@ -16,11 +16,10 @@ const ACTION_ICONS: Record<string, typeof ShieldCheck> = {
 export const AuditLogTab = () => {
   const { t, locale, calendarType } = useI18n();
   const { user } = useAuth();
-  const isDemo = user?.tenantId === "demo";
 
   const { data: logs = [], isLoading } = useQuery({
     queryKey: queryKeys.settings.audit(user?.tenantId),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
     queryFn: () => auditLogService.listRecent(50),
   });
 

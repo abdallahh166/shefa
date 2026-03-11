@@ -13,7 +13,6 @@ import type { PatientDocument } from "@/domain/patient/patient.types";
 
 interface Props {
   patientId: string;
-  isDemo: boolean;
 }
 
 const FILE_ICONS: Record<string, typeof FileText> = {
@@ -26,7 +25,7 @@ const FILE_ICONS: Record<string, typeof FileText> = {
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
-export const PatientDocuments = ({ patientId, isDemo }: Props) => {
+export const PatientDocuments = ({ patientId }: Props) => {
   const { t, locale, calendarType } = useI18n();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -38,12 +37,12 @@ export const PatientDocuments = ({ patientId, isDemo }: Props) => {
   const { data: documents = [], isLoading } = useQuery<PatientDocument[]>({
     queryKey: queryKeys.patients.documents(patientId, user?.tenantId),
     queryFn: () => patientDocumentsService.listByPatient(patientId),
-    enabled: !!patientId && !!user?.tenantId && !isDemo,
+    enabled: !!patientId && !!user?.tenantId,
   });
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user || isDemo) return;
+    if (!file || !user) return;
 
     if (file.size > MAX_SIZE) {
       toast({ title: t("common.error"), description: "File must be under 10 MB", variant: "destructive" });
@@ -108,15 +107,6 @@ export const PatientDocuments = ({ patientId, isDemo }: Props) => {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
-
-  if (isDemo) {
-    return (
-      <div className="bg-card rounded-lg border p-8 text-center">
-        <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-        <p className="text-muted-foreground">{t("patients.noDocuments")}</p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">

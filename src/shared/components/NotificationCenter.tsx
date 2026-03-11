@@ -15,13 +15,6 @@ interface Notification {
   created_at: string;
 }
 
-const DEMO_NOTIFICATIONS: Notification[] = [
-  { id: "1", type: "appointment", title: "Upcoming Appointment", body: "Mohammed Al-Rashid at 2:00 PM with Dr. Sarah Ahmed", created_at: new Date().toISOString(), read: false },
-  { id: "2", type: "lab", title: "Lab Results Ready", body: "CBC results for Fatima Hassan are now available", created_at: new Date(Date.now() - 900000).toISOString(), read: false },
-  { id: "3", type: "billing", title: "Payment Received", body: "INV-005 payment of $480 confirmed", created_at: new Date(Date.now() - 3600000).toISOString(), read: true },
-  { id: "4", type: "alert", title: "Low Stock Alert", body: "Amoxicillin 500mg is running low (25 remaining)", created_at: new Date(Date.now() - 7200000).toISOString(), read: false },
-];
-
 const typeIcon: Record<string, typeof Bell> = {
   appointment: CalendarDays,
   lab: FlaskConical,
@@ -49,16 +42,15 @@ function timeAgo(dateStr: string): string {
 }
 
 export const NotificationCenter = () => {
-  const { t, locale, calendarType } = useI18n();
+  const { t } = useI18n();
   const { user } = useAuth();
-  const isDemo = user?.tenantId === "demo";
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const ref = useRef<HTMLDivElement>(null);
 
   const loadNotifications = useCallback(async () => {
-    if (isDemo || !user?.id) {
-      setNotifications(DEMO_NOTIFICATIONS);
+    if (!user?.id) {
+      setNotifications([]);
       return;
     }
 
@@ -70,7 +62,7 @@ export const NotificationCenter = () => {
       .limit(20);
 
     setNotifications((data as any[]) ?? []);
-  }, [user?.id, isDemo]);
+  }, [user?.id]);
 
   useEffect(() => {
     loadNotifications();
@@ -78,7 +70,7 @@ export const NotificationCenter = () => {
 
   // Realtime subscription for new notifications
   useEffect(() => {
-    if (isDemo || !user?.id) return;
+    if (!user?.id) return;
 
     const channel = supabase
       .channel("user-notifications")
@@ -99,15 +91,12 @@ export const NotificationCenter = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, isDemo]);
+  }, [user?.id]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const markAllRead = async () => {
-    if (isDemo) {
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-      return;
-    }
+    if (!user?.id) return;
     const unreadIds = notifications.filter((n) => !n.read).map((n) => n.id);
     if (unreadIds.length === 0) return;
 
@@ -121,9 +110,8 @@ export const NotificationCenter = () => {
 
   const dismiss = async (id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
-    if (!isDemo) {
-      await supabase.from("notifications" as any).update({ read: true }).eq("id", id);
-    }
+    if (!user?.id) return;
+    await supabase.from("notifications" as any).update({ read: true }).eq("id", id);
   };
 
   useEffect(() => {

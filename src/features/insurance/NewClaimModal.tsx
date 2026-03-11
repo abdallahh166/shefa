@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
-import { useAuth } from "@/core/auth/authStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,8 +17,6 @@ interface NewClaimModalProps {
 
 export const NewClaimModal = ({ open, onClose, onSuccess, patients }: NewClaimModalProps) => {
   const { t } = useI18n();
-  const { user } = useAuth();
-  const isDemo = user?.tenantId === "demo";
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     patient_id: "",
@@ -34,10 +31,6 @@ export const NewClaimModal = ({ open, onClose, onSuccess, patients }: NewClaimMo
     e.preventDefault();
     if (!form.patient_id || !form.provider || !form.service || !form.amount) {
       toast({ title: t("common.missingFields"), description: t("common.pleaseFillAllRequiredFields"), variant: "destructive" });
-      return;
-    }
-    if (isDemo) {
-      toast({ title: t("common.demoMode"), description: t("common.demoModeNoSave"), variant: "destructive" });
       return;
     }
     setLoading(true);

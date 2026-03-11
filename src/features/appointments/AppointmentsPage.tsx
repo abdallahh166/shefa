@@ -1,4 +1,4 @@
-﻿import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { DataTable, Column } from "@/shared/components/DataTable";
 import { StatusBadge } from "@/shared/components/StatusBadge";
@@ -23,13 +23,6 @@ import type { Doctor } from "@/domain/doctor/doctor.types";
 
 type AppointmentRow = AppointmentWithPatientDoctor;
 
-const DEMO_APPOINTMENTS = [
-  { id: "1", patient_name: "Mohammed Al-Rashid", doctor_name: "Dr. Sarah Ahmed", appointment_date: "2026-03-08 09:00", type: "checkup", status: "completed" },
-  { id: "2", patient_name: "Fatima Hassan", doctor_name: "Dr. John Smith", appointment_date: "2026-03-08 10:30", type: "follow_up", status: "in_progress" },
-  { id: "3", patient_name: "Ali Mansour", doctor_name: "Dr. Sarah Ahmed", appointment_date: "2026-03-08 11:00", type: "consultation", status: "scheduled" },
-  { id: "4", patient_name: "Noor Ibrahim", doctor_name: "Dr. Layla Khalid", appointment_date: "2026-03-08 14:00", type: "checkup", status: "scheduled" },
-  { id: "5", patient_name: "Khalid Omar", doctor_name: "Dr. John Smith", appointment_date: "2026-03-08 15:30", type: "emergency", status: "cancelled" },
-];
 
 const statusVariant = { completed: "success", in_progress: "info", scheduled: "default", cancelled: "destructive" } as const;
 
@@ -75,7 +68,6 @@ export const AppointmentsPage = () => {
   const { t, locale, calendarType } = useI18n();
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
-  const isDemo = user?.tenantId === "demo";
   const canManage = hasPermission("manage_appointments");
 
   const [showModal, setShowModal] = useState(false);
@@ -107,7 +99,7 @@ export const AppointmentsPage = () => {
       search: searchTerm.trim() || undefined,
       filters: statusFilter ? { status: statusFilter } : undefined,
     }),
-    enabled: !isDemo && viewMode === "list" && !!user?.tenantId,
+    enabled: viewMode === "list" && !!user?.tenantId,
   });
 
   const { start: calendarStart, end: calendarEnd } = getCalendarRange(calendarCursor, calendarView);
@@ -121,19 +113,19 @@ export const AppointmentsPage = () => {
       calendarStart.toISOString(),
       calendarEnd.toISOString(),
     ),
-    enabled: !isDemo && viewMode === "calendar" && !!user?.tenantId,
+    enabled: viewMode === "calendar" && !!user?.tenantId,
   });
 
   const { data: patientPage } = useQuery({
     queryKey: queryKeys.patients.list({ tenantId: user?.tenantId, page: 1, pageSize: 500 }),
     queryFn: async () => patientService.listPaged({ page: 1, pageSize: 500, sort: { column: "full_name", ascending: true } }),
-    enabled: !!user?.tenantId && !isDemo,
+    enabled: !!user?.tenantId,
   });
 
   const { data: doctorPage } = useQuery({
     queryKey: queryKeys.doctors.list({ tenantId: user?.tenantId, page: 1, pageSize: 500 }),
     queryFn: async () => doctorService.listPaged({ page: 1, pageSize: 500, sort: { column: "full_name", ascending: true } }),
-    enabled: !!user?.tenantId && !isDemo,
+    enabled: !!user?.tenantId,
   });
 
   const patients: Patient[] = patientPage?.data ?? [];
@@ -173,70 +165,43 @@ export const AppointmentsPage = () => {
     }
   };
 
-  const demoFiltered = useMemo(() => {
-    if (!isDemo) return DEMO_APPOINTMENTS;
-    const q = searchTerm.trim().toLowerCase();
-    return DEMO_APPOINTMENTS.filter((a) => {
-      if (statusFilter && a.status !== statusFilter) return false;
-      if (!q) return true;
-      return (
-        a.patient_name.toLowerCase().includes(q) ||
-        a.doctor_name.toLowerCase().includes(q) ||
-        a.type.toLowerCase().includes(q) ||
-        a.status.toLowerCase().includes(q)
-      );
-    });
-  }, [isDemo, statusFilter, searchTerm]);
-
   const listAppointments = listPage?.data ?? [];
   const totalAppointments = listPage?.count ?? 0;
 
-  const listDisplayData: AppointmentCalendarItem[] = isDemo
-    ? demoFiltered.slice((page - 1) * pageSize, page * pageSize)
-    : listAppointments.map((a) => ({
-        id: a.id,
-        patient_name: a.patients?.full_name ?? "—",
-        doctor_name: a.doctors?.full_name ?? "—",
-        appointment_date: a.appointment_date,
-        type: a.type,
-        status: a.status,
-      }));
+  const listDisplayData: AppointmentCalendarItem[] = listAppointments.map((a) => ({
+    id: a.id,
+    patient_name: a.patients?.full_name ?? "—",
+    doctor_name: a.doctors?.full_name ?? "—",
+    appointment_date: a.appointment_date,
+    type: a.type,
+    status: a.status,
+  }));
 
-  const calendarDisplayData: AppointmentCalendarItem[] = isDemo
-    ? DEMO_APPOINTMENTS
-    : calendarAppointments.map((a) => ({
-        id: a.id,
-        patient_name: a.patients?.full_name ?? "—",
-        doctor_name: a.doctors?.full_name ?? "—",
-        appointment_date: a.appointment_date,
-        type: a.type,
-        status: a.status,
-      }));
+  const calendarDisplayData: AppointmentCalendarItem[] = calendarAppointments.map((a) => ({
+    id: a.id,
+    patient_name: a.patients?.full_name ?? "—",
+    doctor_name: a.doctors?.full_name ?? "—",
+    appointment_date: a.appointment_date,
+    type: a.type,
+    status: a.status,
+  }));
 
   const calendarFiltered = useMemo(
     () => (statusFilter ? calendarDisplayData.filter((a) => a.status === statusFilter) : calendarDisplayData),
     [calendarDisplayData, statusFilter],
   );
 
-  const totalForList = isDemo ? demoFiltered.length : totalAppointments;
+  const totalForList = totalAppointments;
 
   const { data: statusCounts = { scheduled: 0, in_progress: 0, completed: 0, cancelled: 0 } } = useQuery({
     queryKey: queryKeys.appointments.statusCounts(user?.tenantId),
-    enabled: !isDemo && !!user?.tenantId,
+    enabled: !!user?.tenantId,
     queryFn: async () => appointmentService.countByStatus(),
   });
 
-  const demoStatusCounts = DEMO_APPOINTMENTS.reduce(
-    (acc, a) => {
-      acc[a.status] = (acc[a.status] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>,
-  );
-  const effectiveStatusCounts = isDemo ? demoStatusCounts : statusCounts;
+  const effectiveStatusCounts = statusCounts;
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
-    if (isDemo) return;
     try {
       await appointmentService.update(id, { status: newStatus as AppointmentRow["status"] });
       toast({ title: t("appointments.appointmentStatusUpdated"), description: statusLabel(newStatus) });
@@ -248,7 +213,6 @@ export const AppointmentsPage = () => {
   };
 
   const handleReschedule = async (id: string, newAppointmentDate: string) => {
-    if (isDemo) return;
     try {
       await appointmentService.update(id, { appointment_date: newAppointmentDate });
       toast({ title: t("appointments.appointmentRescheduled") });
@@ -366,7 +330,7 @@ export const AppointmentsPage = () => {
           serverSearch
           searchValue={searchTerm}
           onSearchChange={setSearchTerm}
-          isLoading={!isDemo && loadingList}
+          isLoading={loadingList}
           exportFileName="appointments"
           page={page}
           pageSize={pageSize}
@@ -392,7 +356,7 @@ export const AppointmentsPage = () => {
           onViewChange={setCalendarView}
           cursor={calendarCursor}
           onCursorChange={setCalendarCursor}
-          rescheduleEnabled={!isDemo && canManage}
+          rescheduleEnabled={canManage}
           onReschedule={handleReschedule}
         />
       )}

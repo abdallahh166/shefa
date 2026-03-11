@@ -67,8 +67,6 @@ export const ar = {
     remove: "إزالة",
     noUsersFound: "لا يوجد مستخدمون",
     preferencesSaved: "تم حفظ التفضيلات",
-    demoMode: "وضع العرض",
-    demoModeNoSave: "لا يمكن حفظ الإعدادات في وضع العرض.",
     passwordsDontMatch: "كلمتا المرور غير متطابقتين",
     passwordTooShort: "كلمة المرور قصيرة جداً",
     mustBeAtLeast6: "يجب أن تكون 6 أحرف على الأقل",
@@ -354,7 +352,6 @@ export const ar = {
     alreadyHaveAccount: "لديك حساب بالفعل؟",
     checkEmail: "تحقق من بريدك الإلكتروني",
     confirmationSent: "أرسلنا لك رابط التأكيد.",
-    demoLogin: "تسجيل دخول تجريبي سريع (بدون حساب):",
     slugAvailable: "اسم العيادة متاح!",
     slugTaken: "اسم العيادة مستخدم بالفعل.",
     slugChecking: "جارٍ التحقق من التوفر...",
@@ -411,9 +408,8 @@ export const ar = {
     rolePermissions: "صلاحيات الأدوار",
     readyToStart: "هل أنت جاهز للبدء؟",
     readyDescription:
-      "أنشئ حساب عيادتك أو جرب النسخة التجريبية لاستكشاف جميع الميزات.",
+      "أنشئ حساب عيادتك لاستكشاف جميع الميزات.",
     goToLogin: "الذهاب لتسجيل الدخول",
-    tryDemo: "تجربة العرض",
     page: "الصفحة",
     admin: "المدير",
     doctor: "الطبيب",
@@ -559,3 +555,4 @@ export const ar = {
     footerCopy: "© 2026 MedFlow. جميع الحقوق محفوظة.",
   },
 };
+
