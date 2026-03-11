@@ -100,7 +100,7 @@ export const InsurancePage = () => {
         service: c.service,
         amount: Number(c.amount),
         claim_date: c.claim_date,
-        status: c.status,
+        status: c.status as ClaimDisplayRow["status"],
       }));
 
   const demoFiltered = useMemo(() => {
