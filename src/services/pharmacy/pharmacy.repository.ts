@@ -77,7 +77,7 @@ export const pharmacyRepository: PharmacyRepository = {
       });
     }
 
-    return (data?.[0] ?? { total_count: 0, low_stock_count: 0, inventory_value: 0 }) as MedicationSummary;
+    return ((data as any)?.[0] ?? { total_count: 0, low_stock_count: 0, inventory_value: 0 }) as MedicationSummary;
   },
   async create(input, tenantId) {
     const payload: Record<string, unknown> = {
