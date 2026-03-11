@@ -1,73 +1,139 @@
-# Welcome to your Lovable project
+# Clinic Management System (Multi-tenant SaaS)
 
-## Project info
+Production-grade clinic management system built with React, Vite, Supabase (Auth, Postgres, Storage), React Query, and Zustand. The codebase is organized into domain, services, repositories, and feature modules with tenant isolation enforced at the database and service layers.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Overview
 
-## How can I edit this code?
+Core capabilities:
+- Multi-tenant clinics
+- Patients, doctors, appointments, prescriptions, labs, billing, insurance
+- Reporting with SQL-side aggregation
+- Audit logging for critical actions
+- Supabase RPCs for sensitive operations
 
-There are several ways of editing your application.
+## Tech stack
 
-**Use Lovable**
+- React 18 + Vite
+- TypeScript + Zod
+- React Query + Zustand
+- Supabase (Auth, Postgres, Storage, Edge Functions)
+- Tailwind CSS + shadcn/ui
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Local development quick start
 
-Changes made via Lovable will be committed automatically to this repo.
+1. Install dependencies:
+```
+npm install
+```
 
-**Use your preferred IDE**
+2. Start Supabase locally:
+```
+supabase start
+```
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+3. Use local environment:
+```
+npm run env:local
+```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+4. Start the app:
+```
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Remote development
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+1. Ensure `.env` points to the remote project.
+2. Use remote environment:
+```
+npm run env:remote
+```
 
-**Use GitHub Codespaces**
+## Environment switching
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+We use `.env` for remote and `.env.local` for local.
 
-## What technologies are used for this project?
+Commands:
+```
+npm run env:local
+npm run env:remote
+npm run env:status
+```
 
-This project is built with:
+Templates:
+- `.env.example` (remote template)
+- `.env.local.example` (local template)
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Supabase workflows
 
-## How can I deploy this project?
+Apply migrations locally:
+```
+supabase migration up
+```
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+Reset local DB:
+```
+supabase db reset
+```
 
-## Can I connect a custom domain to my Lovable project?
+Push migrations to remote:
+```
+supabase db push
+```
 
-Yes, you can!
+Run DB tests (pgTAP):
+```
+supabase test db
+```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Scripts
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- `npm run dev` – start Vite
+- `npm run build` – build for production
+- `npm run lint` – lint
+- `npm run test` – unit tests
+- `npm run test:db` – Supabase db tests
+- `npm run env:local` – switch to local env
+- `npm run env:remote` – switch to remote env
+- `npm run env:status` – check which env is active
+
+## Project structure
+
+```
+src/
+  app/         App wiring and routes
+  core/        Cross-cutting concerns (auth, config)
+  domain/      Zod schemas + types
+  services/    Service layer + repositories
+  features/    Feature modules (UI + hooks)
+  shared/      Shared UI + utilities
+```
+
+## Security notes
+
+- Client uses the publishable key only.
+- Service role key must never be used on the frontend.
+- RLS is enabled across all multi-tenant tables.
+- Storage buckets are tenant-scoped and sensitive assets use signed URLs.
+
+## Documentation
+
+- Local vs remote usage: `docs/local-and-remote-supabase.md`
+- RLS review: `docs/rls-policy-review-2026-03-11.md`
+- Production hardening: `docs/production-hardening.md`
+
+## Deployment
+
+This repo is framework-agnostic; deploy with your preferred platform.
+Before production:
+- `npm run build`
+- `supabase db diff` against production
+- `supabase db push` to production
+- run smoke tests
+
+## Contributing
+
+1. Create a branch
+2. Add migrations for schema changes (never edit applied migrations)
+3. Run `supabase test db`
+4. Open a PR
