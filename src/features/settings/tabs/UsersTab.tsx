@@ -3,14 +3,67 @@ import { Button } from "@/components/ui/button";
 import { PermissionGuard } from "@/core/auth/PermissionGuard";
 import { UserPlus } from "lucide-react";
 import type { ProfileWithRoles } from "@/domain/settings/profile.types";
+import { DataTable, Column } from "@/shared/components/DataTable";
+import { StatusBadge } from "@/shared/components/StatusBadge";
 
 interface UsersTabProps {
   profiles: ProfileWithRoles[];
   onAddUser: () => void;
+  isLoading?: boolean;
+  page?: number;
+  pageSize?: number;
+  total?: number;
+  onPageChange?: (page: number) => void;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
 }
 
-export const UsersTab = ({ profiles, onAddUser }: UsersTabProps) => {
+export const UsersTab = ({
+  profiles,
+  onAddUser,
+  isLoading = false,
+  page,
+  pageSize,
+  total,
+  onPageChange,
+  searchValue,
+  onSearchChange,
+}: UsersTabProps) => {
   const { t } = useI18n();
+
+  const columns: Column<ProfileWithRoles>[] = [
+    {
+      key: "full_name",
+      header: t("auth.fullName"),
+      searchable: true,
+      render: (p) => (
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+            {p.full_name.charAt(0)}
+          </div>
+          <span className="text-sm font-medium">{p.full_name}</span>
+        </div>
+      ),
+    },
+    {
+      key: "role",
+      header: t("settings.usersRoles"),
+      render: (p) => {
+        const role = p.user_roles?.[0]?.role ?? "-";
+        const variant = role === "clinic_admin" ? "info" : role === "doctor" ? "success" : "default";
+        return <StatusBadge variant={variant as any}>{role.replace("_", " ")}</StatusBadge>;
+      },
+    },
+    {
+      key: "actions",
+      header: "",
+      render: () => (
+        <Button variant="outline" size="sm" disabled>
+          {t("common.edit")}
+        </Button>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-4">
@@ -29,28 +82,21 @@ export const UsersTab = ({ profiles, onAddUser }: UsersTabProps) => {
         permission="manage_users"
         fallback={<p className="text-muted-foreground">{t("settings.noPermission")}</p>}
       >
-        <div className="space-y-3">
-          {profiles.length > 0 ? (
-            profiles.map((p) => (
-              <div key={p.id} className="flex items-center justify-between p-3 rounded-lg border">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-                    {p.full_name.charAt(0)}
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium">{p.full_name}</span>
-                    <span className="text-xs text-muted-foreground ml-2 capitalize bg-muted px-2 py-0.5 rounded">
-                      {p.user_roles?.[0]?.role?.replace("_", " ") ?? "-"}
-                    </span>
-                  </div>
-                </div>
-                <Button variant="outline" size="sm">{t("common.edit")}</Button>
-              </div>
-            ))
-          ) : (
-            <p className="text-muted-foreground text-sm py-4 text-center">{t("common.noUsersFound")}</p>
-          )}
-        </div>
+        <DataTable
+          columns={columns}
+          data={profiles}
+          keyExtractor={(p) => p.id}
+          searchable
+          serverSearch
+          searchValue={searchValue}
+          onSearchChange={onSearchChange}
+          isLoading={isLoading}
+          emptyMessage={t("common.noUsersFound")}
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={onPageChange}
+        />
       </PermissionGuard>
     </div>
   );

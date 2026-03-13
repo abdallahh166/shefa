@@ -72,12 +72,17 @@ export const queryKeys = {
     byUser: (userId: string) => ["profiles", "byUser", userId] as const,
   },
   admin: {
-    tenants: () => ["admin", "tenants"] as const,
-    profiles: () => ["admin", "profiles"] as const,
-    subscriptions: () => ["admin", "subscriptions"] as const,
+    tenants: (args?: { page?: number; pageSize?: number; search?: string; plan?: string }) =>
+      ["admin", "tenants", args] as const,
+    profiles: (args?: { page?: number; pageSize?: number; search?: string }) =>
+      ["admin", "profiles", args] as const,
+    subscriptions: (args?: { page?: number; pageSize?: number; search?: string; plan?: string; status?: string }) =>
+      ["admin", "subscriptions", args] as const,
+    subscriptionStats: () => ["admin", "subscriptionStats"] as const,
   },
   reports: {
     root: (tenantId?: string) => tenantKey("reports", tenantId),
+    access: (tenantId?: string) => [...tenantKey("reports", tenantId), "access"] as const,
     overview: (tenantId?: string) => [...tenantKey("reports", tenantId), "overview"] as const,
     revenueByMonth: (tenantId?: string) => [...tenantKey("reports", tenantId), "revenueByMonth"] as const,
     patientGrowth: (tenantId?: string) => [...tenantKey("reports", tenantId), "patientGrowth"] as const,
@@ -94,8 +99,10 @@ export const queryKeys = {
   },
   settings: {
     tenant: (tenantId?: string) => [...tenantKey("settings", tenantId), "tenant"] as const,
-    profiles: (tenantId?: string) => [...tenantKey("settings", tenantId), "profiles"] as const,
+    profiles: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string }) =>
+      [...tenantKey("settings", args?.tenantId), "profiles", args] as const,
     notifications: (userId: string, tenantId?: string) => [...tenantKey("settings", tenantId), "notifications", userId] as const,
-    audit: (tenantId?: string) => [...tenantKey("settings", tenantId), "audit"] as const,
+    audit: (args?: { tenantId?: string; page?: number; pageSize?: number }) =>
+      [...tenantKey("settings", args?.tenantId), "audit", args] as const,
   },
 } as const;

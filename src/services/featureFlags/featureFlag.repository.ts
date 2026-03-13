@@ -16,7 +16,7 @@ export const featureFlagRepository: FeatureFlagRepository = {
       .from("feature_flags")
       .select(FLAG_COLUMNS)
       .eq("tenant_id", tenantId)
-      .order("created_at", { ascending: false });
+      .order("feature_key", { ascending: true });
 
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load feature flags", { code: error.code, details: error });

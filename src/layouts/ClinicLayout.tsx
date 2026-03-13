@@ -38,7 +38,7 @@ const navItems: NavItem[] = [
 
 export const ClinicLayout = () => {
   const { clinicSlug } = useParams();
-  const { user, logout, hasPermission } = useAuth();
+  const { user, logout, hasPermission, tenantOverride, clearTenantOverride } = useAuth();
   const { hasFeature } = useFeatureAccess();
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -47,6 +47,11 @@ export const ClinicLayout = () => {
   const handleLogout = async () => {
     await logout();
     navigate("/login");
+  };
+
+  const handleExitImpersonation = () => {
+    clearTenantOverride();
+    navigate("/admin");
   };
 
   const visibleNav = navItems.filter((item) => hasPermission(item.permission) && (!item.feature || hasFeature(item.feature)));
@@ -120,6 +125,15 @@ export const ClinicLayout = () => {
             <GlobalSearch />
           </div>
           <div className="flex items-center gap-1.5">
+            {user?.role === "super_admin" && tenantOverride && (
+              <button
+                onClick={handleExitImpersonation}
+                className="px-2.5 py-1.5 text-xs rounded-md border border-primary/30 text-primary hover:bg-primary/10"
+                title="Exit tenant view"
+              >
+                Exit {tenantOverride.name}
+              </button>
+            )}
             <LanguageSwitcher />
             <NotificationCenter />
           </div>

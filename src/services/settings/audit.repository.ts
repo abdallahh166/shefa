@@ -6,7 +6,7 @@ const AUDIT_COLUMNS =
   "id, tenant_id, user_id, action, action_type, request_id, entity_type, resource_type, entity_id, details, ip_address, created_at";
 
 export interface AuditLogRepository {
-  listRecent(tenantId: string, limit?: number): Promise<AuditLog[]>;
+  listPaged(tenantId: string, limit: number, offset: number): Promise<{ data: AuditLog[]; count: number }>;
   logEvent(input: {
     tenant_id: string;
     user_id: string;
@@ -21,13 +21,14 @@ export interface AuditLogRepository {
 }
 
 export const auditLogRepository: AuditLogRepository = {
-  async listRecent(tenantId, limit = 50) {
-    const { data, error } = await supabase
+  async listPaged(tenantId, limit, offset) {
+    const to = Math.max(0, offset + limit - 1);
+    const { data, error, count } = await supabase
       .from("audit_logs")
-      .select(AUDIT_COLUMNS)
+      .select(AUDIT_COLUMNS, { count: "exact" })
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false })
-      .limit(limit);
+      .range(offset, to);
 
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load audit logs", {
@@ -36,7 +37,7 @@ export const auditLogRepository: AuditLogRepository = {
       });
     }
 
-    return (data ?? []) as AuditLog[];
+    return { data: (data ?? []) as AuditLog[], count: count ?? 0 };
   },
   async logEvent(input) {
     const { error } = await supabase.rpc("log_audit_event", {

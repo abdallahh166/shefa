@@ -40,8 +40,8 @@ const FEATURE_FLAG_MAP: Record<Feature, FeatureFlagKey | null> = {
 
 export function useFeatureAccess() {
   const { plan } = useSubscription();
-  const { user } = useAuth();
-  const tenantId = user?.tenantId;
+  const { user, tenantOverride } = useAuth();
+  const tenantId = tenantOverride?.id ?? user?.tenantId;
 
   const { data: flags } = useQuery({
     queryKey: queryKeys.featureFlags.list(tenantId),

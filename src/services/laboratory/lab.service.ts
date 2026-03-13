@@ -14,6 +14,8 @@ import { limitOffsetSchema } from "@/domain/shared/pagination.schema";
 import { emitDomainEvent } from "@/core/events";
 import { toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
+import { assertAnyPermission } from "@/services/supabase/permissions";
+import { auditLogService } from "@/services/settings/audit.service";
 import { labRepository } from "./lab.repository";
 import { rateLimitService } from "@/services/security/rateLimit.service";
 
@@ -26,6 +28,7 @@ const labStatusCountsSchema = z.object({
 export const labService = {
   async listPaged(params: LabResultListParams) {
     try {
+      assertAnyPermission(["view_medical_records", "manage_medical_records", "manage_laboratory"]);
       const parsed = labResultListParamsSchema.parse(params);
       const { tenantId } = getTenantContext();
       const result = await labRepository.listPaged(parsed, tenantId);
@@ -38,6 +41,7 @@ export const labService = {
   },
   async listPagedWithRelations(params: LabResultListParams) {
     try {
+      assertAnyPermission(["view_medical_records", "manage_medical_records", "manage_laboratory"]);
       const parsed = labResultListParamsSchema.parse(params);
       const { tenantId } = getTenantContext();
       const result = await labRepository.listPagedWithRelations(parsed, tenantId);
@@ -50,6 +54,7 @@ export const labService = {
   },
   async countByStatus() {
     try {
+      assertAnyPermission(["view_medical_records", "manage_medical_records", "manage_laboratory"]);
       const { tenantId } = getTenantContext();
       const result = await labRepository.countByStatus(tenantId);
       return labStatusCountsSchema.parse(result);
@@ -59,6 +64,7 @@ export const labService = {
   },
   async listByPatient(patientId: string, params?: LimitOffsetParams) {
     try {
+      assertAnyPermission(["view_medical_records", "manage_medical_records", "manage_laboratory"]);
       const parsedId = uuidSchema.parse(patientId);
       const paging = limitOffsetSchema.parse(params ?? {});
       const { tenantId } = getTenantContext();
@@ -70,11 +76,26 @@ export const labService = {
   },
   async create(input: LabResultCreateInput) {
     try {
+      assertAnyPermission(["manage_medical_records", "manage_laboratory"]);
       const parsed = labResultCreateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
       await rateLimitService.assertAllowed("lab_upload", [tenantId, userId]);
       const result = await labRepository.create(parsed, tenantId);
       const labOrder = labResultSchema.parse(result);
+      await auditLogService.logEvent({
+        tenant_id: tenantId,
+        user_id: userId,
+        action: "lab_order_created",
+        action_type: "lab_order_create",
+        entity_type: "lab_order",
+        entity_id: labOrder.id,
+        details: {
+          patient_id: labOrder.patient_id,
+          doctor_id: labOrder.doctor_id,
+          test_name: labOrder.test_name,
+          status: labOrder.status,
+        },
+      });
       await emitDomainEvent(
         "LabResultUploaded",
         {
@@ -92,6 +113,7 @@ export const labService = {
   },
   async update(id: string, input: LabResultUpdateInput) {
     try {
+      assertAnyPermission(["manage_medical_records", "manage_laboratory"]);
       const parsedId = uuidSchema.parse(id);
       const parsed = labResultUpdateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
@@ -101,6 +123,15 @@ export const labService = {
       }
       const result = await labRepository.update(parsedId, parsed, tenantId);
       const labOrder = labResultSchema.parse(result);
+      await auditLogService.logEvent({
+        tenant_id: tenantId,
+        user_id: userId,
+        action: "lab_order_updated",
+        action_type: "lab_order_update",
+        entity_type: "lab_order",
+        entity_id: labOrder.id,
+        details: parsed as Record<string, unknown>,
+      });
       if (shouldEmit) {
         await emitDomainEvent(
           "LabResultUploaded",
@@ -120,20 +151,40 @@ export const labService = {
   },
   async archive(id: string) {
     try {
+      assertAnyPermission(["manage_medical_records", "manage_laboratory"]);
       const parsedId = uuidSchema.parse(id);
       const { tenantId, userId } = getTenantContext();
       const result = await labRepository.archive(parsedId, tenantId, userId);
-      return labResultSchema.parse(result);
+      const labOrder = labResultSchema.parse(result);
+      await auditLogService.logEvent({
+        tenant_id: tenantId,
+        user_id: userId,
+        action: "lab_order_archived",
+        action_type: "lab_order_archive",
+        entity_type: "lab_order",
+        entity_id: labOrder.id,
+      });
+      return labOrder;
     } catch (err) {
       throw toServiceError(err, "Failed to archive lab order");
     }
   },
   async restore(id: string) {
     try {
+      assertAnyPermission(["manage_medical_records", "manage_laboratory"]);
       const parsedId = uuidSchema.parse(id);
-      const { tenantId } = getTenantContext();
+      const { tenantId, userId } = getTenantContext();
       const result = await labRepository.restore(parsedId, tenantId);
-      return labResultSchema.parse(result);
+      const labOrder = labResultSchema.parse(result);
+      await auditLogService.logEvent({
+        tenant_id: tenantId,
+        user_id: userId,
+        action: "lab_order_restored",
+        action_type: "lab_order_restore",
+        entity_type: "lab_order",
+        entity_id: labOrder.id,
+      });
+      return labOrder;
     } catch (err) {
       throw toServiceError(err, "Failed to restore lab order");
     }

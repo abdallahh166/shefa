@@ -1,26 +1,87 @@
-import type { AdminSubscription, AdminTenant } from "@/domain/admin/admin.types";
+import type { AdminSubscription, AdminTenant, AdminSubscriptionStats } from "@/domain/admin/admin.types";
 import type { ProfileWithRoles } from "@/domain/settings/profile.types";
 import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
 
-const TENANT_COLUMNS = "id, name, slug, email, phone, created_at";
+const TENANT_COLUMNS = "id, name, slug, email, phone, created_at, subscriptions(plan, status)";
 const SUBSCRIPTION_COLUMNS =
   "id, tenant_id, plan, status, amount, currency, billing_cycle, expires_at, created_at, tenants(name, slug)";
-const PROFILE_COLUMNS = "id, user_id, tenant_id, full_name, avatar_url, created_at, updated_at";
+const PROFILE_COLUMNS = "id, user_id, tenant_id, full_name, avatar_url, created_at, updated_at, tenants(name, slug)";
 
 export interface AdminRepository {
-  listTenants(): Promise<AdminTenant[]>;
-  listProfilesWithRoles(): Promise<ProfileWithRoles[]>;
-  listSubscriptions(): Promise<AdminSubscription[]>;
+  listTenantsPaged(params: {
+    limit: number;
+    offset: number;
+    search?: string;
+    plan?: AdminSubscription["plan"];
+  }): Promise<{ data: AdminTenant[]; count: number }>;
+  listProfilesWithRolesPaged(params: {
+    limit: number;
+    offset: number;
+    search?: string;
+  }): Promise<{ data: ProfileWithRoles[]; count: number }>;
+  listSubscriptionsPaged(params: {
+    limit: number;
+    offset: number;
+    search?: string;
+    plan?: AdminSubscription["plan"];
+    status?: AdminSubscription["status"];
+  }): Promise<{ data: AdminSubscription[]; count: number }>;
   updateSubscription(id: string, input: Partial<Pick<AdminSubscription, "plan" | "status">>): Promise<AdminSubscription>;
+  getSubscriptionStats(): Promise<AdminSubscriptionStats>;
 }
 
 export const adminRepository: AdminRepository = {
-  async listTenants() {
-    const { data, error } = await supabase
+  async listTenantsPaged({ limit, offset, search, plan }) {
+    const to = Math.max(0, offset + limit - 1);
+
+    if (plan) {
+      let planQuery = supabase
+        .from("subscriptions")
+        .select("plan, status, tenants(id, name, slug, email, phone, created_at)", { count: "exact" })
+        .eq("plan", plan)
+        .order("created_at", { ascending: false })
+        .range(offset, to);
+
+      if (search && search.trim().length > 0) {
+        const q = `%${search.trim()}%`;
+        planQuery = planQuery.or(`tenants.name.ilike.${q},tenants.slug.ilike.${q},tenants.email.ilike.${q}`);
+      }
+
+      const { data, error, count } = await planQuery;
+      if (error) {
+        throw new ServiceError(error.message ?? "Failed to load tenants", {
+          code: error.code,
+          details: error,
+        });
+      }
+
+      const mapped = (data ?? [])
+        .map((row: any) => {
+          if (!row?.tenants) return null;
+          return {
+            ...row.tenants,
+            plan: row.plan ?? null,
+            status: row.status ?? null,
+          };
+        })
+        .filter(Boolean) as AdminTenant[];
+
+      return { data: mapped, count: count ?? 0 };
+    }
+
+    let query = supabase
       .from("tenants")
-      .select(TENANT_COLUMNS)
-      .order("created_at", { ascending: false });
+      .select(TENANT_COLUMNS, { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(offset, to);
+
+    if (search && search.trim().length > 0) {
+      const q = `%${search.trim()}%`;
+      query = query.or(`name.ilike.${q},slug.ilike.${q},email.ilike.${q}`);
+    }
+
+    const { data, error, count } = await query;
 
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load tenants", {
@@ -29,13 +90,31 @@ export const adminRepository: AdminRepository = {
       });
     }
 
-    return (data ?? []) as AdminTenant[];
+    const mapped = (data ?? []).map((row: any) => {
+      const subscription = Array.isArray(row.subscriptions) ? row.subscriptions[0] : row.subscriptions;
+      return {
+        ...row,
+        plan: subscription?.plan ?? null,
+        status: subscription?.status ?? null,
+      } as AdminTenant;
+    });
+
+    return { data: mapped, count: count ?? 0 };
   },
-  async listProfilesWithRoles() {
-    const { data: profiles, error: profilesError } = await supabase
+  async listProfilesWithRolesPaged({ limit, offset, search }) {
+    const to = Math.max(0, offset + limit - 1);
+    let profilesQuery = supabase
       .from("profiles")
-      .select(PROFILE_COLUMNS)
-      .order("created_at", { ascending: false });
+      .select(PROFILE_COLUMNS, { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(offset, to);
+
+    if (search && search.trim().length > 0) {
+      const q = `%${search.trim()}%`;
+      profilesQuery = profilesQuery.ilike("full_name", q);
+    }
+
+    const { data: profiles, error: profilesError, count } = await profilesQuery;
 
     if (profilesError) {
       throw new ServiceError(profilesError.message ?? "Failed to load profiles", {
@@ -45,7 +124,7 @@ export const adminRepository: AdminRepository = {
     }
 
     if (!profiles?.length) {
-      return [];
+      return { data: [], count: count ?? 0 };
     }
 
     const userIds = profiles.map((profile) => profile.user_id);
@@ -67,16 +146,35 @@ export const adminRepository: AdminRepository = {
       rolesByUserId.set(role.user_id, [{ role: role.role }]);
     }
 
-    return profiles.map((profile) => ({
+    const data = profiles.map((profile) => ({
       ...profile,
       user_roles: rolesByUserId.get(profile.user_id) ?? [],
     })) as ProfileWithRoles[];
+
+    return { data, count: count ?? 0 };
   },
-  async listSubscriptions() {
-    const { data, error } = await supabase
+  async listSubscriptionsPaged({ limit, offset, search, plan, status }) {
+    const to = Math.max(0, offset + limit - 1);
+    let query = supabase
       .from("subscriptions")
-      .select(SUBSCRIPTION_COLUMNS)
-      .order("created_at", { ascending: false });
+      .select(SUBSCRIPTION_COLUMNS, { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(offset, to);
+
+    if (plan) {
+      query = query.eq("plan", plan);
+    }
+
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    if (search && search.trim().length > 0) {
+      const q = `%${search.trim()}%`;
+      query = query.or(`tenants.name.ilike.${q},tenants.slug.ilike.${q}`);
+    }
+
+    const { data, error, count } = await query;
 
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load subscriptions", {
@@ -85,7 +183,18 @@ export const adminRepository: AdminRepository = {
       });
     }
 
-    return (data ?? []) as AdminSubscription[];
+    return { data: (data ?? []) as AdminSubscription[], count: count ?? 0 };
+  },
+  async getSubscriptionStats() {
+    const { data, error } = await supabase.rpc("admin_subscription_stats");
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to load subscription stats", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return (data ?? {}) as AdminSubscriptionStats;
   },
   async updateSubscription(id, input) {
     const payload: Record<string, unknown> = {};

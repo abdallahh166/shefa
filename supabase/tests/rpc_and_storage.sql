@@ -1,6 +1,6 @@
 begin;
 
-select plan(5);
+select plan(7);
 
 set local role postgres;
 set local session_replication_role = replica;
@@ -82,6 +82,18 @@ select is(
   (select count(*) from storage.objects where bucket_id = 'patient-documents'),
   1::bigint,
   'Storage policies restrict patient documents to tenant paths'
+);
+
+select is(
+  (select count(*) from public.search_global('Patient', 10)),
+  1::bigint,
+  'Global search returns tenant-scoped patients only'
+);
+
+select is(
+  (select count(*) from public.search_global('INV', 10)),
+  2::bigint,
+  'Global search returns tenant-scoped invoices only'
 );
 
 select * from finish();

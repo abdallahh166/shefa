@@ -10,6 +10,14 @@ vi.mock("@/services/supabase/tenant", () => ({
   getTenantContext: () => ({ tenantId: "00000000-0000-0000-0000-000000000111", userId: "00000000-0000-0000-0000-000000000222" }),
 }));
 
+vi.mock("@/core/auth/authStore", () => ({
+  useAuth: {
+    getState: () => ({
+      hasPermission: () => true,
+    }),
+  },
+}));
+
 vi.mock("@/services/patients/patientDocuments.repository", () => ({
   patientDocumentsRepository: {
     createMetadata: vi.fn(),
@@ -121,5 +129,16 @@ describe("patientDocumentsService", () => {
 
     const result = await patientDocumentsService.remove("00000000-0000-0000-0000-000000009999");
     expect(result).toEqual({ storageError: "storage failed" });
+  });
+
+  it("rejects unsupported document types", async () => {
+    const file = new FileMock(["content"], "script.exe", { type: "application/x-msdownload" }) as unknown as File;
+
+    await expect(
+      patientDocumentsService.upload({
+        patient_id: "00000000-0000-0000-0000-000000000333",
+        file,
+      }),
+    ).rejects.toThrow("Unsupported document type");
   });
 });

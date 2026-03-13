@@ -29,7 +29,7 @@ const SubscriptionContext = createContext<SubscriptionState>(defaultState);
 export const useSubscription = () => useContext(SubscriptionContext);
 
 export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, tenantOverride } = useAuth();
   const [state, setState] = useState<SubscriptionState>(defaultState);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -42,8 +42,8 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // Super admins don't need subscription checks
-    if (user.role === "super_admin") {
+    // Super admins don't need subscription checks unless viewing another tenant
+    if (user.role === "super_admin" && !tenantOverride) {
       setState({
         plan: "enterprise",
         status: "active",
@@ -65,7 +65,8 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       setState((s) => ({ ...s, isLoading: true }));
 
         try {
-        const data = await subscriptionService.getByTenant(user.tenantId);
+        const targetTenantId = tenantOverride?.id ?? user.tenantId;
+        const data = await subscriptionService.getByTenant(targetTenantId);
 
         if (controller.signal.aborted) return;
 
@@ -103,7 +104,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       controller.abort();
     };
-  }, [isAuthenticated, user?.tenantId, user?.role, authLoading]);
+  }, [isAuthenticated, user?.tenantId, user?.role, tenantOverride?.id, authLoading]);
 
   return (
     <SubscriptionContext.Provider value={state}>

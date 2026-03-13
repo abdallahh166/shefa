@@ -26,50 +26,84 @@ type Tab = "revenue" | "patients" | "doctors" | "appointments";
 
 export const ReportsPage = () => {
   const { t } = useI18n();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("revenue");
+  const canViewReports = hasPermission("view_reports") || hasPermission("super_admin");
+
+  const { data: canViewReportsServer = true } = useQuery({
+    queryKey: queryKeys.reports.access(user?.tenantId),
+    enabled: !!user?.tenantId && canViewReports,
+    queryFn: () => reportService.canViewReports(),
+    retry: false,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const canRenderReports = canViewReports && canViewReportsServer;
 
   const { data: overview } = useQuery({
     queryKey: queryKeys.reports.overview(user?.tenantId),
-    enabled: !!user?.tenantId,
+    enabled: !!user?.tenantId && canRenderReports,
     queryFn: () => reportService.getOverview(),
+    staleTime: 1000 * 60 * 5,
+    retry: false,
   });
 
   const { data: revenueData = [] } = useQuery({
     queryKey: queryKeys.reports.revenueByMonth(user?.tenantId),
-    enabled: !!user?.tenantId,
+    enabled: !!user?.tenantId && canRenderReports,
     queryFn: () => reportService.getRevenueByMonth(6),
+    staleTime: 1000 * 60 * 5,
+    retry: false,
   });
 
   const { data: patientGrowth = [] } = useQuery({
     queryKey: queryKeys.reports.patientGrowth(user?.tenantId),
-    enabled: !!user?.tenantId,
+    enabled: !!user?.tenantId && canRenderReports,
     queryFn: () => reportService.getPatientGrowth(6),
+    staleTime: 1000 * 60 * 5,
+    retry: false,
   });
 
   const { data: appointmentTypes = [] } = useQuery({
     queryKey: queryKeys.reports.appointmentTypes(user?.tenantId),
-    enabled: !!user?.tenantId,
+    enabled: !!user?.tenantId && canRenderReports,
     queryFn: () => reportService.getAppointmentTypes(),
+    staleTime: 1000 * 60 * 5,
+    retry: false,
   });
 
   const { data: revenueByService = [] } = useQuery({
     queryKey: queryKeys.reports.revenueByService(user?.tenantId),
-    enabled: !!user?.tenantId,
+    enabled: !!user?.tenantId && canRenderReports,
     queryFn: () => reportService.getRevenueByService(6),
+    staleTime: 1000 * 60 * 5,
+    retry: false,
   });
 
   const { data: doctorPerformance = [] } = useQuery({
     queryKey: queryKeys.reports.doctorPerformance(user?.tenantId),
-    enabled: !!user?.tenantId,
+    enabled: !!user?.tenantId && canRenderReports,
     queryFn: () => reportService.getDoctorPerformance(),
+    staleTime: 1000 * 60 * 5,
+    retry: false,
   });
 
   const { data: appointmentStatusCounts = { scheduled: 0, in_progress: 0, completed: 0, cancelled: 0 } } = useQuery({
     queryKey: queryKeys.reports.appointmentStatuses(user?.tenantId),
-    enabled: !!user?.tenantId,
+    enabled: !!user?.tenantId && canRenderReports,
     queryFn: () => reportService.getAppointmentStatusCounts(),
+    staleTime: 1000 * 60 * 5,
+    retry: false,
   });
+
+  if (!canRenderReports) {
+    return (
+      <div className="space-y-4">
+        <h1 className="page-title">{t("reports.title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("reports.noPermission")}</p>
+      </div>
+    );
+  }
 
   const totalRevenue = overview?.total_revenue ?? 0;
   const totalPatients = overview?.total_patients ?? 0;

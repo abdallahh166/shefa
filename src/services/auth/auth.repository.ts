@@ -5,7 +5,7 @@ import { ServiceError } from "@/services/supabase/errors";
 const PROFILE_COLUMNS = "id, user_id, tenant_id, full_name, avatar_url, tenants:tenant_id(name, slug)";
 
 export interface AuthRepository {
-  signInWithPassword(email: string, password: string): Promise<void>;
+  signInWithPassword(email: string, password: string): Promise<SupabaseUser | null>;
   signOut(): Promise<void>;
   getSession(): Promise<{ user?: SupabaseUser | null }>;
   onAuthStateChange(
@@ -20,10 +20,11 @@ export interface AuthRepository {
 
 export const authRepository: AuthRepository = {
   async signInWithPassword(email, password) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       throw new ServiceError(error.message ?? "Login failed", { code: error.code, details: error });
     }
+    return data.user ?? null;
   },
   async signOut() {
     const { error } = await supabase.auth.signOut();

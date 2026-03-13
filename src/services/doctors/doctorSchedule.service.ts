@@ -4,6 +4,8 @@ import type { DoctorScheduleUpsertInput } from "@/domain/doctor/doctorSchedule.t
 import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import { ServiceError, toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
+import { assertAnyPermission } from "@/services/supabase/permissions";
+import { auditLogService } from "@/services/settings/audit.service";
 import { doctorScheduleRepository } from "./doctorSchedule.repository";
 
 function normalizeTime(value: string) {
@@ -51,6 +53,7 @@ function isScheduleOverlap(err: unknown) {
 export const doctorScheduleService = {
   async listByDoctor(doctorId: string) {
     try {
+      assertAnyPermission(["manage_users", "manage_clinic"]);
       const parsedId = uuidSchema.parse(doctorId);
       const { tenantId } = getTenantContext();
       const result = await doctorScheduleRepository.listByDoctor(parsedId, tenantId);
@@ -66,12 +69,22 @@ export const doctorScheduleService = {
   },
   async save(doctorId: string, rows: DoctorScheduleUpsertInput[]) {
     try {
+      assertAnyPermission(["manage_users", "manage_clinic"]);
       const parsedId = uuidSchema.parse(doctorId);
       const parsedRows = z.array(doctorScheduleUpsertSchema).parse(rows);
       assertNoOverlaps(parsedRows);
-      const { tenantId } = getTenantContext();
+      const { tenantId, userId } = getTenantContext();
       const result = await doctorScheduleRepository.upsertMany(parsedId, parsedRows, tenantId);
       const data = z.array(doctorScheduleSchema).parse(result);
+      await auditLogService.logEvent({
+        tenant_id: tenantId,
+        user_id: userId,
+        action: "doctor_schedule_updated",
+        action_type: "doctor_schedule_update",
+        entity_type: "doctor_schedule",
+        entity_id: parsedId,
+        details: { rows: parsedRows },
+      });
       return data.map((row) => ({
         ...row,
         start_time: normalizeTime(row.start_time),

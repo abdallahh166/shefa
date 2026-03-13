@@ -15,6 +15,8 @@ import { limitOffsetSchema } from "@/domain/shared/pagination.schema";
 import { emitDomainEvent } from "@/core/events";
 import { ServiceError, toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
+import { assertAnyPermission } from "@/services/supabase/permissions";
+import { auditLogService } from "@/services/settings/audit.service";
 import { appointmentRepository } from "./appointment.repository";
 
 async function ensureNoConflict(
@@ -43,6 +45,7 @@ function isExclusionConflict(err: unknown) {
 export const appointmentService = {
   async listPaged(params: AppointmentListParams) {
     try {
+      assertAnyPermission(["view_appointments", "manage_appointments"]);
       const parsed = appointmentListParamsSchema.parse(params);
       const { tenantId } = getTenantContext();
       const result = await appointmentRepository.listPaged(parsed, tenantId);
@@ -55,6 +58,7 @@ export const appointmentService = {
   },
   async listPagedWithRelations(params: AppointmentListParams) {
     try {
+      assertAnyPermission(["view_appointments", "manage_appointments"]);
       const parsed = appointmentListParamsSchema.parse(params);
       const { tenantId } = getTenantContext();
       const result = await appointmentRepository.listPagedWithRelations(parsed, tenantId);
@@ -67,6 +71,7 @@ export const appointmentService = {
   },
   async listByDateRange(start: string, end: string, params?: LimitOffsetParams) {
     try {
+      assertAnyPermission(["view_appointments", "manage_appointments"]);
       const parsedStart = dateTimeStringSchema.parse(start);
       const parsedEnd = dateTimeStringSchema.parse(end);
       const paging = limitOffsetSchema.parse(params ?? {});
@@ -79,6 +84,7 @@ export const appointmentService = {
   },
   async listByPatient(patientId: string, params?: LimitOffsetParams) {
     try {
+      assertAnyPermission(["view_appointments", "manage_appointments"]);
       const parsedId = uuidSchema.parse(patientId);
       const paging = limitOffsetSchema.parse(params ?? {});
       const { tenantId } = getTenantContext();
@@ -90,6 +96,7 @@ export const appointmentService = {
   },
   async countByStatus() {
     try {
+      assertAnyPermission(["view_appointments", "manage_appointments"]);
       const { tenantId } = getTenantContext();
       const result = await appointmentRepository.countByStatus(tenantId);
       return z.record(z.number().int().nonnegative()).parse(result);
@@ -99,11 +106,26 @@ export const appointmentService = {
   },
   async create(input: AppointmentCreateInput) {
     try {
+      assertAnyPermission(["manage_appointments"]);
       const parsed = appointmentCreateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
       await ensureNoConflict(parsed.doctor_id, parsed.appointment_date, tenantId);
       const result = await appointmentRepository.create(parsed, tenantId);
       const appointment = appointmentSchema.parse(result);
+      await auditLogService.logEvent({
+        tenant_id: tenantId,
+        user_id: userId,
+        action: "appointment_created",
+        action_type: "appointment_create",
+        entity_type: "appointment",
+        entity_id: appointment.id,
+        details: {
+          patient_id: appointment.patient_id,
+          doctor_id: appointment.doctor_id,
+          appointment_date: appointment.appointment_date,
+          status: appointment.status,
+        },
+      });
       await emitDomainEvent(
         "AppointmentCreated",
         {
@@ -127,9 +149,10 @@ export const appointmentService = {
   },
   async update(id: string, input: AppointmentUpdateInput) {
     try {
+      assertAnyPermission(["manage_appointments"]);
       const parsedId = uuidSchema.parse(id);
       const parsed = appointmentUpdateSchema.parse(input);
-      const { tenantId } = getTenantContext();
+      const { tenantId, userId } = getTenantContext();
       if (parsed.doctor_id !== undefined || parsed.appointment_date !== undefined) {
         const existing = await appointmentRepository.getById(parsedId, tenantId);
         const doctorId = parsed.doctor_id ?? existing.doctor_id;
@@ -137,7 +160,17 @@ export const appointmentService = {
         await ensureNoConflict(doctorId, appointmentDate, tenantId, parsedId);
       }
       const result = await appointmentRepository.update(parsedId, parsed, tenantId);
-      return appointmentSchema.parse(result);
+      const appointment = appointmentSchema.parse(result);
+      await auditLogService.logEvent({
+        tenant_id: tenantId,
+        user_id: userId,
+        action: "appointment_updated",
+        action_type: "appointment_update",
+        entity_type: "appointment",
+        entity_id: appointment.id,
+        details: parsed as Record<string, unknown>,
+      });
+      return appointment;
     } catch (err) {
       if (isExclusionConflict(err)) {
         throw new ServiceError("Appointment overlaps with an existing booking", {
@@ -150,20 +183,40 @@ export const appointmentService = {
   },
   async archive(id: string) {
     try {
+      assertAnyPermission(["manage_appointments"]);
       const parsedId = uuidSchema.parse(id);
       const { tenantId, userId } = getTenantContext();
       const result = await appointmentRepository.archive(parsedId, tenantId, userId);
-      return appointmentSchema.parse(result);
+      const appointment = appointmentSchema.parse(result);
+      await auditLogService.logEvent({
+        tenant_id: tenantId,
+        user_id: userId,
+        action: "appointment_archived",
+        action_type: "appointment_archive",
+        entity_type: "appointment",
+        entity_id: appointment.id,
+      });
+      return appointment;
     } catch (err) {
       throw toServiceError(err, "Failed to archive appointment");
     }
   },
   async restore(id: string) {
     try {
+      assertAnyPermission(["manage_appointments"]);
       const parsedId = uuidSchema.parse(id);
-      const { tenantId } = getTenantContext();
+      const { tenantId, userId } = getTenantContext();
       const result = await appointmentRepository.restore(parsedId, tenantId);
-      return appointmentSchema.parse(result);
+      const appointment = appointmentSchema.parse(result);
+      await auditLogService.logEvent({
+        tenant_id: tenantId,
+        user_id: userId,
+        action: "appointment_restored",
+        action_type: "appointment_restore",
+        entity_type: "appointment",
+        entity_id: appointment.id,
+      });
+      return appointment;
     } catch (err) {
       throw toServiceError(err, "Failed to restore appointment");
     }

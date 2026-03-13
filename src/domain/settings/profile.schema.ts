@@ -20,4 +20,11 @@ export const profileUpdateSchema = z.object({
 
 export const profileWithRolesSchema = profileSchema.extend({
   user_roles: z.array(z.object({ role: appRoleEnum })).optional(),
+  tenants: z
+    .object({
+      name: z.string().trim().min(1).max(200),
+      slug: z.string().trim().min(1).max(120),
+    })
+    .optional()
+    .nullable(),
 });
