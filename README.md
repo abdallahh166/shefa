@@ -2,6 +2,14 @@
 
 Production-grade clinic management system built with React, Vite, Supabase (Auth, Postgres, Storage), React Query, and Zustand. The codebase is organized into domain, services, repositories, and feature modules with tenant isolation enforced at the database and service layers.
 
+## TL;DR
+
+- Multi-tenant healthcare SaaS with strict tenant isolation at RLS + repository layers.
+- Domain models validated via Zod, service layer enforces business rules.
+- Supabase RPCs handle sensitive or aggregate operations.
+- Materialized views power reports; scheduled refresh is always configured.
+- Storage is tenant-scoped with private buckets and signed URL access.
+
 ## Overview
 
 Core capabilities:
@@ -11,7 +19,7 @@ Core capabilities:
 - Audit logging for critical actions
 - Supabase RPCs for sensitive operations
 
-## Feature modules
+## Feature Modules
 
 ### 1. Authentication & Security
 Features:
@@ -152,24 +160,82 @@ Features:
 - Audit log viewer
 - Tenant configuration
 
-## System characteristics
+## Architecture
 
-- React + Vite frontend with Supabase backend
-- Domain/service/repository layering
-- SQL-side reporting aggregation
-- Tenant-scoped queries
-- Schema validation with Zod
-- Audit logging
+### Layering
+- `domain`: Zod schemas + types. Pure validation and invariants.
+- `services`: Business logic, validation, tenant resolution, error handling.
+- `repositories`: All direct Supabase access (no Supabase in UI).
+- `features`: UI modules + hooks.
+- `core`: Auth, env validation, shared app infrastructure.
 
-## Tech stack
+### Dependency Flow
+```
+features -> services -> repositories -> Supabase
+features -> domain (types/schemas)
+services -> domain (validation)
+repositories -> Supabase client
+```
 
-- React 18 + Vite
-- TypeScript + Zod
-- React Query + Zustand
-- Supabase (Auth, Postgres, Storage, Edge Functions)
-- Tailwind CSS + shadcn/ui
+### Tenant Context
+- Tenant is derived from authenticated user context in services (`getTenantContext`).
+- Repositories enforce tenant scoping in queries.
+- RLS policies enforce tenant isolation in the database.
 
-## Local development quick start
+## Data Flow (High Level)
+
+1. UI triggers service calls.
+2. Services validate input with Zod, resolve tenant/user context.
+3. Repositories execute tenant-scoped queries or RPCs.
+4. Output is validated against domain schemas.
+5. React Query caches data with tenant-scoped keys.
+
+## Database & Schema Highlights
+
+- Tenant isolation via `tenant_id` on all data tables.
+- Exclusion constraints for preventing overlapping appointments and doctor schedules.
+- Trigram indexes for fast ILIKE search.
+- Report materialized views for aggregate KPIs.
+- Audit logs for critical domain changes.
+
+## Security Model
+
+- RLS enabled across all multi-tenant tables.
+- RBAC enforced at RLS + service layer.
+- Storage buckets private; access via signed URLs.
+- Edge functions hardened with CAPTCHA, rate limiting, and email verification.
+- Service role keys used only in server-side functions.
+
+## Performance & Scalability
+
+- Server-side pagination for large lists.
+- Typeahead search with limits and server-side filtering.
+- Materialized views for reports (scheduled refresh).
+- Tenant-scoped React Query keys to avoid cache bleeding.
+- Realtime invalidation targets specific query keys.
+
+## Observability
+
+- Client error logs stored in `client_error_logs` (tenant-scoped).
+- Audit logs for critical actions (patients, appointments, invoices, documents, lab orders, prescriptions, insurance).
+
+## Environment & Configuration
+
+Environment validation is enforced at startup in `src/core/env/env.ts`.
+
+Required variables:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+
+Optional variables:
+- `VITE_SUPABASE_PROJECT_ID`
+- `VITE_CAPTCHA_SITE_KEY`
+
+Templates:
+- `.env.example` (remote)
+- `.env.local.example` (local)
+
+## Local Development Quick Start
 
 1. Install dependencies:
 ```
@@ -191,7 +257,7 @@ npm run env:local
 npm run dev
 ```
 
-## Remote development
+## Remote Development
 
 1. Ensure `.env` points to the remote project.
 2. Use remote environment:
@@ -199,7 +265,7 @@ npm run dev
 npm run env:remote
 ```
 
-## Environment switching
+## Environment Switching
 
 We use `.env` for remote and `.env.local` for local.
 
@@ -210,11 +276,7 @@ npm run env:remote
 npm run env:status
 ```
 
-Templates:
-- `.env.example` (remote template)
-- `.env.local.example` (local template)
-
-## Supabase workflows
+## Supabase Workflows
 
 Apply migrations locally:
 ```
@@ -236,6 +298,12 @@ Run DB tests (pgTAP):
 supabase test db
 ```
 
+## Testing
+
+- Unit tests: `npm run test`
+- Database policy + RPC tests: `supabase test db`
+- Build validation: `npm run build`
+
 ## Scripts
 
 - `npm run dev` - start Vite
@@ -247,24 +315,24 @@ supabase test db
 - `npm run env:remote` - switch to remote env
 - `npm run env:status` - check which env is active
 
-## Project structure
+## Project Structure
 
 ```
 src/
   app/         App wiring and routes
-  core/        Cross-cutting concerns (auth, config)
+  core/        Cross-cutting concerns (auth, env, config)
   domain/      Zod schemas + types
   services/    Service layer + repositories
   features/    Feature modules (UI + hooks)
   shared/      Shared UI + utilities
 ```
 
-## Security notes
+## Security Notes
 
-- Client uses the publishable key only.
+- Client uses publishable key only.
 - Service role key must never be used on the frontend.
 - RLS is enabled across all multi-tenant tables.
-- Storage buckets are tenant-scoped and sensitive assets use signed URLs.
+- Storage buckets are private; sensitive assets use signed URLs.
 
 ## Documentation
 
@@ -279,7 +347,26 @@ Before production:
 - `npm run build`
 - `supabase db diff` against production
 - `supabase db push` to production
-- run smoke tests
+- Run smoke tests
+
+## Architecture and Risk Analysis
+
+### Strengths
+- Clear domain/service/repository separation.
+- Tenant isolation enforced at multiple layers.
+- Zod validation at service boundaries.
+- RLS + audit logging for critical data.
+- Report aggregates via materialized views.
+
+### Remaining Considerations
+- Materialized view refresh schedule should match business requirements for reporting freshness.
+- Realtime invalidation is optimized but still domain-level; record-level invalidation could further reduce refetch.
+- Large patient histories are now paginated; UI should expose pagination controls where needed.
+
+### Security Posture Summary
+- RLS coverage expanded and tested.
+- Storage policies enforce tenant isolation.
+- Edge functions hardened with CAPTCHA, rate limits, and email verification.
 
 ## Contributing
 
@@ -287,4 +374,3 @@ Before production:
 2. Add migrations for schema changes (never edit applied migrations)
 3. Run `supabase test db`
 4. Open a PR
-
