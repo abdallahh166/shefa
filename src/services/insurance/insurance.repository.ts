@@ -12,7 +12,7 @@ import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
 
 const CLAIM_COLUMNS =
-  "id, tenant_id, patient_id, provider, service, amount, claim_date, status, created_at, updated_at";
+  "id, tenant_id, patient_id, provider, service, amount, claim_date, status, deleted_at, deleted_by, created_at, updated_at";
 const CLAIM_WITH_PATIENT_COLUMNS = `${CLAIM_COLUMNS}, patients(full_name)`;
 
 const SEARCH_COLUMNS = ["provider", "service", "status"];
@@ -34,6 +34,8 @@ export interface InsuranceRepository {
   getSummary(tenantId: string): Promise<InsuranceSummary>;
   create(input: InsuranceClaimCreateInput, tenantId: string): Promise<InsuranceClaim>;
   update(id: string, input: InsuranceClaimUpdateInput, tenantId: string): Promise<InsuranceClaim>;
+  archive(id: string, tenantId: string, userId: string): Promise<InsuranceClaim>;
+  restore(id: string, tenantId: string): Promise<InsuranceClaim>;
 }
 
 export const insuranceRepository: InsuranceRepository = {
@@ -47,7 +49,8 @@ export const insuranceRepository: InsuranceRepository = {
     let query = supabase
       .from("insurance_claims")
       .select(CLAIM_COLUMNS, { count: "exact" })
-      .eq("tenant_id", tenantId);
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null);
 
     const filters = params.filters ?? {};
     if (typeof filters.status === "string" && filters.status.length > 0) {
@@ -92,7 +95,8 @@ export const insuranceRepository: InsuranceRepository = {
     let query = supabase
       .from("insurance_claims")
       .select(CLAIM_WITH_PATIENT_COLUMNS, { count: "exact" })
-      .eq("tenant_id", tenantId);
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null);
 
     const filters = params.filters ?? {};
     if (typeof filters.status === "string" && filters.status.length > 0) {
@@ -180,6 +184,7 @@ export const insuranceRepository: InsuranceRepository = {
         .select(CLAIM_COLUMNS)
         .eq("id", id)
         .eq("tenant_id", tenantId)
+        .is("deleted_at", null)
         .single();
       return assertOk(result) as InsuranceClaim;
     }
@@ -187,6 +192,28 @@ export const insuranceRepository: InsuranceRepository = {
     const result = await supabase
       .from("insurance_claims")
       .update(payload)
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .select(CLAIM_COLUMNS)
+      .single();
+
+    return assertOk(result) as InsuranceClaim;
+  },
+  async archive(id, tenantId, userId) {
+    const result = await supabase
+      .from("insurance_claims")
+      .update({ deleted_at: new Date().toISOString(), deleted_by: userId })
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .select(CLAIM_COLUMNS)
+      .single();
+
+    return assertOk(result) as InsuranceClaim;
+  },
+  async restore(id, tenantId) {
+    const result = await supabase
+      .from("insurance_claims")
+      .update({ deleted_at: null, deleted_by: null })
       .eq("id", id)
       .eq("tenant_id", tenantId)
       .select(CLAIM_COLUMNS)

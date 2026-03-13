@@ -43,10 +43,30 @@ export const doctorService = {
   async remove(id: string) {
     try {
       const parsedId = uuidSchema.parse(id);
-      const { tenantId } = getTenantContext();
-      return await doctorRepository.remove(parsedId, tenantId);
+      const { tenantId, userId } = getTenantContext();
+      return await doctorRepository.remove(parsedId, tenantId, userId);
     } catch (err) {
       throw toServiceError(err, "Failed to delete doctor");
+    }
+  },
+  async archive(id: string) {
+    try {
+      const parsedId = uuidSchema.parse(id);
+      const { tenantId, userId } = getTenantContext();
+      const result = await doctorRepository.archive(parsedId, tenantId, userId);
+      return doctorSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to archive doctor");
+    }
+  },
+  async restore(id: string) {
+    try {
+      const parsedId = uuidSchema.parse(id);
+      const { tenantId } = getTenantContext();
+      const result = await doctorRepository.restore(parsedId, tenantId);
+      return doctorSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to restore doctor");
     }
   },
 };

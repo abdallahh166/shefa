@@ -31,6 +31,8 @@ export const patientSchema = z.object({
   address: z.string().trim().max(255).optional().nullable(),
   insurance_provider: z.string().trim().max(120).optional().nullable(),
   status: patientStatusEnum,
+  deleted_at: dateTimeStringSchema.optional().nullable(),
+  deleted_by: uuidSchema.optional().nullable(),
   created_at: dateTimeStringSchema,
   updated_at: dateTimeStringSchema,
 });
@@ -89,6 +91,8 @@ export const patientDocumentSchema = z.object({
   file_type: z.string().trim().min(1).max(120),
   uploaded_by: uuidSchema,
   notes: z.string().trim().max(500).optional().nullable(),
+  deleted_at: dateTimeStringSchema.optional().nullable(),
+  deleted_by: uuidSchema.optional().nullable(),
   created_at: dateTimeStringSchema,
 });
 

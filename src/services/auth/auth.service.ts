@@ -3,6 +3,7 @@ import { toServiceError } from "@/services/supabase/errors";
 import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import { authRepository } from "./auth.repository";
 import { env } from "@/core/env/env";
+import { rateLimitService } from "@/services/security/rateLimit.service";
 
 const emailSchema = z.string().trim().email();
 const passwordSchema = z.string().min(8).max(128);
@@ -14,6 +15,7 @@ export const authService = {
     try {
       const parsedEmail = emailSchema.parse(email);
       const parsedPassword = z.string().min(1).parse(password);
+      await rateLimitService.assertAllowed("login", [parsedEmail]);
       await authRepository.signInWithPassword(parsedEmail, parsedPassword);
     } catch (err) {
       throw toServiceError(err, "Login failed");
@@ -40,6 +42,7 @@ export const authService = {
   async resetPassword(email: string, redirectTo: string) {
     try {
       const parsedEmail = emailSchema.parse(email);
+      await rateLimitService.assertAllowed("password_reset", [parsedEmail]);
       await authRepository.resetPasswordForEmail(parsedEmail, redirectTo);
     } catch (err) {
       throw toServiceError(err, "Failed to send reset email");

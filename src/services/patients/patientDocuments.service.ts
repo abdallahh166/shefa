@@ -16,12 +16,14 @@ import {
   removePatientDocument,
   uploadPatientDocument,
 } from "./patientDocuments.storage";
+import { rateLimitService } from "@/services/security/rateLimit.service";
 
 export const patientDocumentsService = {
   async upload(input: PatientDocumentUploadInput) {
     try {
       const parsed = patientDocumentUploadSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
+      await rateLimitService.assertAllowed("document_upload", [tenantId, userId]);
       const uploadResult = await uploadPatientDocument({
         tenantId,
         patientId: parsed.patient_id,
@@ -72,8 +74,8 @@ export const patientDocumentsService = {
   async remove(documentId: string) {
     try {
       const parsedId = uuidSchema.parse(documentId);
-      const { tenantId } = getTenantContext();
-      const deleted = await patientDocumentsRepository.remove(parsedId, tenantId);
+      const { tenantId, userId } = getTenantContext();
+      const deleted = await patientDocumentsRepository.remove(parsedId, tenantId, userId);
       const parsedDeleted = deleted
         ? patientDocumentSchema.pick({ file_path: true }).parse(deleted)
         : null;
@@ -88,6 +90,26 @@ export const patientDocumentsService = {
       return {};
     } catch (err) {
       throw toServiceError(err, "Failed to delete patient document");
+    }
+  },
+  async archive(documentId: string) {
+    try {
+      const parsedId = uuidSchema.parse(documentId);
+      const { tenantId, userId } = getTenantContext();
+      const result = await patientDocumentsRepository.archive(parsedId, tenantId, userId);
+      return result ? patientDocumentSchema.parse(result) : null;
+    } catch (err) {
+      throw toServiceError(err, "Failed to archive patient document");
+    }
+  },
+  async restore(documentId: string) {
+    try {
+      const parsedId = uuidSchema.parse(documentId);
+      const { tenantId } = getTenantContext();
+      const result = await patientDocumentsRepository.restore(parsedId, tenantId);
+      return result ? patientDocumentSchema.parse(result) : null;
+    } catch (err) {
+      throw toServiceError(err, "Failed to restore patient document");
     }
   },
 };

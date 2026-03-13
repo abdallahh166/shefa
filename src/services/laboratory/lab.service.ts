@@ -14,6 +14,7 @@ import { limitOffsetSchema } from "@/domain/shared/pagination.schema";
 import { toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { labRepository } from "./lab.repository";
+import { rateLimitService } from "@/services/security/rateLimit.service";
 
 const labStatusCountsSchema = z.object({
   pending: z.number().int().nonnegative(),
@@ -69,7 +70,8 @@ export const labService = {
   async create(input: LabResultCreateInput) {
     try {
       const parsed = labResultCreateSchema.parse(input);
-      const { tenantId } = getTenantContext();
+      const { tenantId, userId } = getTenantContext();
+      await rateLimitService.assertAllowed("lab_upload", [tenantId, userId]);
       const result = await labRepository.create(parsed, tenantId);
       return labResultSchema.parse(result);
     } catch (err) {
@@ -80,11 +82,34 @@ export const labService = {
     try {
       const parsedId = uuidSchema.parse(id);
       const parsed = labResultUpdateSchema.parse(input);
-      const { tenantId } = getTenantContext();
+      const { tenantId, userId } = getTenantContext();
+      if (parsed.result !== undefined || parsed.status === "completed") {
+        await rateLimitService.assertAllowed("lab_upload", [tenantId, userId]);
+      }
       const result = await labRepository.update(parsedId, parsed, tenantId);
       return labResultSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to update lab order");
+    }
+  },
+  async archive(id: string) {
+    try {
+      const parsedId = uuidSchema.parse(id);
+      const { tenantId, userId } = getTenantContext();
+      const result = await labRepository.archive(parsedId, tenantId, userId);
+      return labResultSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to archive lab order");
+    }
+  },
+  async restore(id: string) {
+    try {
+      const parsedId = uuidSchema.parse(id);
+      const { tenantId } = getTenantContext();
+      const result = await labRepository.restore(parsedId, tenantId);
+      return labResultSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to restore lab order");
     }
   },
 };

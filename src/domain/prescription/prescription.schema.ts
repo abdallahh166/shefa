@@ -14,6 +14,8 @@ export const prescriptionSchema = z.object({
   dosage: z.string().trim().min(1).max(200),
   status: prescriptionStatusEnum,
   prescribed_date: dateStringSchema,
+  deleted_at: dateTimeStringSchema.optional().nullable(),
+  deleted_by: uuidSchema.optional().nullable(),
   created_at: dateTimeStringSchema,
 });
 

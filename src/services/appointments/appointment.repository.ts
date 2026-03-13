@@ -12,7 +12,7 @@ import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
 
 const APPOINTMENT_COLUMNS =
-  "id, tenant_id, patient_id, doctor_id, appointment_date, duration_minutes, type, status, notes, created_at, updated_at";
+  "id, tenant_id, patient_id, doctor_id, appointment_date, duration_minutes, type, status, notes, deleted_at, deleted_by, created_at, updated_at";
 const APPOINTMENT_WITH_DOCTOR_COLUMNS = `${APPOINTMENT_COLUMNS}, doctors(full_name)`;
 const APPOINTMENT_WITH_PATIENT_DOCTOR_COLUMNS = `${APPOINTMENT_COLUMNS}, patients(full_name), doctors(full_name)`;
 
@@ -44,6 +44,8 @@ export interface AppointmentRepository {
   hasConflict(doctorId: string, appointmentDate: string, tenantId: string, excludeId?: string): Promise<boolean>;
   create(input: AppointmentCreateInput, tenantId: string): Promise<Appointment>;
   update(id: string, input: AppointmentUpdateInput, tenantId: string): Promise<Appointment>;
+  archive(id: string, tenantId: string, userId: string): Promise<Appointment>;
+  restore(id: string, tenantId: string): Promise<Appointment>;
 }
 
 export const appointmentRepository: AppointmentRepository = {
@@ -57,7 +59,8 @@ export const appointmentRepository: AppointmentRepository = {
     let query = supabase
       .from("appointments")
       .select(APPOINTMENT_COLUMNS, { count: "exact" })
-      .eq("tenant_id", tenantId);
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null);
 
     const filters = params.filters ?? {};
     if (typeof filters.status === "string" && filters.status.length > 0) {
@@ -111,7 +114,8 @@ export const appointmentRepository: AppointmentRepository = {
     let query = supabase
       .from("appointments")
       .select(APPOINTMENT_WITH_PATIENT_DOCTOR_COLUMNS, { count: "exact" })
-      .eq("tenant_id", tenantId);
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null);
 
     const filters = params.filters ?? {};
     if (typeof filters.status === "string" && filters.status.length > 0) {
@@ -162,6 +166,7 @@ export const appointmentRepository: AppointmentRepository = {
       .from("appointments")
       .select(APPOINTMENT_WITH_PATIENT_DOCTOR_COLUMNS)
       .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
       .gte("appointment_date", start)
       .lte("appointment_date", end)
       .order("appointment_date", { ascending: true })
@@ -183,6 +188,7 @@ export const appointmentRepository: AppointmentRepository = {
       .from("appointments")
       .select(APPOINTMENT_WITH_DOCTOR_COLUMNS)
       .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
       .eq("patient_id", patientId)
       .order("appointment_date", { ascending: false })
       .range(offset, offset + limit - 1);
@@ -204,6 +210,7 @@ export const appointmentRepository: AppointmentRepository = {
           .from("appointments")
           .select("id", { count: "exact", head: true })
           .eq("tenant_id", tenantId)
+          .is("deleted_at", null)
           .eq("status", status);
         if (error) {
           throw new ServiceError(error.message ?? "Failed to load appointment counts", {
@@ -226,6 +233,7 @@ export const appointmentRepository: AppointmentRepository = {
       .select(APPOINTMENT_COLUMNS)
       .eq("id", id)
       .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
       .single();
 
     return assertOk(result) as Appointment;
@@ -235,6 +243,7 @@ export const appointmentRepository: AppointmentRepository = {
       .from("appointments")
       .select("id", { count: "exact", head: true })
       .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
       .eq("doctor_id", doctorId)
       .eq("appointment_date", appointmentDate)
       .neq("status", "cancelled");
@@ -298,6 +307,28 @@ export const appointmentRepository: AppointmentRepository = {
     const result = await supabase
       .from("appointments")
       .update(payload)
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .select(APPOINTMENT_COLUMNS)
+      .single();
+
+    return assertOk(result) as Appointment;
+  },
+  async archive(id, tenantId, userId) {
+    const result = await supabase
+      .from("appointments")
+      .update({ deleted_at: new Date().toISOString(), deleted_by: userId })
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .select(APPOINTMENT_COLUMNS)
+      .single();
+
+    return assertOk(result) as Appointment;
+  },
+  async restore(id, tenantId) {
+    const result = await supabase
+      .from("appointments")
+      .update({ deleted_at: null, deleted_by: null })
       .eq("id", id)
       .eq("tenant_id", tenantId)
       .select(APPOINTMENT_COLUMNS)

@@ -14,6 +14,8 @@ export const invoiceSchema = z.object({
   amount: z.coerce.number().min(0),
   invoice_date: dateStringSchema,
   status: invoiceStatusEnum,
+  deleted_at: dateTimeStringSchema.optional().nullable(),
+  deleted_by: uuidSchema.optional().nullable(),
   created_at: dateTimeStringSchema,
   updated_at: dateTimeStringSchema,
 });

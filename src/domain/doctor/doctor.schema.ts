@@ -26,6 +26,8 @@ export const doctorSchema = z.object({
   email: emailSchema,
   rating: z.number().min(0).max(5).optional().nullable(),
   status: doctorStatusEnum,
+  deleted_at: dateTimeStringSchema.optional().nullable(),
+  deleted_by: uuidSchema.optional().nullable(),
   created_at: dateTimeStringSchema,
   updated_at: dateTimeStringSchema,
 });

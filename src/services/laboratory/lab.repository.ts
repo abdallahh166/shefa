@@ -12,7 +12,7 @@ import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
 
 const LAB_COLUMNS =
-  "id, tenant_id, patient_id, doctor_id, test_name, order_date, status, result, created_at, updated_at";
+  "id, tenant_id, patient_id, doctor_id, test_name, order_date, status, result, deleted_at, deleted_by, created_at, updated_at";
 const LAB_WITH_DOCTOR_COLUMNS = `${LAB_COLUMNS}, doctors(full_name)`;
 const LAB_WITH_PATIENT_DOCTOR_COLUMNS = `${LAB_COLUMNS}, patients(full_name), doctors(full_name)`;
 
@@ -36,6 +36,8 @@ export interface LabRepository {
   listByPatient(patientId: string, tenantId: string, params?: LimitOffsetParams): Promise<LabOrderWithDoctor[]>;
   create(input: LabResultCreateInput, tenantId: string): Promise<LabResult>;
   update(id: string, input: LabResultUpdateInput, tenantId: string): Promise<LabResult>;
+  archive(id: string, tenantId: string, userId: string): Promise<LabResult>;
+  restore(id: string, tenantId: string): Promise<LabResult>;
 }
 
 export const labRepository: LabRepository = {
@@ -49,7 +51,8 @@ export const labRepository: LabRepository = {
     let query = supabase
       .from("lab_orders")
       .select(LAB_COLUMNS, { count: "exact" })
-      .eq("tenant_id", tenantId);
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null);
 
     const filters = params.filters ?? {};
     if (typeof filters.status === "string" && filters.status.length > 0) {
@@ -97,7 +100,8 @@ export const labRepository: LabRepository = {
     let query = supabase
       .from("lab_orders")
       .select(LAB_WITH_PATIENT_DOCTOR_COLUMNS, { count: "exact" })
-      .eq("tenant_id", tenantId);
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null);
 
     const filters = params.filters ?? {};
     if (typeof filters.status === "string" && filters.status.length > 0) {
@@ -143,6 +147,7 @@ export const labRepository: LabRepository = {
           .from("lab_orders")
           .select("id", { count: "exact", head: true })
           .eq("tenant_id", tenantId)
+          .is("deleted_at", null)
           .eq("status", status);
         if (error) {
           throw new ServiceError(error.message ?? "Failed to load lab order counts", {
@@ -166,6 +171,7 @@ export const labRepository: LabRepository = {
       .from("lab_orders")
       .select(LAB_WITH_DOCTOR_COLUMNS)
       .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
       .eq("patient_id", patientId)
       .order("order_date", { ascending: false })
       .range(offset, offset + limit - 1);
@@ -222,6 +228,28 @@ export const labRepository: LabRepository = {
     const result = await supabase
       .from("lab_orders")
       .update(payload)
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .select(LAB_COLUMNS)
+      .single();
+
+    return assertOk(result) as LabResult;
+  },
+  async archive(id, tenantId, userId) {
+    const result = await supabase
+      .from("lab_orders")
+      .update({ deleted_at: new Date().toISOString(), deleted_by: userId })
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .select(LAB_COLUMNS)
+      .single();
+
+    return assertOk(result) as LabResult;
+  },
+  async restore(id, tenantId) {
+    const result = await supabase
+      .from("lab_orders")
+      .update({ deleted_at: null, deleted_by: null })
       .eq("id", id)
       .eq("tenant_id", tenantId)
       .select(LAB_COLUMNS)

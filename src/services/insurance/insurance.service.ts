@@ -68,4 +68,24 @@ export const insuranceService = {
       throw toServiceError(err, "Failed to update insurance claim");
     }
   },
+  async archive(id: string) {
+    try {
+      const parsedId = uuidSchema.parse(id);
+      const { tenantId, userId } = getTenantContext();
+      const result = await insuranceRepository.archive(parsedId, tenantId, userId);
+      return insuranceClaimSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to archive insurance claim");
+    }
+  },
+  async restore(id: string) {
+    try {
+      const parsedId = uuidSchema.parse(id);
+      const { tenantId } = getTenantContext();
+      const result = await insuranceRepository.restore(parsedId, tenantId);
+      return insuranceClaimSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to restore insurance claim");
+    }
+  },
 };
