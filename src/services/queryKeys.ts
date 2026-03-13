@@ -86,6 +86,9 @@ export const queryKeys = {
     revenueByService: (tenantId?: string) => [...tenantKey("reports", tenantId), "revenueByService"] as const,
     doctorPerformance: (tenantId?: string) => [...tenantKey("reports", tenantId), "doctorPerformance"] as const,
   },
+  featureFlags: {
+    list: (tenantId?: string) => [...tenantKey("featureFlags", tenantId), "list"] as const,
+  },
   globalSearch: {
     query: (term: string, tenantId?: string) => [...tenantKey("globalSearch", tenantId), "query", term] as const,
   },

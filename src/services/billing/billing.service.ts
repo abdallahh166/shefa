@@ -12,8 +12,10 @@ import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import type { InvoiceCreateInput, InvoiceListParams, InvoiceUpdateInput } from "@/domain/billing/billing.types";
 import type { LimitOffsetParams } from "@/domain/shared/pagination.types";
 import { limitOffsetSchema } from "@/domain/shared/pagination.schema";
+import { emitDomainEvent } from "@/core/events";
 import { toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
+import { rateLimitService } from "@/services/security/rateLimit.service";
 import { billingRepository } from "./billing.repository";
 
 export const billingService = {
@@ -85,7 +87,8 @@ export const billingService = {
   async create(input: InvoiceCreateInput) {
     try {
       const parsed = invoiceCreateSchema.parse(input);
-      const { tenantId } = getTenantContext();
+      const { tenantId, userId } = getTenantContext();
+      await rateLimitService.assertAllowed("invoice_create", [tenantId, userId]);
       const result = await billingRepository.create(parsed, tenantId);
       return invoiceSchema.parse(result);
     } catch (err) {
@@ -96,9 +99,21 @@ export const billingService = {
     try {
       const parsedId = uuidSchema.parse(id);
       const parsed = invoiceUpdateSchema.parse(input);
-      const { tenantId } = getTenantContext();
+      const { tenantId, userId } = getTenantContext();
       const result = await billingRepository.update(parsedId, parsed, tenantId);
-      return invoiceSchema.parse(result);
+      const invoice = invoiceSchema.parse(result);
+      if (parsed.status === "paid") {
+        await emitDomainEvent(
+          "InvoicePaid",
+          {
+            invoiceId: invoice.id,
+            patientId: invoice.patient_id,
+            amount: Number(invoice.amount),
+          },
+          { tenantId, userId },
+        );
+      }
+      return invoice;
     } catch (err) {
       throw toServiceError(err, "Failed to update invoice");
     }

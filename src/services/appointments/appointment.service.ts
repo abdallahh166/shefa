@@ -12,6 +12,7 @@ import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import type { AppointmentCreateInput, AppointmentListParams, AppointmentUpdateInput } from "@/domain/appointment/appointment.types";
 import type { LimitOffsetParams } from "@/domain/shared/pagination.types";
 import { limitOffsetSchema } from "@/domain/shared/pagination.schema";
+import { emitDomainEvent } from "@/core/events";
 import { ServiceError, toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { appointmentRepository } from "./appointment.repository";
@@ -99,10 +100,21 @@ export const appointmentService = {
   async create(input: AppointmentCreateInput) {
     try {
       const parsed = appointmentCreateSchema.parse(input);
-      const { tenantId } = getTenantContext();
+      const { tenantId, userId } = getTenantContext();
       await ensureNoConflict(parsed.doctor_id, parsed.appointment_date, tenantId);
       const result = await appointmentRepository.create(parsed, tenantId);
-      return appointmentSchema.parse(result);
+      const appointment = appointmentSchema.parse(result);
+      await emitDomainEvent(
+        "AppointmentCreated",
+        {
+          appointmentId: appointment.id,
+          patientId: appointment.patient_id,
+          doctorId: appointment.doctor_id,
+          appointmentDate: appointment.appointment_date,
+        },
+        { tenantId, userId },
+      );
+      return appointment;
     } catch (err) {
       if (isExclusionConflict(err)) {
         throw new ServiceError("Appointment overlaps with an existing booking", {

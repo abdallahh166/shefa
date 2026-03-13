@@ -1,4 +1,4 @@
-import type { Notification } from "@/domain/notifications/notification.types";
+import type { Notification, NotificationCreateInput } from "@/domain/notifications/notification.types";
 import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
 
@@ -8,6 +8,7 @@ export interface NotificationRepository {
   listByUser(userId: string, limit?: number): Promise<Notification[]>;
   markRead(id: string, userId: string): Promise<void>;
   markManyRead(ids: string[], userId: string): Promise<void>;
+  create(input: NotificationCreateInput): Promise<Notification>;
   subscribeToUser(
     userId: string,
     onInsert: (payload: Notification) => void,
@@ -47,6 +48,26 @@ export const notificationRepository: NotificationRepository = {
     if (error) {
       throw new ServiceError(error.message ?? "Failed to update notifications", { code: error.code, details: error });
     }
+  },
+  async create(input) {
+    const { data, error } = await supabase
+      .from("notifications")
+      .insert({
+        tenant_id: input.tenant_id,
+        user_id: input.user_id,
+        title: input.title,
+        body: input.body ?? null,
+        type: input.type,
+        read: input.read ?? false,
+      })
+      .select(NOTIFICATION_COLUMNS)
+      .single();
+
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to create notification", { code: error.code, details: error });
+    }
+
+    return data as Notification;
   },
   subscribeToUser(userId, onInsert) {
     const channel = supabase

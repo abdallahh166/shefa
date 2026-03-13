@@ -16,3 +16,12 @@ export const notificationSchema = z.object({
 export const notificationMarkReadSchema = z.object({
   id: uuidSchema,
 });
+
+export const notificationCreateSchema = z.object({
+  tenant_id: uuidSchema,
+  user_id: uuidSchema,
+  title: z.string().trim().min(1).max(200),
+  body: z.string().trim().max(2000).optional().nullable(),
+  type: z.string().trim().min(1).max(50),
+  read: z.boolean().optional(),
+});

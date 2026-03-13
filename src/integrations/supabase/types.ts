@@ -151,34 +151,43 @@ export type Database = {
       audit_logs: {
         Row: {
           action: string
+          action_type: string | null
           created_at: string
           details: Json | null
           entity_id: string | null
           entity_type: string
           id: string
           ip_address: string | null
+          request_id: string | null
+          resource_type: string | null
           tenant_id: string
           user_id: string
         }
         Insert: {
           action: string
+          action_type?: string | null
           created_at?: string
           details?: Json | null
           entity_id?: string | null
           entity_type: string
           id?: string
           ip_address?: string | null
+          request_id?: string | null
+          resource_type?: string | null
           tenant_id: string
           user_id: string
         }
         Update: {
           action?: string
+          action_type?: string | null
           created_at?: string
           details?: Json | null
           entity_id?: string | null
           entity_type?: string
           id?: string
           ip_address?: string | null
+          request_id?: string | null
+          resource_type?: string | null
           tenant_id?: string
           user_id?: string
         }
@@ -201,10 +210,13 @@ export type Database = {
       }
       client_error_logs: {
         Row: {
+          action_type: string | null
           component_stack: string | null
           created_at: string
           id: string
           message: string
+          request_id: string | null
+          resource_type: string | null
           stack: string | null
           tenant_id: string
           url: string | null
@@ -212,10 +224,13 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          action_type?: string | null
           component_stack?: string | null
           created_at?: string
           id?: string
           message: string
+          request_id?: string | null
+          resource_type?: string | null
           stack?: string | null
           tenant_id: string
           url?: string | null
@@ -223,10 +238,13 @@ export type Database = {
           user_id: string
         }
         Update: {
+          action_type?: string | null
           component_stack?: string | null
           created_at?: string
           id?: string
           message?: string
+          request_id?: string | null
+          resource_type?: string | null
           stack?: string | null
           tenant_id?: string
           url?: string | null
@@ -374,6 +392,45 @@ export type Database = {
           },
           {
             foreignKeyName: "doctors_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feature_flags: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          feature_key: string
+          id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          feature_key: string
+          id?: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          feature_key?: string
+          id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feature_flags_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "mv_report_overview"
+            referencedColumns: ["tenant_id"]
+          },
+          {
+            foreignKeyName: "feature_flags_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1684,17 +1741,32 @@ export type Database = {
       is_empty: { Args: { "": string }; Returns: string }
       isnt_empty: { Args: { "": string }; Returns: string }
       lives_ok: { Args: { "": string }; Returns: string }
-      log_audit_event: {
-        Args: {
-          _action: string
-          _details?: Json
-          _entity_id?: string
-          _entity_type: string
-          _tenant_id: string
-          _user_id: string
-        }
-        Returns: undefined
-      }
+      log_audit_event:
+        | {
+            Args: {
+              _action: string
+              _details?: Json
+              _entity_id?: string
+              _entity_type: string
+              _tenant_id: string
+              _user_id: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              _action: string
+              _action_type?: string
+              _details?: Json
+              _entity_id: string
+              _entity_type: string
+              _request_id?: string
+              _resource_type?: string
+              _tenant_id: string
+              _user_id: string
+            }
+            Returns: undefined
+          }
       no_plan: { Args: never; Returns: boolean[] }
       num_failed: { Args: never; Returns: number }
       os_name: { Args: never; Returns: string }

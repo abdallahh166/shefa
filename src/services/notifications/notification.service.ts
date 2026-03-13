@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { notificationSchema } from "@/domain/notifications/notification.schema";
+import { notificationCreateSchema, notificationSchema } from "@/domain/notifications/notification.schema";
 import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import { toServiceError } from "@/services/supabase/errors";
 import { notificationRepository } from "./notification.repository";
@@ -30,6 +30,22 @@ export const notificationService = {
       await notificationRepository.markManyRead(parsedIds, parsedUserId);
     } catch (err) {
       throw toServiceError(err, "Failed to update notifications");
+    }
+  },
+  async create(input: {
+    tenant_id: string;
+    user_id: string;
+    title: string;
+    body?: string | null;
+    type: string;
+    read?: boolean;
+  }) {
+    try {
+      const parsed = notificationCreateSchema.parse(input);
+      const result = await notificationRepository.create(parsed);
+      return notificationSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to create notification");
     }
   },
   subscribe(userId: string, onInsert: (notification: any) => void) {

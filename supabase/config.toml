@@ -11,3 +11,18 @@ verify_jwt = false
 
 [functions.appointment-reminders]
 verify_jwt = false
+
+[functions.send-appointment-notifications]
+verify_jwt = true
+
+[functions.generate-monthly-reports]
+verify_jwt = true
+
+[functions.refresh-materialized-views]
+verify_jwt = true
+
+[functions.process-insurance-claims]
+verify_jwt = true
+
+[functions.send-invoice-emails]
+verify_jwt = true
