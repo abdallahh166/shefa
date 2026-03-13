@@ -11,6 +11,7 @@ import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import type { LabResultCreateInput, LabResultListParams, LabResultUpdateInput } from "@/domain/lab/lab.types";
 import type { LimitOffsetParams } from "@/domain/shared/pagination.types";
 import { limitOffsetSchema } from "@/domain/shared/pagination.schema";
+import { emitDomainEvent } from "@/core/events";
 import { toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { labRepository } from "./lab.repository";
@@ -73,7 +74,18 @@ export const labService = {
       const { tenantId, userId } = getTenantContext();
       await rateLimitService.assertAllowed("lab_upload", [tenantId, userId]);
       const result = await labRepository.create(parsed, tenantId);
-      return labResultSchema.parse(result);
+      const labOrder = labResultSchema.parse(result);
+      await emitDomainEvent(
+        "LabResultUploaded",
+        {
+          labOrderId: labOrder.id,
+          patientId: labOrder.patient_id,
+          doctorId: labOrder.doctor_id,
+          status: labOrder.status,
+        },
+        { tenantId, userId },
+      );
+      return labOrder;
     } catch (err) {
       throw toServiceError(err, "Failed to create lab order");
     }
@@ -83,11 +95,25 @@ export const labService = {
       const parsedId = uuidSchema.parse(id);
       const parsed = labResultUpdateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
-      if (parsed.result !== undefined || parsed.status === "completed") {
+      const shouldEmit = parsed.result !== undefined || parsed.status === "completed";
+      if (shouldEmit) {
         await rateLimitService.assertAllowed("lab_upload", [tenantId, userId]);
       }
       const result = await labRepository.update(parsedId, parsed, tenantId);
-      return labResultSchema.parse(result);
+      const labOrder = labResultSchema.parse(result);
+      if (shouldEmit) {
+        await emitDomainEvent(
+          "LabResultUploaded",
+          {
+            labOrderId: labOrder.id,
+            patientId: labOrder.patient_id,
+            doctorId: labOrder.doctor_id,
+            status: labOrder.status,
+          },
+          { tenantId, userId },
+        );
+      }
+      return labOrder;
     } catch (err) {
       throw toServiceError(err, "Failed to update lab order");
     }

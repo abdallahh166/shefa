@@ -7,6 +7,7 @@ import {
 } from "@/domain/patient/patient.schema";
 import { uuidListSchema, uuidSchema } from "@/domain/shared/identifiers.schema";
 import type { PatientCreateInput, PatientListParams, PatientUpdateInput } from "@/domain/patient/patient.types";
+import { emitDomainEvent } from "@/core/events";
 import { toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { patientRepository } from "./patient.repository";
@@ -37,9 +38,15 @@ export const patientService = {
   async create(input: PatientCreateInput) {
     try {
       const parsed = patientCreateSchema.parse(input);
-      const { tenantId } = getTenantContext();
+      const { tenantId, userId } = getTenantContext();
       const result = await patientRepository.create(parsed, tenantId);
-      return patientSchema.parse(result);
+      const patient = patientSchema.parse(result);
+      await emitDomainEvent(
+        "PatientRegistered",
+        { patientId: patient.id, fullName: patient.full_name },
+        { tenantId, userId },
+      );
+      return patient;
     } catch (err) {
       throw toServiceError(err, "Failed to create patient");
     }

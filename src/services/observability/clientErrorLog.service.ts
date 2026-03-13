@@ -6,6 +6,9 @@ export const clientErrorLogService = {
   async log(input: {
     tenant_id: string;
     user_id: string;
+    request_id?: string | null;
+    action_type?: string | null;
+    resource_type?: string | null;
     message: string;
     stack?: string | null;
     component_stack?: string | null;

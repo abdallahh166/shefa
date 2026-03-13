@@ -10,6 +10,7 @@ import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import type { PrescriptionCreateInput, PrescriptionListParams, PrescriptionUpdateInput } from "@/domain/prescription/prescription.types";
 import type { LimitOffsetParams } from "@/domain/shared/pagination.types";
 import { limitOffsetSchema } from "@/domain/shared/pagination.schema";
+import { emitDomainEvent } from "@/core/events";
 import { toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { prescriptionRepository } from "./prescription.repository";
@@ -41,9 +42,19 @@ export const prescriptionService = {
   async create(input: PrescriptionCreateInput) {
     try {
       const parsed = prescriptionCreateSchema.parse(input);
-      const { tenantId } = getTenantContext();
+      const { tenantId, userId } = getTenantContext();
       const result = await prescriptionRepository.create(parsed, tenantId);
-      return prescriptionSchema.parse(result);
+      const prescription = prescriptionSchema.parse(result);
+      await emitDomainEvent(
+        "PrescriptionIssued",
+        {
+          prescriptionId: prescription.id,
+          patientId: prescription.patient_id,
+          doctorId: prescription.doctor_id,
+        },
+        { tenantId, userId },
+      );
+      return prescription;
     } catch (err) {
       throw toServiceError(err, "Failed to create prescription");
     }

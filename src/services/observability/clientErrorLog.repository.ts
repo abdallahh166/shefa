@@ -11,6 +11,9 @@ export const clientErrorLogRepository: ClientErrorLogRepository = {
     const { error } = await supabase.from("client_error_logs").insert({
       tenant_id: input.tenant_id,
       user_id: input.user_id,
+      request_id: input.request_id ?? null,
+      action_type: input.action_type ?? null,
+      resource_type: input.resource_type ?? null,
       message: input.message,
       stack: input.stack ?? null,
       component_stack: input.component_stack ?? null,

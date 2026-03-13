@@ -25,3 +25,5 @@ export { subscriptionService } from "./subscription/subscription.service";
 export { userPreferencesService } from "./settings/userPreferences.service";
 export { clientErrorLogService } from "./observability/clientErrorLog.service";
 export { realtimeService } from "./realtime/realtime.service";
+export { featureFlagService } from "./featureFlags/featureFlag.service";
+export { jobService } from "./jobs/job.service";

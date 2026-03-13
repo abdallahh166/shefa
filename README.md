@@ -188,6 +188,18 @@ repositories -> Supabase client
 - Services validate inputs and outputs with Zod.
 - React Query keys are tenant-scoped via `src/services/queryKeys.ts`.
 
+### Event System
+- Lightweight domain event bus in `src/core/events`.
+- Events emit from services and trigger handlers for audit logging, notifications, and analytics refresh.
+
+### Background Jobs
+- Job runner in `src/core/jobs` with retry and logging.
+- Jobs execute via Supabase Edge Functions (admin-only).
+
+### Feature Flags
+- `feature_flags` table with tenant-scoped flags.
+- `useFeatureAccess` combines plan entitlements + flags to control module visibility.
+
 ## Data Flow (High Level)
 
 1. UI triggers service calls.
@@ -217,6 +229,8 @@ repositories -> Supabase client
 - `insurance_claims`
 - `notifications`, `notification_preferences`
 - `audit_logs`, `client_error_logs`
+- `feature_flags`
+- `rate_limits`
 
 ### RPC Functions (Selected)
 - `check_rate_limit`
@@ -233,6 +247,11 @@ repositories -> Supabase client
 - `check-slug` (public slug availability with CAPTCHA + rate limiting)
 - `invite-staff` (authenticated, admin-only)
 - `appointment-reminders` (cron-invoked, emails + in-app notifications)
+- `send-appointment-notifications` (admin-only job trigger)
+- `generate-monthly-reports` (admin-only job trigger)
+- `refresh-materialized-views` (admin-only job trigger)
+- `process-insurance-claims` (admin-only job trigger)
+- `send-invoice-emails` (admin-only job trigger)
 
 ### Storage Buckets
 - `avatars` (private, image-only)
@@ -246,6 +265,7 @@ repositories -> Supabase client
 - Edge functions hardened with CAPTCHA, rate limiting, and email verification.
 - Service role keys used only in server-side functions.
 - Rate limiting enforced via `check_rate_limit` for login, password reset, and upload flows.
+- Soft deletes enforced by repository filters and restrictive RLS policies.
 
 ## Performance & Scalability
 
@@ -259,6 +279,7 @@ repositories -> Supabase client
 
 - Client error logs stored in `client_error_logs` (tenant-scoped).
 - Audit logs for critical actions (patients, appointments, invoices, documents, lab orders, prescriptions, insurance).
+- Audit and error logs include `request_id`, `action_type`, and `resource_type` for tracing.
 
 ## Error Handling
 
@@ -418,10 +439,8 @@ Before production:
 
 ## Roadmap (Planned Enhancements)
 
-- Domain event system for decoupled side effects (audit, notifications, analytics).
-- Feature-flag system per tenant to control module visibility.
-- Background job framework for heavy workflows and periodic maintenance.
-- Soft delete migrations across core entities (if not yet applied in production).
+- Advanced job orchestration (queue-based execution) as load grows.
+- Automated incident alerts and SLO dashboards.
 
 ## Contributing
 

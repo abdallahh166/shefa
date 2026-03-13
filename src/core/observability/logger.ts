@@ -1,9 +1,11 @@
 import { clientErrorLogService } from "@/services/observability/clientErrorLog.service";
 import { useAuth } from "@/core/auth/authStore";
+import { createRequestId } from "./requestId";
 
 export type LogContext = {
   feature?: string;
   action?: string;
+  resourceType?: string;
   metadata?: Record<string, unknown>;
 };
 
@@ -34,6 +36,9 @@ export async function reportError(error: unknown, context?: LogContext) {
     await clientErrorLogService.log({
       tenant_id: user.tenantId,
       user_id: user.id,
+      request_id: createRequestId(),
+      action_type: context?.action ?? null,
+      resource_type: context?.resourceType ?? context?.feature ?? null,
       message,
       stack,
       component_stack: null,
