@@ -139,24 +139,25 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;
 DO $$
 DECLARE
   _schedule text := current_setting('app.settings.report_refresh_schedule', true);
+  _effective_schedule text;
   _job_id bigint;
 BEGIN
-  IF _schedule IS NOT NULL AND length(trim(_schedule)) > 0 THEN
-    SELECT jobid INTO _job_id
-    FROM cron.job
-    WHERE jobname = 'report-refresh-job'
-    LIMIT 1;
+  _effective_schedule := COALESCE(NULLIF(trim(_schedule), ''), '0 * * * *');
 
-    IF _job_id IS NOT NULL THEN
-      PERFORM cron.unschedule(_job_id);
-    END IF;
+  SELECT jobid INTO _job_id
+  FROM cron.job
+  WHERE jobname = 'report-refresh-job'
+  LIMIT 1;
 
-    PERFORM cron.schedule(
-      'report-refresh-job',
-      _schedule,
-      'SELECT public.refresh_report_materialized_views();'
-    );
+  IF _job_id IS NOT NULL THEN
+    PERFORM cron.unschedule(_job_id);
   END IF;
+
+  PERFORM cron.schedule(
+    'report-refresh-job',
+    _effective_schedule,
+    'SELECT public.refresh_report_materialized_views();'
+  );
 END;
 $$;
 

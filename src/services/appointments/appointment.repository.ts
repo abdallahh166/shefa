@@ -6,7 +6,7 @@ import type {
   AppointmentWithDoctor,
   AppointmentWithPatientDoctor,
 } from "@/domain/appointment/appointment.types";
-import type { PagedResult } from "@/domain/shared/pagination.types";
+import type { LimitOffsetParams, PagedResult } from "@/domain/shared/pagination.types";
 import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
@@ -32,8 +32,13 @@ function escapeSearchTerm(term: string) {
 export interface AppointmentRepository {
   listPaged(params: AppointmentListParams, tenantId: string): Promise<PagedResult<Appointment>>;
   listPagedWithRelations(params: AppointmentListParams, tenantId: string): Promise<PagedResult<AppointmentWithPatientDoctor>>;
-  listByDateRange(start: string, end: string, tenantId: string): Promise<AppointmentWithPatientDoctor[]>;
-  listByPatient(patientId: string, tenantId: string): Promise<AppointmentWithDoctor[]>;
+  listByDateRange(
+    start: string,
+    end: string,
+    tenantId: string,
+    params?: LimitOffsetParams,
+  ): Promise<AppointmentWithPatientDoctor[]>;
+  listByPatient(patientId: string, tenantId: string, params?: LimitOffsetParams): Promise<AppointmentWithDoctor[]>;
   countByStatus(tenantId: string): Promise<Record<string, number>>;
   getById(id: string, tenantId: string): Promise<Appointment>;
   hasConflict(doctorId: string, appointmentDate: string, tenantId: string, excludeId?: string): Promise<boolean>;
@@ -150,14 +155,17 @@ export const appointmentRepository: AppointmentRepository = {
 
     return { data: (data ?? []) as AppointmentWithPatientDoctor[], count: count ?? 0 };
   },
-  async listByDateRange(start, end, tenantId) {
+  async listByDateRange(start, end, tenantId, params) {
+    const limit = params?.limit ?? 50;
+    const offset = params?.offset ?? 0;
     const { data, error } = await supabase
       .from("appointments")
       .select(APPOINTMENT_WITH_PATIENT_DOCTOR_COLUMNS)
       .eq("tenant_id", tenantId)
       .gte("appointment_date", start)
       .lte("appointment_date", end)
-      .order("appointment_date", { ascending: true });
+      .order("appointment_date", { ascending: true })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load appointments", {
@@ -168,13 +176,16 @@ export const appointmentRepository: AppointmentRepository = {
 
     return (data ?? []) as AppointmentWithPatientDoctor[];
   },
-  async listByPatient(patientId, tenantId) {
+  async listByPatient(patientId, tenantId, params) {
+    const limit = params?.limit ?? 50;
+    const offset = params?.offset ?? 0;
     const { data, error } = await supabase
       .from("appointments")
       .select(APPOINTMENT_WITH_DOCTOR_COLUMNS)
       .eq("tenant_id", tenantId)
       .eq("patient_id", patientId)
-      .order("appointment_date", { ascending: false });
+      .order("appointment_date", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load patient appointments", {

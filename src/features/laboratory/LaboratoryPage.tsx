@@ -13,12 +13,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { formatDate } from "@/shared/utils/formatDate";
 import { labService } from "@/services/laboratory/lab.service";
-import { patientService } from "@/services/patients/patient.service";
-import { doctorService } from "@/services/doctors/doctor.service";
 import { queryKeys } from "@/services/queryKeys";
 import type { LabOrderWithPatientDoctor } from "@/domain/lab/lab.types";
-import type { Patient } from "@/domain/patient/patient.types";
-import type { Doctor } from "@/domain/doctor/doctor.types";
 
 const statusVariant: Record<string, "default" | "warning" | "success"> = { pending: "default", processing: "warning", completed: "success" };
 
@@ -63,21 +59,6 @@ export const LaboratoryPage = () => {
     }),
     enabled: !!user?.tenantId,
   });
-
-  const { data: patientPage } = useQuery({
-    queryKey: queryKeys.patients.list({ tenantId: user?.tenantId, page: 1, pageSize: 500 }),
-    queryFn: async () => patientService.listPaged({ page: 1, pageSize: 500, sort: { column: "full_name", ascending: true } }),
-    enabled: !!user?.tenantId,
-  });
-
-  const { data: doctorPage } = useQuery({
-    queryKey: queryKeys.doctors.list({ tenantId: user?.tenantId, page: 1, pageSize: 500 }),
-    queryFn: async () => doctorService.listPaged({ page: 1, pageSize: 500, sort: { column: "full_name", ascending: true } }),
-    enabled: !!user?.tenantId,
-  });
-
-  const patients: Patient[] = patientPage?.data ?? [];
-  const doctors: Doctor[] = doctorPage?.data ?? [];
 
   useEffect(() => {
     setPage(1);
@@ -206,8 +187,6 @@ export const LaboratoryPage = () => {
         onSuccess={() => {
           invalidateLabs();
         }}
-        patients={patients.map((p) => ({ id: p.id, full_name: p.full_name }))}
-        doctors={doctors.map((d) => ({ id: d.id, full_name: d.full_name }))}
       />
     </div>
   );

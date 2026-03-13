@@ -6,7 +6,7 @@ import type {
   LabResultListParams,
   LabResultUpdateInput,
 } from "@/domain/lab/lab.types";
-import type { PagedResult } from "@/domain/shared/pagination.types";
+import type { LimitOffsetParams, PagedResult } from "@/domain/shared/pagination.types";
 import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
@@ -33,7 +33,7 @@ export interface LabRepository {
   listPaged(params: LabResultListParams, tenantId: string): Promise<PagedResult<LabResult>>;
   listPagedWithRelations(params: LabResultListParams, tenantId: string): Promise<PagedResult<LabOrderWithPatientDoctor>>;
   countByStatus(tenantId: string): Promise<Record<"pending" | "processing" | "completed", number>>;
-  listByPatient(patientId: string, tenantId: string): Promise<LabOrderWithDoctor[]>;
+  listByPatient(patientId: string, tenantId: string, params?: LimitOffsetParams): Promise<LabOrderWithDoctor[]>;
   create(input: LabResultCreateInput, tenantId: string): Promise<LabResult>;
   update(id: string, input: LabResultUpdateInput, tenantId: string): Promise<LabResult>;
 }
@@ -159,13 +159,16 @@ export const labRepository: LabRepository = {
       { pending: 0, processing: 0, completed: 0 } as Record<"pending" | "processing" | "completed", number>,
     );
   },
-  async listByPatient(patientId, tenantId) {
+  async listByPatient(patientId, tenantId, params) {
+    const limit = params?.limit ?? 50;
+    const offset = params?.offset ?? 0;
     const { data, error } = await supabase
       .from("lab_orders")
       .select(LAB_WITH_DOCTOR_COLUMNS)
       .eq("tenant_id", tenantId)
       .eq("patient_id", patientId)
-      .order("order_date", { ascending: false });
+      .order("order_date", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load patient lab orders", {

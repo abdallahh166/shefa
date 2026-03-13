@@ -7,8 +7,11 @@ import {
   invoiceUpdateSchema,
   invoiceWithPatientSchema,
 } from "@/domain/billing/billing.schema";
+import { dateStringSchema } from "@/domain/shared/date.schema";
 import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import type { InvoiceCreateInput, InvoiceListParams, InvoiceUpdateInput } from "@/domain/billing/billing.types";
+import type { LimitOffsetParams } from "@/domain/shared/pagination.types";
+import { limitOffsetSchema } from "@/domain/shared/pagination.schema";
 import { toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { billingRepository } from "./billing.repository";
@@ -56,11 +59,24 @@ export const billingService = {
       throw toServiceError(err, "Failed to load invoices");
     }
   },
-  async listByPatient(patientId: string) {
+  async listByDateRange(start: string, end: string, params?: LimitOffsetParams) {
+    try {
+      const parsedStart = dateStringSchema.parse(start);
+      const parsedEnd = dateStringSchema.parse(end);
+      const paging = limitOffsetSchema.parse(params ?? {});
+      const { tenantId } = getTenantContext();
+      const result = await billingRepository.listByDateRange(parsedStart, parsedEnd, tenantId, paging);
+      return z.array(invoiceSchema).parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to load invoices");
+    }
+  },
+  async listByPatient(patientId: string, params?: LimitOffsetParams) {
     try {
       const parsedId = uuidSchema.parse(patientId);
+      const paging = limitOffsetSchema.parse(params ?? {});
       const { tenantId } = getTenantContext();
-      const result = await billingRepository.listByPatient(parsedId, tenantId);
+      const result = await billingRepository.listByPatient(parsedId, tenantId, paging);
       return z.array(invoiceSchema).parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to load patient invoices");

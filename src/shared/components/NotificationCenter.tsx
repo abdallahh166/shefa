@@ -3,7 +3,7 @@ import { Bell, CalendarDays, FlaskConical, DollarSign, AlertTriangle, X, Info } 
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
-import { supabase } from "@/integrations/supabase/client";
+import { notificationService } from "@/services/notifications/notification.service";
 import { formatDate } from "@/shared/utils/formatDate";
 
 interface Notification {
@@ -54,14 +54,8 @@ export const NotificationCenter = () => {
       return;
     }
 
-    const { data } = await supabase
-      .from("notifications" as any)
-      .select("id, type, title, body, read, created_at")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(20);
-
-    setNotifications((data as any[]) ?? []);
+    const data = await notificationService.listRecent(user.id, 20);
+    setNotifications(data as Notification[]);
   }, [user?.id]);
 
   useEffect(() => {
@@ -72,24 +66,12 @@ export const NotificationCenter = () => {
   useEffect(() => {
     if (!user?.id) return;
 
-    const channel = supabase
-      .channel("user-notifications")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          setNotifications((prev) => [payload.new as Notification, ...prev]);
-        },
-      )
-      .subscribe();
+    const subscription = notificationService.subscribe(user.id, (payload) => {
+      setNotifications((prev) => [payload as Notification, ...prev]);
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      subscription.unsubscribe();
     };
   }, [user?.id]);
 
@@ -100,18 +82,15 @@ export const NotificationCenter = () => {
     const unreadIds = notifications.filter((n) => !n.read).map((n) => n.id);
     if (unreadIds.length === 0) return;
 
-    await supabase
-      .from("notifications" as any)
-      .update({ read: true })
-      .in("id", unreadIds);
+    await notificationService.markAllRead(user.id, unreadIds);
 
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
-  const dismiss = async (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-    if (!user?.id) return;
-    await supabase.from("notifications" as any).update({ read: true }).eq("id", id);
+    const dismiss = async (id: string) => {
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      if (!user?.id) return;
+    await notificationService.markRead(user.id, id);
   };
 
   useEffect(() => {

@@ -1,4 +1,5 @@
 import type { PatientDocument, PatientDocumentCreateInput } from "@/domain/patient/patient.types";
+import type { LimitOffsetParams } from "@/domain/shared/pagination.types";
 import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
@@ -8,7 +9,7 @@ const PATIENT_DOCUMENT_COLUMNS =
 
 export interface PatientDocumentsRepository {
   createMetadata(input: PatientDocumentCreateInput, tenantId: string): Promise<PatientDocument>;
-  listByPatient(patientId: string, tenantId: string): Promise<PatientDocument[]>;
+  listByPatient(patientId: string, tenantId: string, params?: LimitOffsetParams): Promise<PatientDocument[]>;
   remove(documentId: string, tenantId: string): Promise<{ file_path: string } | null>;
 }
 
@@ -33,13 +34,16 @@ export const patientDocumentsRepository: PatientDocumentsRepository = {
 
     return assertOk(result) as PatientDocument;
   },
-  async listByPatient(patientId, tenantId) {
+  async listByPatient(patientId, tenantId, params) {
+    const limit = params?.limit ?? 50;
+    const offset = params?.offset ?? 0;
     const { data, error } = await supabase
       .from("patient_documents")
       .select(PATIENT_DOCUMENT_COLUMNS)
       .eq("patient_id", patientId)
       .eq("tenant_id", tenantId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load patient documents", {

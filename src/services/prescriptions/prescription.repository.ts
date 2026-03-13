@@ -5,7 +5,7 @@ import type {
   PrescriptionListParams,
   PrescriptionWithDoctor,
 } from "@/domain/prescription/prescription.types";
-import type { PagedResult } from "@/domain/shared/pagination.types";
+import type { LimitOffsetParams, PagedResult } from "@/domain/shared/pagination.types";
 import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
@@ -27,7 +27,7 @@ function escapeSearchTerm(term: string) {
 
 export interface PrescriptionRepository {
   listPaged(params: PrescriptionListParams, tenantId: string): Promise<PagedResult<Prescription>>;
-  listByPatient(patientId: string, tenantId: string): Promise<PrescriptionWithDoctor[]>;
+  listByPatient(patientId: string, tenantId: string, params?: LimitOffsetParams): Promise<PrescriptionWithDoctor[]>;
   create(input: PrescriptionCreateInput, tenantId: string): Promise<Prescription>;
   update(id: string, input: PrescriptionUpdateInput, tenantId: string): Promise<Prescription>;
 }
@@ -81,13 +81,16 @@ export const prescriptionRepository: PrescriptionRepository = {
 
     return { data: (data ?? []) as Prescription[], count: count ?? 0 };
   },
-  async listByPatient(patientId, tenantId) {
+  async listByPatient(patientId, tenantId, params) {
+    const limit = params?.limit ?? 50;
+    const offset = params?.offset ?? 0;
     const { data, error } = await supabase
       .from("prescriptions")
       .select(PRESCRIPTION_WITH_DOCTOR_COLUMNS)
       .eq("tenant_id", tenantId)
       .eq("patient_id", patientId)
-      .order("prescribed_date", { ascending: false });
+      .order("prescribed_date", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load patient prescriptions", {

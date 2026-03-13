@@ -13,10 +13,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { formatDate, formatCurrency } from "@/shared/utils/formatDate";
 import { insuranceService } from "@/services/insurance/insurance.service";
-import { patientService } from "@/services/patients/patient.service";
 import { queryKeys } from "@/services/queryKeys";
 import type { InsuranceClaimWithPatient } from "@/domain/insurance/insurance.types";
-import type { Patient } from "@/domain/patient/patient.types";
 
 const statusVariant: Record<string, "success" | "warning" | "destructive"> = { approved: "success", pending: "warning", rejected: "destructive" };
 
@@ -61,14 +59,6 @@ export const InsurancePage = () => {
     }),
     enabled: !!user?.tenantId,
   });
-
-  const { data: patientPage } = useQuery({
-    queryKey: queryKeys.patients.list({ tenantId: user?.tenantId, page: 1, pageSize: 500 }),
-    queryFn: async () => patientService.listPaged({ page: 1, pageSize: 500, sort: { column: "full_name", ascending: true } }),
-    enabled: !!user?.tenantId,
-  });
-
-  const patients: Patient[] = patientPage?.data ?? [];
 
   useEffect(() => {
     setPage(1);
@@ -198,7 +188,6 @@ export const InsurancePage = () => {
         onSuccess={() => {
           invalidateClaims();
         }}
-        patients={patients.map((p) => ({ id: p.id, full_name: p.full_name }))}
       />
     </div>
   );

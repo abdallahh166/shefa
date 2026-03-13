@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/core/auth/authStore";
+import { userPreferencesService } from "@/services/settings/userPreferences.service";
 
 const STORAGE_KEY = "medflow-theme";
 
@@ -45,19 +45,13 @@ export function setStoredTheme(theme: ThemeMode) {
 
 // Persist dark mode preference to DB
 async function saveThemeToDb(userId: string, dark: boolean) {
-  await supabase
-    .from("user_preferences" as any)
-    .upsert({ user_id: userId, dark_mode: dark }, { onConflict: "user_id" });
+  await userPreferencesService.setDarkMode(userId, dark);
 }
 
 // Load dark mode preference from DB
 async function loadThemeFromDb(userId: string): Promise<ThemeMode | null> {
-  const { data } = await supabase
-    .from("user_preferences" as any)
-    .select("dark_mode")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (data) return (data as any).dark_mode ? "dark" : "light";
+  const data = await userPreferencesService.getByUserId(userId);
+  if (data) return data.dark_mode ? "dark" : "light";
   return null;
 }
 

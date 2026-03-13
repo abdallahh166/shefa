@@ -1,7 +1,5 @@
-import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
-
-const BUCKET = "patient-documents";
+import { patientDocumentsStorageRepository } from "./patientDocuments.storage.repository";
 
 function sanitizeFileName(fileName: string) {
   const cleaned = fileName
@@ -27,20 +25,11 @@ export async function uploadPatientDocument(options: {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "");
   const filePath = `${options.tenantId}/patients/${options.patientId}/${timestamp}-${safeName}`;
 
-  const { error } = await supabase
-    .storage
-    .from(BUCKET)
-    .upload(filePath, options.file, {
-      contentType: options.file.type || "application/octet-stream",
-      upsert: false,
-    });
-
-  if (error) {
-    throw new ServiceError(error.message ?? "Failed to upload document", {
-      code: error.code,
-      details: error,
-    });
-  }
+  await patientDocumentsStorageRepository.upload(
+    filePath,
+    options.file,
+    options.file.type || "application/octet-stream",
+  );
 
   return {
     filePath,
@@ -52,23 +41,10 @@ export async function uploadPatientDocument(options: {
 
 export async function downloadPatientDocument(tenantId: string, filePath: string) {
   assertTenantPath(tenantId, filePath);
-  const { data, error } = await supabase.storage.from(BUCKET).download(filePath);
-  if (error || !data) {
-    throw new ServiceError(error?.message ?? "Failed to download document", {
-      code: error?.code,
-      details: error,
-    });
-  }
-  return data;
+  return patientDocumentsStorageRepository.download(filePath);
 }
 
 export async function removePatientDocument(tenantId: string, filePath: string) {
   assertTenantPath(tenantId, filePath);
-  const { error } = await supabase.storage.from(BUCKET).remove([filePath]);
-  if (error) {
-    throw new ServiceError(error.message ?? "Failed to delete document", {
-      code: error.code,
-      details: error,
-    });
-  }
+  await patientDocumentsStorageRepository.remove(filePath);
 }

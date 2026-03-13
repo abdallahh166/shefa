@@ -8,6 +8,8 @@ import {
 } from "@/domain/prescription/prescription.schema";
 import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import type { PrescriptionCreateInput, PrescriptionListParams, PrescriptionUpdateInput } from "@/domain/prescription/prescription.types";
+import type { LimitOffsetParams } from "@/domain/shared/pagination.types";
+import { limitOffsetSchema } from "@/domain/shared/pagination.schema";
 import { toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { prescriptionRepository } from "./prescription.repository";
@@ -25,11 +27,12 @@ export const prescriptionService = {
       throw toServiceError(err, "Failed to load prescriptions");
     }
   },
-  async listByPatient(patientId: string) {
+  async listByPatient(patientId: string, params?: LimitOffsetParams) {
     try {
       const parsedId = uuidSchema.parse(patientId);
+      const paging = limitOffsetSchema.parse(params ?? {});
       const { tenantId } = getTenantContext();
-      const result = await prescriptionRepository.listByPatient(parsedId, tenantId);
+      const result = await prescriptionRepository.listByPatient(parsedId, tenantId, paging);
       return z.array(prescriptionWithDoctorSchema).parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to load patient prescriptions");

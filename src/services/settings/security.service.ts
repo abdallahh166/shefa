@@ -1,14 +1,11 @@
-import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
+import { securityRepository } from "./security.repository";
 
 export const securityService = {
   async updatePassword(newPassword: string) {
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) {
-      throw new ServiceError(error.message ?? "Failed to update password", {
-        code: error.code,
-        details: error,
-      });
+    if (!newPassword || newPassword.length < 8) {
+      throw new ServiceError("Password must be at least 8 characters");
     }
+    await securityRepository.updatePassword(newPassword);
   },
 };

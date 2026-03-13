@@ -1,6 +1,6 @@
 begin;
 
-select plan(12);
+select plan(22);
 
 -- Use a superuser role for setup to bypass RLS and foreign keys.
 set local role postgres;
@@ -51,10 +51,35 @@ values
   ('00000000-0000-0000-0000-000000000301', '00000000-0000-0000-0000-000000000001', 'Dr One', 'General', 'available'),
   ('00000000-0000-0000-0000-000000000302', '00000000-0000-0000-0000-000000000002', 'Dr Two', 'General', 'available');
 
+insert into public.doctor_schedules (tenant_id, doctor_id, day_of_week, start_time, end_time, is_active)
+values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000301', 1, '09:00', '17:00', true),
+  ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000302', 1, '09:00', '17:00', true);
+
+insert into public.medications (tenant_id, name, category, stock, unit, price, status)
+values
+  ('00000000-0000-0000-0000-000000000001', 'Med One', 'General', 10, 'tabs', 5, 'in_stock'),
+  ('00000000-0000-0000-0000-000000000002', 'Med Two', 'General', 20, 'tabs', 7, 'low_stock');
+
 insert into public.appointments (tenant_id, patient_id, doctor_id, appointment_date, status, type)
 values
   ('00000000-0000-0000-0000-000000000001', (select id from public.patients where tenant_id = '00000000-0000-0000-0000-000000000001' limit 1), '00000000-0000-0000-0000-000000000301', '2026-03-10T09:00:00Z', 'scheduled', 'checkup'),
   ('00000000-0000-0000-0000-000000000002', (select id from public.patients where tenant_id = '00000000-0000-0000-0000-000000000002' limit 1), '00000000-0000-0000-0000-000000000302', '2026-03-10T10:00:00Z', 'scheduled', 'checkup');
+
+insert into public.appointment_reminder_log (appointment_id, tenant_id, notified_user_id, channel)
+values
+  (
+    (select id from public.appointments where tenant_id = '00000000-0000-0000-0000-000000000001' limit 1),
+    '00000000-0000-0000-0000-000000000001',
+    '00000000-0000-0000-0000-000000000011',
+    'in_app'
+  ),
+  (
+    (select id from public.appointments where tenant_id = '00000000-0000-0000-0000-000000000002' limit 1),
+    '00000000-0000-0000-0000-000000000002',
+    '00000000-0000-0000-0000-000000000012',
+    'in_app'
+  );
 
 insert into public.prescriptions (tenant_id, patient_id, doctor_id, medication, dosage, status)
 values
@@ -80,6 +105,18 @@ insert into public.patient_documents (tenant_id, patient_id, file_name, file_pat
 values
   ('00000000-0000-0000-0000-000000000001', (select id from public.patients where tenant_id = '00000000-0000-0000-0000-000000000001' limit 1), 'doc-a.pdf', '00000000-0000-0000-0000-000000000001/doc-a.pdf', 10, 'application/pdf', '00000000-0000-0000-0000-000000000011'),
   ('00000000-0000-0000-0000-000000000002', (select id from public.patients where tenant_id = '00000000-0000-0000-0000-000000000002' limit 1), 'doc-b.pdf', '00000000-0000-0000-0000-000000000002/doc-b.pdf', 10, 'application/pdf', '00000000-0000-0000-0000-000000000012');
+
+insert into public.notifications (tenant_id, user_id, title, body, type)
+values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000011', 'Notice 1', 'Hello', 'info'),
+  ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000012', 'Notice 2', 'Hello', 'info');
+
+set local session_replication_role = replica;
+insert into public.client_error_logs (tenant_id, user_id, message)
+values
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000011', 'Error One'),
+  ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000012', 'Error Two');
+set local session_replication_role = origin;
 
 insert into public.audit_logs (tenant_id, user_id, action, entity_type, entity_id)
 values
@@ -150,6 +187,70 @@ select is(
   (select count(*) from public.patient_documents),
   1::bigint,
   'Tenant user sees only their tenant patient documents'
+);
+
+select is(
+  (select count(*) from public.doctors),
+  1::bigint,
+  'Tenant user sees only their tenant doctors'
+);
+
+select is(
+  (select count(*) from public.doctor_schedules),
+  1::bigint,
+  'Clinic admin sees only their tenant schedules'
+);
+
+select throws_ok(
+  $$
+  insert into public.doctor_schedules (tenant_id, doctor_id, day_of_week, start_time, end_time, is_active)
+  values ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000302', 2, '10:00', '12:00', true);
+  $$,
+  '42501',
+  'new row violates row-level security policy for table "doctor_schedules"',
+  'Clinic admin cannot insert schedules for other tenants'
+);
+
+select is(
+  (select count(*) from public.medications),
+  1::bigint,
+  'Tenant user sees only their tenant medications'
+);
+
+select is(
+  (select count(*) from public.notifications),
+  1::bigint,
+  'User sees only own notifications'
+);
+
+select is(
+  (select count(*) from public.client_error_logs),
+  1::bigint,
+  'Clinic admin sees only tenant client error logs'
+);
+
+select is(
+  (select count(*) from public.profiles),
+  1::bigint,
+  'Tenant user sees only tenant profiles'
+);
+
+select is(
+  (select count(*) from public.user_roles),
+  1::bigint,
+  'User sees only own roles'
+);
+
+select is(
+  (select count(*) from public.tenants),
+  1::bigint,
+  'User sees only own tenant record'
+);
+
+select is(
+  (select count(*) from public.appointment_reminder_log),
+  0::bigint,
+  'Authenticated users cannot access appointment reminder log'
 );
 
 select is(

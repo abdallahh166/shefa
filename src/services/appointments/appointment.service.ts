@@ -10,7 +10,9 @@ import {
 import { dateTimeStringSchema } from "@/domain/shared/date.schema";
 import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import type { AppointmentCreateInput, AppointmentListParams, AppointmentUpdateInput } from "@/domain/appointment/appointment.types";
-import { toServiceError } from "@/services/supabase/errors";
+import type { LimitOffsetParams } from "@/domain/shared/pagination.types";
+import { limitOffsetSchema } from "@/domain/shared/pagination.schema";
+import { ServiceError, toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { appointmentRepository } from "./appointment.repository";
 
@@ -24,6 +26,17 @@ async function ensureNoConflict(
   if (hasConflict) {
     throw new Error("Appointment conflict detected");
   }
+}
+
+function isExclusionConflict(err: unknown) {
+  if (!(err instanceof ServiceError)) return false;
+  if (err.code === "23P01") return true;
+  const message = `${err.message ?? ""}`;
+  const detailsMessage =
+    typeof (err.details as { message?: string } | undefined)?.message === "string"
+      ? (err.details as { message: string }).message
+      : "";
+  return message.includes("appointments_no_overlap") || detailsMessage.includes("appointments_no_overlap");
 }
 
 export const appointmentService = {
@@ -51,22 +64,24 @@ export const appointmentService = {
       throw toServiceError(err, "Failed to load appointments");
     }
   },
-  async listByDateRange(start: string, end: string) {
+  async listByDateRange(start: string, end: string, params?: LimitOffsetParams) {
     try {
       const parsedStart = dateTimeStringSchema.parse(start);
       const parsedEnd = dateTimeStringSchema.parse(end);
+      const paging = limitOffsetSchema.parse(params ?? {});
       const { tenantId } = getTenantContext();
-      const result = await appointmentRepository.listByDateRange(parsedStart, parsedEnd, tenantId);
+      const result = await appointmentRepository.listByDateRange(parsedStart, parsedEnd, tenantId, paging);
       return z.array(appointmentWithPatientDoctorSchema).parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to load appointments");
     }
   },
-  async listByPatient(patientId: string) {
+  async listByPatient(patientId: string, params?: LimitOffsetParams) {
     try {
       const parsedId = uuidSchema.parse(patientId);
+      const paging = limitOffsetSchema.parse(params ?? {});
       const { tenantId } = getTenantContext();
-      const result = await appointmentRepository.listByPatient(parsedId, tenantId);
+      const result = await appointmentRepository.listByPatient(parsedId, tenantId, paging);
       return z.array(appointmentWithDoctorSchema).parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to load patient appointments");
@@ -89,6 +104,12 @@ export const appointmentService = {
       const result = await appointmentRepository.create(parsed, tenantId);
       return appointmentSchema.parse(result);
     } catch (err) {
+      if (isExclusionConflict(err)) {
+        throw new ServiceError("Appointment overlaps with an existing booking", {
+          code: "APPOINTMENT_OVERLAP",
+          details: err,
+        });
+      }
       throw toServiceError(err, "Failed to create appointment");
     }
   },
@@ -106,6 +127,12 @@ export const appointmentService = {
       const result = await appointmentRepository.update(parsedId, parsed, tenantId);
       return appointmentSchema.parse(result);
     } catch (err) {
+      if (isExclusionConflict(err)) {
+        throw new ServiceError("Appointment overlaps with an existing booking", {
+          code: "APPOINTMENT_OVERLAP",
+          details: err,
+        });
+      }
       throw toServiceError(err, "Failed to update appointment");
     }
   },

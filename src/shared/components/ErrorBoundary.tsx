@@ -1,7 +1,7 @@
 import { Component, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/core/auth/authStore";
+import { clientErrorLogService } from "@/services/observability/clientErrorLog.service";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -37,7 +37,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         : null;
 
     try {
-      await supabase.from("client_error_logs").insert({
+      await clientErrorLogService.log({
         tenant_id: user.tenantId,
         user_id: user.id,
         message,

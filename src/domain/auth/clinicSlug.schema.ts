@@ -3,6 +3,7 @@ import { z } from "zod";
 export const clinicSlugCheckInputSchema = z.object({
   clinicName: z.string().trim().min(2).max(120),
   customSlug: z.string().trim().min(2).max(80).optional(),
+  captchaToken: z.string().trim().min(1).optional(),
 });
 
 export const clinicSlugCheckResultSchema = z.object({

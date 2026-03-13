@@ -37,6 +37,8 @@ export const queryKeys = {
     root: (tenantId?: string) => tenantKey("billing", tenantId),
     list: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string; filters?: Record<string, unknown> }) =>
       listKey("billing", args),
+    range: (args?: { tenantId?: string; start?: string; end?: string }) =>
+      [...tenantKey("billing", args?.tenantId), "range", args] as const,
     summary: (tenantId?: string) => [...tenantKey("billing", tenantId), "summary"] as const,
     monthCount: (tenantId?: string, monthKey?: string) => [...tenantKey("billing", tenantId), "monthCount", monthKey] as const,
   },
@@ -75,6 +77,7 @@ export const queryKeys = {
     subscriptions: () => ["admin", "subscriptions"] as const,
   },
   reports: {
+    root: (tenantId?: string) => tenantKey("reports", tenantId),
     overview: (tenantId?: string) => [...tenantKey("reports", tenantId), "overview"] as const,
     revenueByMonth: (tenantId?: string) => [...tenantKey("reports", tenantId), "revenueByMonth"] as const,
     patientGrowth: (tenantId?: string) => [...tenantKey("reports", tenantId), "patientGrowth"] as const,

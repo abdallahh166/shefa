@@ -2,7 +2,7 @@ import { z } from "zod";
 import { doctorScheduleSchema, doctorScheduleUpsertSchema } from "@/domain/doctor/doctorSchedule.schema";
 import type { DoctorScheduleUpsertInput } from "@/domain/doctor/doctorSchedule.types";
 import { uuidSchema } from "@/domain/shared/identifiers.schema";
-import { toServiceError } from "@/services/supabase/errors";
+import { ServiceError, toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { doctorScheduleRepository } from "./doctorSchedule.repository";
 
@@ -37,6 +37,17 @@ function assertNoOverlaps(rows: DoctorScheduleUpsertInput[]) {
   }
 }
 
+function isScheduleOverlap(err: unknown) {
+  if (!(err instanceof ServiceError)) return false;
+  if (err.code === "23P01") return true;
+  const message = `${err.message ?? ""}`;
+  const detailsMessage =
+    typeof (err.details as { message?: string } | undefined)?.message === "string"
+      ? (err.details as { message: string }).message
+      : "";
+  return message.includes("doctor_schedules_no_overlap") || detailsMessage.includes("doctor_schedules_no_overlap");
+}
+
 export const doctorScheduleService = {
   async listByDoctor(doctorId: string) {
     try {
@@ -67,6 +78,12 @@ export const doctorScheduleService = {
         end_time: normalizeTime(row.end_time),
       }));
     } catch (err) {
+      if (isScheduleOverlap(err)) {
+        throw new ServiceError("Schedule overlaps with an existing time range", {
+          code: "SCHEDULE_OVERLAP",
+          details: err,
+        });
+      }
       throw toServiceError(err, "Failed to save doctor schedule");
     }
   },
