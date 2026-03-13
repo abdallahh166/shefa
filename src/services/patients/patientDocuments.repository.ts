@@ -5,12 +5,14 @@ import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
 
 const PATIENT_DOCUMENT_COLUMNS =
-  "id, patient_id, tenant_id, file_name, file_path, file_size, file_type, uploaded_by, notes, created_at";
+  "id, patient_id, tenant_id, file_name, file_path, file_size, file_type, uploaded_by, notes, deleted_at, deleted_by, created_at";
 
 export interface PatientDocumentsRepository {
   createMetadata(input: PatientDocumentCreateInput, tenantId: string): Promise<PatientDocument>;
   listByPatient(patientId: string, tenantId: string, params?: LimitOffsetParams): Promise<PatientDocument[]>;
-  remove(documentId: string, tenantId: string): Promise<{ file_path: string } | null>;
+  archive(documentId: string, tenantId: string, userId: string): Promise<PatientDocument | null>;
+  restore(documentId: string, tenantId: string): Promise<PatientDocument | null>;
+  remove(documentId: string, tenantId: string, userId: string): Promise<{ file_path: string } | null>;
 }
 
 export const patientDocumentsRepository: PatientDocumentsRepository = {
@@ -42,6 +44,7 @@ export const patientDocumentsRepository: PatientDocumentsRepository = {
       .select(PATIENT_DOCUMENT_COLUMNS)
       .eq("patient_id", patientId)
       .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -54,15 +57,30 @@ export const patientDocumentsRepository: PatientDocumentsRepository = {
 
     return (data ?? []) as PatientDocument[];
   },
-  async remove(documentId, tenantId) {
+  async archive(documentId, tenantId, userId) {
     const result = await supabase
       .from("patient_documents")
-      .delete()
+      .update({ deleted_at: new Date().toISOString(), deleted_by: userId })
       .eq("id", documentId)
       .eq("tenant_id", tenantId)
-      .select("file_path")
+      .select(PATIENT_DOCUMENT_COLUMNS)
       .single();
 
-    return assertOk(result) as { file_path: string } | null;
+    return assertOk(result) as PatientDocument | null;
+  },
+  async restore(documentId, tenantId) {
+    const result = await supabase
+      .from("patient_documents")
+      .update({ deleted_at: null, deleted_by: null })
+      .eq("id", documentId)
+      .eq("tenant_id", tenantId)
+      .select(PATIENT_DOCUMENT_COLUMNS)
+      .single();
+
+    return assertOk(result) as PatientDocument | null;
+  },
+  async remove(documentId, tenantId, userId) {
+    const archived = await patientDocumentsRepository.archive(documentId, tenantId, userId);
+    return archived ? { file_path: archived.file_path } : null;
   },
 };

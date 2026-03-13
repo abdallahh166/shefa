@@ -5,7 +5,7 @@ import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
 
 const PATIENT_COLUMNS =
-  "id, tenant_id, patient_code, full_name, date_of_birth, gender, blood_type, phone, email, address, insurance_provider, status, created_at, updated_at";
+  "id, tenant_id, patient_code, full_name, date_of_birth, gender, blood_type, phone, email, address, insurance_provider, status, deleted_at, deleted_by, created_at, updated_at";
 
 const SEARCH_COLUMNS = ["patient_code", "full_name", "phone", "email"];
 const SORTABLE_COLUMNS = new Set([
@@ -26,7 +26,9 @@ export interface PatientRepository {
   getById(id: string, tenantId: string): Promise<Patient>;
   create(input: PatientCreateInput, tenantId: string): Promise<Patient>;
   update(id: string, input: PatientUpdateInput, tenantId: string): Promise<Patient>;
-  deleteBulk(ids: string[], tenantId: string): Promise<void>;
+  archive(id: string, tenantId: string, userId: string): Promise<Patient>;
+  restore(id: string, tenantId: string): Promise<Patient>;
+  deleteBulk(ids: string[], tenantId: string, userId: string): Promise<void>;
 }
 
 export const patientRepository: PatientRepository = {
@@ -40,7 +42,8 @@ export const patientRepository: PatientRepository = {
     let query = supabase
       .from("patients")
       .select(PATIENT_COLUMNS, { count: "exact" })
-      .eq("tenant_id", tenantId);
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null);
 
     const filters = params.filters ?? {};
     if (typeof filters.status === "string" && filters.status.length > 0) {
@@ -78,6 +81,7 @@ export const patientRepository: PatientRepository = {
       .select(PATIENT_COLUMNS)
       .eq("id", id)
       .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
       .single();
 
     return assertOk(result) as Patient;
@@ -132,11 +136,33 @@ export const patientRepository: PatientRepository = {
 
     return assertOk(result) as Patient;
   },
-  async deleteBulk(ids, tenantId) {
+  async archive(id, tenantId, userId) {
+    const result = await supabase
+      .from("patients")
+      .update({ deleted_at: new Date().toISOString(), deleted_by: userId })
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .select(PATIENT_COLUMNS)
+      .single();
+
+    return assertOk(result) as Patient;
+  },
+  async restore(id, tenantId) {
+    const result = await supabase
+      .from("patients")
+      .update({ deleted_at: null, deleted_by: null })
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .select(PATIENT_COLUMNS)
+      .single();
+
+    return assertOk(result) as Patient;
+  },
+  async deleteBulk(ids, tenantId, userId) {
     if (ids.length === 0) return;
     const { error } = await supabase
       .from("patients")
-      .delete()
+      .update({ deleted_at: new Date().toISOString(), deleted_by: userId })
       .in("id", ids)
       .eq("tenant_id", tenantId);
 

@@ -103,4 +103,24 @@ export const billingService = {
       throw toServiceError(err, "Failed to update invoice");
     }
   },
+  async archive(id: string) {
+    try {
+      const parsedId = uuidSchema.parse(id);
+      const { tenantId, userId } = getTenantContext();
+      const result = await billingRepository.archive(parsedId, tenantId, userId);
+      return invoiceSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to archive invoice");
+    }
+  },
+  async restore(id: string) {
+    try {
+      const parsedId = uuidSchema.parse(id);
+      const { tenantId } = getTenantContext();
+      const result = await billingRepository.restore(parsedId, tenantId);
+      return invoiceSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to restore invoice");
+    }
+  },
 };

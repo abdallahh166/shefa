@@ -5,7 +5,7 @@ import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
 
 const DOCTOR_COLUMNS =
-  "id, tenant_id, user_id, full_name, specialty, phone, email, rating, status, created_at, updated_at";
+  "id, tenant_id, user_id, full_name, specialty, phone, email, rating, status, deleted_at, deleted_by, created_at, updated_at";
 
 const SEARCH_COLUMNS = ["full_name", "specialty", "phone", "email"];
 const SORTABLE_COLUMNS = new Set([
@@ -25,7 +25,9 @@ export interface DoctorRepository {
   listPaged(params: DoctorListParams, tenantId: string): Promise<PagedResult<Doctor>>;
   create(input: DoctorCreateInput, tenantId: string): Promise<Doctor>;
   update(id: string, input: DoctorUpdateInput, tenantId: string): Promise<Doctor>;
-  remove(id: string, tenantId: string): Promise<void>;
+  archive(id: string, tenantId: string, userId: string): Promise<Doctor>;
+  restore(id: string, tenantId: string): Promise<Doctor>;
+  remove(id: string, tenantId: string, userId: string): Promise<void>;
 }
 
 export const doctorRepository: DoctorRepository = {
@@ -39,7 +41,8 @@ export const doctorRepository: DoctorRepository = {
     let query = supabase
       .from("doctors")
       .select(DOCTOR_COLUMNS, { count: "exact" })
-      .eq("tenant_id", tenantId);
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null);
 
     const filters = params.filters ?? {};
     if (typeof filters.status === "string" && filters.status.length > 0) {
@@ -105,12 +108,13 @@ export const doctorRepository: DoctorRepository = {
     if (input.status !== undefined) payload.status = input.status;
 
     if (Object.keys(payload).length === 0) {
-      const result = await supabase
-        .from("doctors")
-        .select(DOCTOR_COLUMNS)
-        .eq("id", id)
-        .eq("tenant_id", tenantId)
-        .single();
+    const result = await supabase
+      .from("doctors")
+      .select(DOCTOR_COLUMNS)
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
+      .single();
       return assertOk(result) as Doctor;
     }
 
@@ -124,18 +128,29 @@ export const doctorRepository: DoctorRepository = {
 
     return assertOk(result) as Doctor;
   },
-  async remove(id, tenantId) {
-    const { error } = await supabase
+  async archive(id, tenantId, userId) {
+    const result = await supabase
       .from("doctors")
-      .delete()
+      .update({ deleted_at: new Date().toISOString(), deleted_by: userId })
       .eq("id", id)
-      .eq("tenant_id", tenantId);
+      .eq("tenant_id", tenantId)
+      .select(DOCTOR_COLUMNS)
+      .single();
 
-    if (error) {
-      throw new ServiceError(error.message ?? "Failed to delete doctor", {
-        code: error.code,
-        details: error,
-      });
-    }
+    return assertOk(result) as Doctor;
+  },
+  async restore(id, tenantId) {
+    const result = await supabase
+      .from("doctors")
+      .update({ deleted_at: null, deleted_by: null })
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .select(DOCTOR_COLUMNS)
+      .single();
+
+    return assertOk(result) as Doctor;
+  },
+  async remove(id, tenantId, userId) {
+    await doctorRepository.archive(id, tenantId, userId);
   },
 };

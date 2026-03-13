@@ -14,6 +14,8 @@ export const labResultSchema = z.object({
   order_date: dateStringSchema,
   status: labStatusEnum,
   result: z.string().trim().max(2000).optional().nullable(),
+  deleted_at: dateTimeStringSchema.optional().nullable(),
+  deleted_by: uuidSchema.optional().nullable(),
   created_at: dateTimeStringSchema,
   updated_at: dateTimeStringSchema,
 });

@@ -5,10 +5,11 @@ Production-grade clinic management system built with React, Vite, Supabase (Auth
 ## TL;DR
 
 - Multi-tenant healthcare SaaS with strict tenant isolation at RLS + repository layers.
-- Domain models validated via Zod, service layer enforces business rules.
-- Supabase RPCs handle sensitive or aggregate operations.
-- Materialized views power reports; scheduled refresh is always configured.
+- Domain models validated via Zod; services enforce business rules and return standardized errors.
+- Supabase RPCs handle sensitive or aggregate operations; edge functions cover public onboarding.
+- Materialized views power reports; refresh is scheduled via pg_cron.
 - Storage is tenant-scoped with private buckets and signed URL access.
+- Rate limiting is enforced for auth and upload workflows.
 
 ## Overview
 
@@ -182,6 +183,11 @@ repositories -> Supabase client
 - Repositories enforce tenant scoping in queries.
 - RLS policies enforce tenant isolation in the database.
 
+### Data Access Rules
+- Supabase client is used only inside repositories.
+- Services validate inputs and outputs with Zod.
+- React Query keys are tenant-scoped via `src/services/queryKeys.ts`.
+
 ## Data Flow (High Level)
 
 1. UI triggers service calls.
@@ -198,6 +204,40 @@ repositories -> Supabase client
 - Report materialized views for aggregate KPIs.
 - Audit logs for critical domain changes.
 
+## Supabase Backend Surface
+
+### Core Tables (High Level)
+- `tenants`, `profiles`, `user_roles`, `subscriptions`
+- `patients`, `patient_documents`, `medical_records`
+- `doctors`, `doctor_schedules`
+- `appointments`, `appointment_reminder_log`
+- `prescriptions`, `medications`
+- `lab_orders`
+- `invoices`, `invoice_items`
+- `insurance_claims`
+- `notifications`, `notification_preferences`
+- `audit_logs`, `client_error_logs`
+
+### RPC Functions (Selected)
+- `check_rate_limit`
+- `log_audit_event`
+- `get_report_overview`, `get_report_revenue_by_month`, `get_report_patient_growth`
+- `get_report_appointment_types`, `get_report_appointment_statuses`
+- `get_report_revenue_by_service`, `get_report_doctor_performance`
+- `get_invoice_summary`, `get_medication_summary`, `get_insurance_summary`
+- `generate_patient_code`
+- `search_global`
+
+### Edge Functions
+- `register-clinic` (public onboarding with CAPTCHA + rate limiting)
+- `check-slug` (public slug availability with CAPTCHA + rate limiting)
+- `invite-staff` (authenticated, admin-only)
+- `appointment-reminders` (cron-invoked, emails + in-app notifications)
+
+### Storage Buckets
+- `avatars` (private, image-only)
+- `patient-documents` (private, tenant-scoped)
+
 ## Security Model
 
 - RLS enabled across all multi-tenant tables.
@@ -205,6 +245,7 @@ repositories -> Supabase client
 - Storage buckets private; access via signed URLs.
 - Edge functions hardened with CAPTCHA, rate limiting, and email verification.
 - Service role keys used only in server-side functions.
+- Rate limiting enforced via `check_rate_limit` for login, password reset, and upload flows.
 
 ## Performance & Scalability
 
@@ -218,6 +259,11 @@ repositories -> Supabase client
 
 - Client error logs stored in `client_error_logs` (tenant-scoped).
 - Audit logs for critical actions (patients, appointments, invoices, documents, lab orders, prescriptions, insurance).
+
+## Error Handling
+
+- Services throw standardized errors (`ServiceError`, `ValidationError`, `AuthorizationError`, `NotFoundError`, `ConflictError`, `BusinessRuleError`).
+- Repositories map Supabase errors to service errors consistently.
 
 ## Environment & Configuration
 
@@ -362,11 +408,20 @@ Before production:
 - Materialized view refresh schedule should match business requirements for reporting freshness.
 - Realtime invalidation is optimized but still domain-level; record-level invalidation could further reduce refetch.
 - Large patient histories are now paginated; UI should expose pagination controls where needed.
+- Soft delete columns are referenced in services; ensure migrations exist in every environment.
+- If additional public endpoints are added, they must include CAPTCHA and rate limiting.
 
 ### Security Posture Summary
 - RLS coverage expanded and tested.
 - Storage policies enforce tenant isolation.
 - Edge functions hardened with CAPTCHA, rate limits, and email verification.
+
+## Roadmap (Planned Enhancements)
+
+- Domain event system for decoupled side effects (audit, notifications, analytics).
+- Feature-flag system per tenant to control module visibility.
+- Background job framework for heavy workflows and periodic maintenance.
+- Soft delete migrations across core entities (if not yet applied in production).
 
 ## Contributing
 
@@ -374,3 +429,159 @@ Before production:
 2. Add migrations for schema changes (never edit applied migrations)
 3. Run `supabase test db`
 4. Open a PR
+
+---
+
+## Data Model Diagram (High-Level)
+
+```mermaid
+flowchart LR
+  tenants["tenants"] --> profiles["profiles"]
+  tenants --> user_roles["user_roles"]
+  tenants --> patients["patients"]
+  tenants --> doctors["doctors"]
+  tenants --> appointments["appointments"]
+  tenants --> prescriptions["prescriptions"]
+  tenants --> lab_orders["lab_orders"]
+  tenants --> invoices["invoices"]
+  tenants --> insurance_claims["insurance_claims"]
+  tenants --> notifications["notifications"]
+  tenants --> audit_logs["audit_logs"]
+
+  patients --> patient_documents["patient_documents"]
+  patients --> appointments
+  patients --> prescriptions
+  patients --> lab_orders
+  patients --> invoices
+  patients --> insurance_claims
+
+  doctors --> appointments
+  doctors --> doctor_schedules["doctor_schedules"]
+
+  invoices --> invoice_items["invoice_items"]
+```
+
+Notes:
+- All core entities are tenant-scoped by `tenant_id`.
+- Soft delete columns are used in core entities (`deleted_at`, `deleted_by`).
+- Audit logs capture critical domain actions.
+
+---
+
+## API Examples
+
+### Services (Frontend)
+
+```ts
+import { patientService } from "@/services";
+
+// Create a patient
+const created = await patientService.create({
+  full_name: "Maya Hassan",
+  date_of_birth: "1991-04-12",
+  gender: "female",
+  phone: "+20 100 555 1122",
+});
+
+// List patients with pagination
+const page = await patientService.list({ search: "maya", limit: 20, offset: 0 });
+```
+
+```ts
+import { appointmentService } from "@/services";
+
+// Create appointment with conflict protection
+await appointmentService.create({
+  patient_id: "uuid",
+  doctor_id: "uuid",
+  appointment_date: "2026-03-13T10:00:00.000Z",
+  duration_minutes: 30,
+  type: "consultation",
+});
+```
+
+```ts
+import { reportService } from "@/services";
+
+// Aggregated dashboards (RPC-backed)
+const overview = await reportService.getOverview();
+const revenueByMonth = await reportService.getRevenueByMonth(6);
+```
+
+### RPC (Database)
+
+```sql
+-- Get reporting overview
+select * from public.get_report_overview();
+
+-- Apply tenant-safe global search (limit results)
+select * from public.search_global('maya', 8);
+```
+
+### Edge Functions
+
+```bash
+# Check slug availability (public, CAPTCHA required)
+curl -X POST "$SUPABASE_URL/functions/v1/check-slug" \
+  -H "Content-Type: application/json" \
+  -d '{"clinicName":"Bright Clinic","captchaToken":"..."}'
+
+# Register clinic (public, CAPTCHA + rate limiting)
+curl -X POST "$SUPABASE_URL/functions/v1/register-clinic" \
+  -H "Content-Type: application/json" \
+  -d '{"clinicName":"Bright Clinic","fullName":"Maya Hassan","email":"maya@example.com","password":"strong-pass","captchaToken":"..."}'
+```
+
+---
+
+## Ops Runbooks
+
+### Local Development
+
+1. Start Supabase locally:
+```
+supabase start
+```
+2. Apply migrations:
+```
+supabase migration up
+```
+3. Run DB tests:
+```
+supabase test db
+```
+
+### Remote Deploy (Supabase)
+
+1. Ensure `.env` points to remote project:
+```
+npm run env:remote
+```
+2. Apply migrations to remote:
+```
+supabase db push
+```
+3. Validate policies and RPCs:
+```
+supabase test db
+```
+
+### Backup & Restore
+
+- Backup: use Supabase dashboard backups or `pg_dump` from a managed replica.
+- Restore: create a new project, restore snapshot, re-apply secrets, then repoint `.env`.
+
+### Incident Response (Data Leakage or Policy Regression)
+
+1. Freeze writes by revoking write policies or setting tenant feature flags to disable modules.
+2. Rotate keys:
+   - Rotate JWT secrets and service role keys.
+   - Regenerate signed URL policies if used.
+3. Run audit log review by tenant and time window.
+4. Patch and re-run `supabase test db`.
+
+### Edge Functions Operations
+
+- Deploy: `supabase functions deploy <name>`
+- Secrets: `supabase secrets set KEY=VALUE`
+- Verify JWT: set `verify_jwt = true` in `supabase/config.toml` for protected functions.

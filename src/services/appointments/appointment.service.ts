@@ -136,4 +136,24 @@ export const appointmentService = {
       throw toServiceError(err, "Failed to update appointment");
     }
   },
+  async archive(id: string) {
+    try {
+      const parsedId = uuidSchema.parse(id);
+      const { tenantId, userId } = getTenantContext();
+      const result = await appointmentRepository.archive(parsedId, tenantId, userId);
+      return appointmentSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to archive appointment");
+    }
+  },
+  async restore(id: string) {
+    try {
+      const parsedId = uuidSchema.parse(id);
+      const { tenantId } = getTenantContext();
+      const result = await appointmentRepository.restore(parsedId, tenantId);
+      return appointmentSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to restore appointment");
+    }
+  },
 };

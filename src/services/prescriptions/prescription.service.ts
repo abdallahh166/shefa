@@ -59,4 +59,24 @@ export const prescriptionService = {
       throw toServiceError(err, "Failed to update prescription");
     }
   },
+  async archive(id: string) {
+    try {
+      const parsedId = uuidSchema.parse(id);
+      const { tenantId, userId } = getTenantContext();
+      const result = await prescriptionRepository.archive(parsedId, tenantId, userId);
+      return prescriptionSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to archive prescription");
+    }
+  },
+  async restore(id: string) {
+    try {
+      const parsedId = uuidSchema.parse(id);
+      const { tenantId } = getTenantContext();
+      const result = await prescriptionRepository.restore(parsedId, tenantId);
+      return prescriptionSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to restore prescription");
+    }
+  },
 };

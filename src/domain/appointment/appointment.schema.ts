@@ -27,6 +27,8 @@ export const appointmentSchema = z.object({
   type: appointmentTypeEnum,
   status: appointmentStatusEnum,
   notes: z.string().trim().max(2000).optional().nullable(),
+  deleted_at: dateTimeStringSchema.optional().nullable(),
+  deleted_by: uuidSchema.optional().nullable(),
   created_at: dateTimeStringSchema,
   updated_at: dateTimeStringSchema,
 });

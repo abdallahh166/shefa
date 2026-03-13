@@ -58,10 +58,30 @@ export const patientService = {
   async deleteBulk(ids: string[]) {
     try {
       const parsed = uuidListSchema.parse(ids);
-      const { tenantId } = getTenantContext();
-      return await patientRepository.deleteBulk(parsed, tenantId);
+      const { tenantId, userId } = getTenantContext();
+      return await patientRepository.deleteBulk(parsed, tenantId, userId);
     } catch (err) {
       throw toServiceError(err, "Failed to delete patients");
+    }
+  },
+  async archive(id: string) {
+    try {
+      const parsedId = uuidSchema.parse(id);
+      const { tenantId, userId } = getTenantContext();
+      const result = await patientRepository.archive(parsedId, tenantId, userId);
+      return patientSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to archive patient");
+    }
+  },
+  async restore(id: string) {
+    try {
+      const parsedId = uuidSchema.parse(id);
+      const { tenantId } = getTenantContext();
+      const result = await patientRepository.restore(parsedId, tenantId);
+      return patientSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to restore patient");
     }
   },
 };

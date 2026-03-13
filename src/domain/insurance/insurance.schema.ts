@@ -14,6 +14,8 @@ export const insuranceClaimSchema = z.object({
   amount: z.coerce.number().min(0),
   claim_date: dateStringSchema,
   status: insuranceStatusEnum,
+  deleted_at: dateTimeStringSchema.optional().nullable(),
+  deleted_by: uuidSchema.optional().nullable(),
   created_at: dateTimeStringSchema,
   updated_at: dateTimeStringSchema,
 });

@@ -11,7 +11,7 @@ import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
 
 const PRESCRIPTION_COLUMNS =
-  "id, tenant_id, patient_id, doctor_id, medication, dosage, status, prescribed_date, created_at";
+  "id, tenant_id, patient_id, doctor_id, medication, dosage, status, prescribed_date, deleted_at, deleted_by, created_at";
 const PRESCRIPTION_WITH_DOCTOR_COLUMNS = `${PRESCRIPTION_COLUMNS}, doctors(full_name)`;
 
 const SEARCH_COLUMNS = ["medication", "dosage", "status"];
@@ -30,6 +30,8 @@ export interface PrescriptionRepository {
   listByPatient(patientId: string, tenantId: string, params?: LimitOffsetParams): Promise<PrescriptionWithDoctor[]>;
   create(input: PrescriptionCreateInput, tenantId: string): Promise<Prescription>;
   update(id: string, input: PrescriptionUpdateInput, tenantId: string): Promise<Prescription>;
+  archive(id: string, tenantId: string, userId: string): Promise<Prescription>;
+  restore(id: string, tenantId: string): Promise<Prescription>;
 }
 
 export const prescriptionRepository: PrescriptionRepository = {
@@ -43,7 +45,8 @@ export const prescriptionRepository: PrescriptionRepository = {
     let query = supabase
       .from("prescriptions")
       .select(PRESCRIPTION_COLUMNS, { count: "exact" })
-      .eq("tenant_id", tenantId);
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null);
 
     const filters = params.filters ?? {};
     if (typeof filters.status === "string" && filters.status.length > 0) {
@@ -88,6 +91,7 @@ export const prescriptionRepository: PrescriptionRepository = {
       .from("prescriptions")
       .select(PRESCRIPTION_WITH_DOCTOR_COLUMNS)
       .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
       .eq("patient_id", patientId)
       .order("prescribed_date", { ascending: false })
       .range(offset, offset + limit - 1);
@@ -144,6 +148,28 @@ export const prescriptionRepository: PrescriptionRepository = {
     const result = await supabase
       .from("prescriptions")
       .update(payload)
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .select(PRESCRIPTION_COLUMNS)
+      .single();
+
+    return assertOk(result) as Prescription;
+  },
+  async archive(id, tenantId, userId) {
+    const result = await supabase
+      .from("prescriptions")
+      .update({ deleted_at: new Date().toISOString(), deleted_by: userId })
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .select(PRESCRIPTION_COLUMNS)
+      .single();
+
+    return assertOk(result) as Prescription;
+  },
+  async restore(id, tenantId) {
+    const result = await supabase
+      .from("prescriptions")
+      .update({ deleted_at: null, deleted_by: null })
       .eq("id", id)
       .eq("tenant_id", tenantId)
       .select(PRESCRIPTION_COLUMNS)

@@ -12,7 +12,7 @@ import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
 
 const INVOICE_COLUMNS =
-  "id, tenant_id, patient_id, invoice_code, service, amount, invoice_date, status, created_at, updated_at";
+  "id, tenant_id, patient_id, invoice_code, service, amount, invoice_date, status, deleted_at, deleted_by, created_at, updated_at";
 const INVOICE_WITH_PATIENT_COLUMNS = `${INVOICE_COLUMNS}, patients(full_name)`;
 
 const SEARCH_COLUMNS = ["invoice_code", "service", "status"];
@@ -37,6 +37,8 @@ export interface BillingRepository {
   listByPatient(patientId: string, tenantId: string, params?: LimitOffsetParams): Promise<Invoice[]>;
   create(input: InvoiceCreateInput, tenantId: string): Promise<Invoice>;
   update(id: string, input: InvoiceUpdateInput, tenantId: string): Promise<Invoice>;
+  archive(id: string, tenantId: string, userId: string): Promise<Invoice>;
+  restore(id: string, tenantId: string): Promise<Invoice>;
 }
 
 export const billingRepository: BillingRepository = {
@@ -50,7 +52,8 @@ export const billingRepository: BillingRepository = {
     let query = supabase
       .from("invoices")
       .select(INVOICE_COLUMNS, { count: "exact" })
-      .eq("tenant_id", tenantId);
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null);
 
     const filters = params.filters ?? {};
     if (typeof filters.status === "string" && filters.status.length > 0) {
@@ -95,7 +98,8 @@ export const billingRepository: BillingRepository = {
     let query = supabase
       .from("invoices")
       .select(INVOICE_WITH_PATIENT_COLUMNS, { count: "exact" })
-      .eq("tenant_id", tenantId);
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null);
 
     const filters = params.filters ?? {};
     if (typeof filters.status === "string" && filters.status.length > 0) {
@@ -146,6 +150,7 @@ export const billingRepository: BillingRepository = {
       .from("invoices")
       .select("id", { count: "exact", head: true })
       .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
       .gte("invoice_date", start)
       .lt("invoice_date", end);
 
@@ -165,6 +170,7 @@ export const billingRepository: BillingRepository = {
       .from("invoices")
       .select(INVOICE_COLUMNS)
       .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
       .gte("invoice_date", start)
       .lte("invoice_date", end)
       .order("invoice_date", { ascending: false })
@@ -186,6 +192,7 @@ export const billingRepository: BillingRepository = {
       .from("invoices")
       .select(INVOICE_COLUMNS)
       .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
       .eq("patient_id", patientId)
       .order("invoice_date", { ascending: false })
       .range(offset, offset + limit - 1);
@@ -242,6 +249,28 @@ export const billingRepository: BillingRepository = {
     const result = await supabase
       .from("invoices")
       .update(payload)
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .select(INVOICE_COLUMNS)
+      .single();
+
+    return assertOk(result) as Invoice;
+  },
+  async archive(id, tenantId, userId) {
+    const result = await supabase
+      .from("invoices")
+      .update({ deleted_at: new Date().toISOString(), deleted_by: userId })
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .select(INVOICE_COLUMNS)
+      .single();
+
+    return assertOk(result) as Invoice;
+  },
+  async restore(id, tenantId) {
+    const result = await supabase
+      .from("invoices")
+      .update({ deleted_at: null, deleted_by: null })
       .eq("id", id)
       .eq("tenant_id", tenantId)
       .select(INVOICE_COLUMNS)
