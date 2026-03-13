@@ -8,8 +8,9 @@ import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import type { PatientDocumentCreateInput, PatientDocumentUploadInput } from "@/domain/patient/patient.types";
 import type { LimitOffsetParams } from "@/domain/shared/pagination.types";
 import { limitOffsetSchema } from "@/domain/shared/pagination.schema";
-import { toServiceError } from "@/services/supabase/errors";
+import { ValidationError, toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
+import { assertAnyPermission } from "@/services/supabase/permissions";
 import { patientDocumentsRepository } from "./patientDocuments.repository";
 import {
   downloadPatientDocument,
@@ -18,10 +19,34 @@ import {
 } from "./patientDocuments.storage";
 import { rateLimitService } from "@/services/security/rateLimit.service";
 
+const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
+const ALLOWED_DOCUMENT_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "text/plain",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
+
+function assertDocumentAllowed(file: File) {
+  if (file.size > MAX_DOCUMENT_BYTES) {
+    throw new ValidationError("Document exceeds 10 MB limit");
+  }
+  const type = file.type?.toLowerCase().trim();
+  if (type && !ALLOWED_DOCUMENT_TYPES.has(type)) {
+    throw new ValidationError("Unsupported document type");
+  }
+}
+
 export const patientDocumentsService = {
   async upload(input: PatientDocumentUploadInput) {
     try {
+      assertAnyPermission(["manage_patients", "manage_medical_records"]);
       const parsed = patientDocumentUploadSchema.parse(input);
+      assertDocumentAllowed(parsed.file);
       const { tenantId, userId } = getTenantContext();
       await rateLimitService.assertAllowed("document_upload", [tenantId, userId]);
       const uploadResult = await uploadPatientDocument({
@@ -53,6 +78,7 @@ export const patientDocumentsService = {
   },
   async listByPatient(patientId: string, params?: LimitOffsetParams) {
     try {
+      assertAnyPermission(["view_patients", "manage_patients", "view_medical_records", "manage_medical_records"]);
       const parsedId = uuidSchema.parse(patientId);
       const paging = limitOffsetSchema.parse(params ?? {});
       const { tenantId } = getTenantContext();
@@ -64,6 +90,7 @@ export const patientDocumentsService = {
   },
   async download(document: { file_path: string }) {
     try {
+      assertAnyPermission(["view_patients", "manage_patients", "view_medical_records", "manage_medical_records"]);
       const parsed = patientDocumentSchema.pick({ file_path: true }).parse(document);
       const { tenantId } = getTenantContext();
       return await downloadPatientDocument(tenantId, parsed.file_path);
@@ -73,6 +100,7 @@ export const patientDocumentsService = {
   },
   async remove(documentId: string) {
     try {
+      assertAnyPermission(["manage_patients", "manage_medical_records"]);
       const parsedId = uuidSchema.parse(documentId);
       const { tenantId, userId } = getTenantContext();
       const deleted = await patientDocumentsRepository.remove(parsedId, tenantId, userId);
@@ -94,6 +122,7 @@ export const patientDocumentsService = {
   },
   async archive(documentId: string) {
     try {
+      assertAnyPermission(["manage_patients", "manage_medical_records"]);
       const parsedId = uuidSchema.parse(documentId);
       const { tenantId, userId } = getTenantContext();
       const result = await patientDocumentsRepository.archive(parsedId, tenantId, userId);
@@ -104,6 +133,7 @@ export const patientDocumentsService = {
   },
   async restore(documentId: string) {
     try {
+      assertAnyPermission(["manage_patients", "manage_medical_records"]);
       const parsedId = uuidSchema.parse(documentId);
       const { tenantId } = getTenantContext();
       const result = await patientDocumentsRepository.restore(parsedId, tenantId);

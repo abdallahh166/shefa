@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { toServiceError } from "@/services/supabase/errors";
+import { AuthorizationError, toServiceError } from "@/services/supabase/errors";
 import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import { authRepository } from "./auth.repository";
 import { env } from "@/core/env/env";
@@ -16,7 +16,13 @@ export const authService = {
       const parsedEmail = emailSchema.parse(email);
       const parsedPassword = z.string().min(1).parse(password);
       await rateLimitService.assertAllowed("login", [parsedEmail]);
-      await authRepository.signInWithPassword(parsedEmail, parsedPassword);
+      const user = await authRepository.signInWithPassword(parsedEmail, parsedPassword);
+      const userConfirmedAt = (user as { email_confirmed_at?: string | null; confirmed_at?: string | null } | null) ?? null;
+      const isVerified = Boolean(userConfirmedAt?.email_confirmed_at ?? userConfirmedAt?.confirmed_at);
+      if (user && !isVerified) {
+        await authRepository.signOut().catch(() => undefined);
+        throw new AuthorizationError("Please verify your email before logging in.");
+      }
     } catch (err) {
       throw toServiceError(err, "Login failed");
     }

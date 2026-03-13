@@ -35,7 +35,7 @@ export const ResetPasswordPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 6) {
+    if (password.length < 8) {
       toast({ title: t("common.passwordTooShort"), description: t("common.mustBeAtLeast6"), variant: "destructive" });
       return;
     }

@@ -5,45 +5,50 @@ import { ServiceError } from "@/services/supabase/errors";
 const NOTIFICATION_COLUMNS = "id, tenant_id, user_id, title, body, type, read, created_at";
 
 export interface NotificationRepository {
-  listByUser(userId: string, limit?: number): Promise<Notification[]>;
-  markRead(id: string, userId: string): Promise<void>;
-  markManyRead(ids: string[], userId: string): Promise<void>;
+  listByUserPaged(tenantId: string, userId: string, limit: number, offset: number): Promise<{ data: Notification[]; count: number }>;
+  markRead(id: string, tenantId: string, userId: string): Promise<void>;
+  markManyRead(ids: string[], tenantId: string, userId: string): Promise<void>;
   create(input: NotificationCreateInput): Promise<Notification>;
   subscribeToUser(
+    tenantId: string,
     userId: string,
     onInsert: (payload: Notification) => void,
   ): { unsubscribe: () => void };
 }
 
 export const notificationRepository: NotificationRepository = {
-  async listByUser(userId, limit = 20) {
-    const { data, error } = await supabase
+  async listByUserPaged(tenantId, userId, limit, offset) {
+    const to = Math.max(0, offset + limit - 1);
+    const { data, error, count } = await supabase
       .from("notifications")
-      .select(NOTIFICATION_COLUMNS)
+      .select(NOTIFICATION_COLUMNS, { count: "exact" })
+      .eq("tenant_id", tenantId)
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
-      .limit(limit);
+      .range(offset, to);
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load notifications", { code: error.code, details: error });
     }
-    return (data ?? []) as Notification[];
+    return { data: (data ?? []) as Notification[], count: count ?? 0 };
   },
-  async markRead(id, userId) {
+  async markRead(id, tenantId, userId) {
     const { error } = await supabase
       .from("notifications")
       .update({ read: true })
       .eq("id", id)
+      .eq("tenant_id", tenantId)
       .eq("user_id", userId);
     if (error) {
       throw new ServiceError(error.message ?? "Failed to update notification", { code: error.code, details: error });
     }
   },
-  async markManyRead(ids, userId) {
+  async markManyRead(ids, tenantId, userId) {
     if (ids.length === 0) return;
     const { error } = await supabase
       .from("notifications")
       .update({ read: true })
       .in("id", ids)
+      .eq("tenant_id", tenantId)
       .eq("user_id", userId);
     if (error) {
       throw new ServiceError(error.message ?? "Failed to update notifications", { code: error.code, details: error });
@@ -69,7 +74,7 @@ export const notificationRepository: NotificationRepository = {
 
     return data as Notification;
   },
-  subscribeToUser(userId, onInsert) {
+  subscribeToUser(tenantId, userId, onInsert) {
     const channel = supabase
       .channel(`user-notifications:${userId}`)
       .on(
@@ -81,7 +86,9 @@ export const notificationRepository: NotificationRepository = {
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          onInsert(payload.new as Notification);
+          const row = payload.new as Notification;
+          if (row.tenant_id !== tenantId) return;
+          onInsert(row);
         },
       )
       .subscribe();

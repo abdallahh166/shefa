@@ -8,6 +8,8 @@ export type Role = "super_admin" | "clinic_admin" | "doctor" | "receptionist" | 
 type SupaUser = {
   id: string;
   email?: string | null;
+  email_confirmed_at?: string | null;
+  confirmed_at?: string | null;
 };
 
 export type Permission =
@@ -62,16 +64,25 @@ export interface AppUser {
   avatar?: string;
 }
 
+export type TenantOverride = {
+  id: string;
+  slug: string;
+  name: string;
+} | null;
+
 interface AuthState {
   user: AppUser | null;
   supabaseUser: SupaUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  tenantOverride: TenantOverride;
   setUser: (user: AppUser | null, supabaseUser?: SupaUser | null) => void;
   setLoading: (loading: boolean) => void;
   logout: () => Promise<void>;
   hasPermission: (permission: Permission) => boolean;
   hasRole: (role: Role) => boolean;
+  setTenantOverride: (tenant: TenantOverride) => void;
+  clearTenantOverride: () => void;
   initialize: () => Promise<void>;
 }
 
@@ -82,6 +93,7 @@ export const useAuth = create<AuthState>()(
       supabaseUser: null,
       isAuthenticated: false,
       isLoading: true,
+      tenantOverride: null,
       setUser: (user, supabaseUser) => set({
         user,
         supabaseUser: supabaseUser ?? null,
@@ -91,7 +103,7 @@ export const useAuth = create<AuthState>()(
       setLoading: (isLoading) => set({ isLoading }),
       logout: async () => {
         await authService.logout();
-        set({ user: null, supabaseUser: null, isAuthenticated: false });
+        set({ user: null, supabaseUser: null, isAuthenticated: false, tenantOverride: null });
       },
       hasPermission: (permission) => {
         const { user } = get();
@@ -99,6 +111,12 @@ export const useAuth = create<AuthState>()(
         return ROLE_PERMISSIONS[user.role]?.includes(permission) ?? false;
       },
       hasRole: (role) => get().user?.role === role,
+      setTenantOverride: (tenant) => {
+        set({ tenantOverride: tenant });
+      },
+      clearTenantOverride: () => {
+        set({ tenantOverride: null });
+      },
       initialize: async () => {
         set({ isLoading: true });
         const timeout = new Promise<never>((_, reject) =>
@@ -139,6 +157,12 @@ async function loadUserProfile(
   supaUser: SupaUser,
   set: (partial: Partial<AuthState>) => void
 ) {
+  const isVerified = Boolean(supaUser.email_confirmed_at ?? supaUser.confirmed_at);
+  if (!isVerified) {
+    await authService.logout().catch(() => undefined);
+    set({ user: null, supabaseUser: null, isAuthenticated: false });
+    return;
+  }
   const { profile, role } = await authService.loadUserProfile(supaUser.id);
   if (profile && role) {
     const tenant = profile.tenants as any;

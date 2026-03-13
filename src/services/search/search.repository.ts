@@ -8,7 +8,7 @@ export interface SearchRepository {
 
 export const searchRepository: SearchRepository = {
   async searchGlobal(_tenantId, term, limit = 8) {
-    const { data, error } = await (supabase.rpc as any)("search_global", { _term: term, _limit: limit });
+    const { data, error } = await supabase.rpc("search_global", { _term: term, _limit: limit });
     if (error) {
       throw new ServiceError(error.message ?? "Failed to search", {
         code: error.code,

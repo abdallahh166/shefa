@@ -5,16 +5,28 @@ import { ServiceError } from "@/services/supabase/errors";
 const PROFILE_COLUMNS = "id, user_id, tenant_id, full_name, avatar_url, created_at, updated_at";
 
 export interface SettingsUsersRepository {
-  listProfilesWithRoles(tenantId: string): Promise<ProfileWithRoles[]>;
+  listProfilesWithRolesPaged(tenantId: string, params: { limit: number; offset: number; search?: string }): Promise<{
+    data: ProfileWithRoles[];
+    count: number;
+  }>;
 }
 
 export const settingsUsersRepository: SettingsUsersRepository = {
-  async listProfilesWithRoles(tenantId) {
-    const { data: profiles, error: profilesError } = await supabase
+  async listProfilesWithRolesPaged(tenantId, params) {
+    const to = Math.max(0, params.offset + params.limit - 1);
+    let profilesQuery = supabase
       .from("profiles")
-      .select(PROFILE_COLUMNS)
+      .select(PROFILE_COLUMNS, { count: "exact" })
       .eq("tenant_id", tenantId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(params.offset, to);
+
+    if (params.search && params.search.trim().length > 0) {
+      const q = `%${params.search.trim()}%`;
+      profilesQuery = profilesQuery.ilike("full_name", q);
+    }
+
+    const { data: profiles, error: profilesError, count } = await profilesQuery;
 
     if (profilesError) {
       throw new ServiceError(profilesError.message ?? "Failed to load profiles", {
@@ -24,7 +36,7 @@ export const settingsUsersRepository: SettingsUsersRepository = {
     }
 
     if (!profiles?.length) {
-      return [];
+      return { data: [], count: count ?? 0 };
     }
 
     const userIds = profiles.map((profile) => profile.user_id);
@@ -45,9 +57,11 @@ export const settingsUsersRepository: SettingsUsersRepository = {
       rolesByUserId.set(role.user_id, [{ role: role.role }]);
     }
 
-    return profiles.map((profile) => ({
+    const data = profiles.map((profile) => ({
       ...(profile as any),
       user_roles: rolesByUserId.get(profile.user_id) ?? [],
-    }));
+    })) as ProfileWithRoles[];
+
+    return { data, count: count ?? 0 };
   },
 };

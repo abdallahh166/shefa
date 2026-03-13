@@ -8,7 +8,7 @@ import {
   revenueByMonthRowSchema,
   revenueByServiceRowSchema,
 } from "@/domain/reports/reports.schema";
-import { toServiceError } from "@/services/supabase/errors";
+import { AuthorizationError, toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { reportRepository } from "./report.repository";
 
@@ -19,10 +19,24 @@ const statusCountsSchema = z.object({
   cancelled: z.number().int().nonnegative(),
 });
 
+const monthsSchema = z.coerce.number().int().min(1).max(24);
+const limitSchema = z.coerce.number().int().min(1).max(20);
+
 const monthLabel = (dateStr: string, withYear: boolean) =>
   new Date(dateStr).toLocaleString("en", withYear ? { month: "short", year: "2-digit" } : { month: "short" });
 
 export const reportService = {
+  async canViewReports() {
+    try {
+      const { tenantId } = getTenantContext();
+      await reportRepository.assertAccess(tenantId);
+      return true;
+    } catch (err) {
+      const mapped = toServiceError(err, "Failed to verify report access");
+      if (mapped instanceof AuthorizationError) return false;
+      throw mapped;
+    }
+  },
   async getOverview() {
     try {
       const { tenantId } = getTenantContext();
@@ -35,7 +49,8 @@ export const reportService = {
   async getRevenueByMonth(months = 6) {
     try {
       const { tenantId } = getTenantContext();
-      const result = await reportRepository.getRevenueByMonth(tenantId, months);
+      const safeMonths = monthsSchema.parse(months);
+      const result = await reportRepository.getRevenueByMonth(tenantId, safeMonths);
       const rows = z.array(revenueByMonthRowSchema).parse(result);
       return rows.map((row) => ({
         month: monthLabel(row.month_start, true),
@@ -49,7 +64,8 @@ export const reportService = {
   async getPatientGrowth(months = 6) {
     try {
       const { tenantId } = getTenantContext();
-      const result = await reportRepository.getPatientGrowth(tenantId, months);
+      const safeMonths = monthsSchema.parse(months);
+      const result = await reportRepository.getPatientGrowth(tenantId, safeMonths);
       const rows = z.array(patientGrowthRowSchema).parse(result);
       return rows.map((row) => ({
         month: monthLabel(row.month_start, false),
@@ -94,7 +110,8 @@ export const reportService = {
   async getRevenueByService(limit = 6) {
     try {
       const { tenantId } = getTenantContext();
-      const result = await reportRepository.getRevenueByService(tenantId, limit);
+      const safeLimit = limitSchema.parse(limit);
+      const result = await reportRepository.getRevenueByService(tenantId, safeLimit);
       const rows = z.array(revenueByServiceRowSchema).parse(result);
       return rows.map((row) => ({
         name: row.service,

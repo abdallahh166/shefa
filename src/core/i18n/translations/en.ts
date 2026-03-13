@@ -65,12 +65,14 @@ export const en = {
     approve: "Approve",
     reject: "Reject",
     remove: "Remove",
+    markAllRead: "Mark all as read",
+    loadMore: "Load more",
     noUsersFound: "No users found",
     preferencesSaved: "Preferences saved",
     passwordsDontMatch: "Passwords don't match",
     passwordTooShort: "Password too short",
-    mustBeAtLeast6: "Must be at least 6 characters",
-    passwordMinLength: "Password must be at least 6 characters",
+    mustBeAtLeast6: "Must be at least 8 characters",
+    passwordMinLength: "Password must be at least 8 characters",
     invalidResetLink: "Invalid reset link",
     invalidResetLinkDesc:
       "This link is invalid or has expired. Please request a new password reset.",
@@ -299,6 +301,7 @@ export const en = {
     appointments: "Appointments",
     completionRate: "Completion Rate",
     count: "Count",
+    noPermission: "You don't have permission to view reports.",
   },
   settings: {
     title: "Settings",
@@ -336,6 +339,7 @@ export const en = {
     avatarUpdated: "Profile photo updated",
     avatarRemoved: "Profile photo removed",
     avatarTooLarge: "Image must be under 2 MB",
+    avatarInvalidType: "Only JPG, PNG, or WebP images are allowed",
   },
   auth: {
     login: "Sign In",

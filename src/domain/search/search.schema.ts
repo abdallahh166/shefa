@@ -13,6 +13,6 @@ export const searchResultSchema = z.object({
 export const searchResultsSchema = z.array(searchResultSchema);
 
 export const globalSearchInputSchema = z.object({
-  term: z.string().trim().min(1),
+  term: z.string().trim().min(2).max(100),
   limit: z.number().int().min(1).max(20).optional(),
 });

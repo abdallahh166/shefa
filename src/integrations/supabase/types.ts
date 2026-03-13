@@ -1578,6 +1578,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_subscription_stats: { Args: never; Returns: Json }
       check_rate_limit: {
         Args: { _key: string; _max_hits: number; _window_seconds: number }
         Returns: boolean

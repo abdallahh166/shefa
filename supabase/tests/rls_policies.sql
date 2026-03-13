@@ -1,6 +1,6 @@
 begin;
 
-select plan(22);
+select plan(25);
 
 -- Use a superuser role for setup to bypass RLS and foreign keys.
 set local role postgres;
@@ -11,6 +11,7 @@ select set_config('request.jwt.claim.role', '', true);
 
 TRUNCATE
   public.audit_logs,
+  public.feature_flags,
   public.patient_documents,
   public.insurance_claims,
   public.lab_orders,
@@ -110,6 +111,11 @@ insert into public.notifications (tenant_id, user_id, title, body, type)
 values
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000011', 'Notice 1', 'Hello', 'info'),
   ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000012', 'Notice 2', 'Hello', 'info');
+
+insert into public.feature_flags (tenant_id, feature_key, enabled)
+values
+  ('00000000-0000-0000-0000-000000000001', 'pharmacy_module', true),
+  ('00000000-0000-0000-0000-000000000002', 'pharmacy_module', false);
 
 set local session_replication_role = replica;
 insert into public.client_error_logs (tenant_id, user_id, message)
@@ -221,6 +227,30 @@ select is(
   (select count(*) from public.notifications),
   1::bigint,
   'User sees only own notifications'
+);
+
+select is(
+  (select count(*) from public.feature_flags),
+  1::bigint,
+  'Tenant user sees only their tenant feature flags'
+);
+
+select lives_ok(
+  $$
+  insert into public.feature_flags (tenant_id, feature_key, enabled)
+  values ('00000000-0000-0000-0000-000000000001', 'lab_module', true);
+  $$,
+  'Clinic admin can manage feature flags in their tenant'
+);
+
+select throws_ok(
+  $$
+  insert into public.feature_flags (tenant_id, feature_key, enabled)
+  values ('00000000-0000-0000-0000-000000000002', 'insurance_module', true);
+  $$,
+  '42501',
+  'new row violates row-level security policy for table "feature_flags"',
+  'Clinic admin cannot manage feature flags for other tenants'
 );
 
 select is(

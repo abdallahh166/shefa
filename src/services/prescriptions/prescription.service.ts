@@ -13,11 +13,14 @@ import { limitOffsetSchema } from "@/domain/shared/pagination.schema";
 import { emitDomainEvent } from "@/core/events";
 import { toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
+import { assertAnyPermission } from "@/services/supabase/permissions";
+import { auditLogService } from "@/services/settings/audit.service";
 import { prescriptionRepository } from "./prescription.repository";
 
 export const prescriptionService = {
   async listPaged(params: PrescriptionListParams) {
     try {
+      assertAnyPermission(["view_medical_records", "manage_medical_records"]);
       const parsed = prescriptionListParamsSchema.parse(params);
       const { tenantId } = getTenantContext();
       const result = await prescriptionRepository.listPaged(parsed, tenantId);
@@ -30,6 +33,7 @@ export const prescriptionService = {
   },
   async listByPatient(patientId: string, params?: LimitOffsetParams) {
     try {
+      assertAnyPermission(["view_medical_records", "manage_medical_records"]);
       const parsedId = uuidSchema.parse(patientId);
       const paging = limitOffsetSchema.parse(params ?? {});
       const { tenantId } = getTenantContext();
@@ -41,10 +45,24 @@ export const prescriptionService = {
   },
   async create(input: PrescriptionCreateInput) {
     try {
+      assertAnyPermission(["manage_medical_records"]);
       const parsed = prescriptionCreateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
       const result = await prescriptionRepository.create(parsed, tenantId);
       const prescription = prescriptionSchema.parse(result);
+      await auditLogService.logEvent({
+        tenant_id: tenantId,
+        user_id: userId,
+        action: "prescription_created",
+        action_type: "prescription_create",
+        entity_type: "prescription",
+        entity_id: prescription.id,
+        details: {
+          patient_id: prescription.patient_id,
+          doctor_id: prescription.doctor_id,
+          medication: prescription.medication,
+        },
+      });
       await emitDomainEvent(
         "PrescriptionIssued",
         {
@@ -61,31 +79,62 @@ export const prescriptionService = {
   },
   async update(id: string, input: PrescriptionUpdateInput) {
     try {
+      assertAnyPermission(["manage_medical_records"]);
       const parsedId = uuidSchema.parse(id);
       const parsed = prescriptionUpdateSchema.parse(input);
-      const { tenantId } = getTenantContext();
+      const { tenantId, userId } = getTenantContext();
       const result = await prescriptionRepository.update(parsedId, parsed, tenantId);
-      return prescriptionSchema.parse(result);
+      const prescription = prescriptionSchema.parse(result);
+      await auditLogService.logEvent({
+        tenant_id: tenantId,
+        user_id: userId,
+        action: "prescription_updated",
+        action_type: "prescription_update",
+        entity_type: "prescription",
+        entity_id: prescription.id,
+        details: parsed as Record<string, unknown>,
+      });
+      return prescription;
     } catch (err) {
       throw toServiceError(err, "Failed to update prescription");
     }
   },
   async archive(id: string) {
     try {
+      assertAnyPermission(["manage_medical_records"]);
       const parsedId = uuidSchema.parse(id);
       const { tenantId, userId } = getTenantContext();
       const result = await prescriptionRepository.archive(parsedId, tenantId, userId);
-      return prescriptionSchema.parse(result);
+      const prescription = prescriptionSchema.parse(result);
+      await auditLogService.logEvent({
+        tenant_id: tenantId,
+        user_id: userId,
+        action: "prescription_archived",
+        action_type: "prescription_archive",
+        entity_type: "prescription",
+        entity_id: prescription.id,
+      });
+      return prescription;
     } catch (err) {
       throw toServiceError(err, "Failed to archive prescription");
     }
   },
   async restore(id: string) {
     try {
+      assertAnyPermission(["manage_medical_records"]);
       const parsedId = uuidSchema.parse(id);
-      const { tenantId } = getTenantContext();
+      const { tenantId, userId } = getTenantContext();
       const result = await prescriptionRepository.restore(parsedId, tenantId);
-      return prescriptionSchema.parse(result);
+      const prescription = prescriptionSchema.parse(result);
+      await auditLogService.logEvent({
+        tenant_id: tenantId,
+        user_id: userId,
+        action: "prescription_restored",
+        action_type: "prescription_restore",
+        entity_type: "prescription",
+        entity_id: prescription.id,
+      });
+      return prescription;
     } catch (err) {
       throw toServiceError(err, "Failed to restore prescription");
     }

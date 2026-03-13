@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
 import { cn } from "@/lib/utils";
@@ -15,22 +15,46 @@ import { ProfileTab } from "./tabs/ProfileTab";
 import { SubscriptionTab } from "./tabs/SubscriptionTab";
 import { settingsUsersService } from "@/services/settings/users.service";
 import { queryKeys } from "@/services/queryKeys";
+import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 
 type Tab = "profile" | "general" | "users" | "notifications" | "appearance" | "security" | "audit" | "subscription";
 
 export const SettingsPage = () => {
   const { t } = useI18n();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>("profile");
   const [showAddUser, setShowAddUser] = useState(false);
+  const [userPage, setUserPage] = useState(1);
+  const [userSearch, setUserSearch] = useState("");
+  const debouncedUserSearch = useDebouncedValue(userSearch, 300);
+  const pageSize = 20;
+  const canManageUsers = hasPermission("manage_users");
 
-  const profilesQueryKey = queryKeys.settings.profiles(user?.tenantId);
-  const { data: profiles = [], refetch: refetchProfiles } = useQuery({
-    queryKey: profilesQueryKey,
-    enabled: !!user?.tenantId,
-    queryFn: () => settingsUsersService.listProfilesWithRoles(),
+  useEffect(() => {
+    setUserPage(1);
+  }, [debouncedUserSearch]);
+
+  const profilesQueryKey = queryKeys.settings.profiles({
+    tenantId: user?.tenantId,
+    page: userPage,
+    pageSize,
+    search: debouncedUserSearch.trim() || undefined,
   });
+
+  const { data: profilesResponse, refetch: refetchProfiles, isLoading: loadingProfiles } = useQuery({
+    queryKey: profilesQueryKey,
+    enabled: !!user?.tenantId && canManageUsers,
+    queryFn: () =>
+      settingsUsersService.listProfilesWithRolesPaged({
+        page: userPage,
+        pageSize,
+        search: debouncedUserSearch.trim() || undefined,
+      }),
+  });
+
+  const profiles = profilesResponse?.data ?? [];
+  const profilesTotal = profilesResponse?.total ?? 0;
 
   const tabs: { key: Tab; icon: any; label: string }[] = [
     { key: "profile", icon: User, label: t("settings.profile") },
@@ -78,6 +102,13 @@ export const SettingsPage = () => {
             <UsersTab
               profiles={profiles}
               onAddUser={() => setShowAddUser(true)}
+              isLoading={loadingProfiles}
+              page={userPage}
+              pageSize={pageSize}
+              total={profilesTotal}
+              onPageChange={setUserPage}
+              searchValue={userSearch}
+              onSearchChange={setUserSearch}
             />
           )}
           {activeTab === "security" && <SecurityTab />}
@@ -92,7 +123,9 @@ export const SettingsPage = () => {
         open={showAddUser}
         onClose={() => setShowAddUser(false)}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: profilesQueryKey });
+          queryClient.invalidateQueries({ queryKey: ["settings", user?.tenantId, "profiles"] });
+          setUserPage(1);
+          setUserSearch("");
           refetchProfiles();
         }}
       />

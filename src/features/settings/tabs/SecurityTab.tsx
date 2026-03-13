@@ -21,7 +21,7 @@ export const SecurityTab = () => {
       toast({ title: t("common.passwordsDontMatch"), variant: "destructive" });
       return;
     }
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8) {
       toast({ title: t("common.passwordMinLength"), variant: "destructive" });
       return;
     }

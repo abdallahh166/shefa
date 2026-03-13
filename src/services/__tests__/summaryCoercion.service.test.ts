@@ -10,6 +10,14 @@ vi.mock("@/services/supabase/tenant", () => ({
   getTenantContext: () => ({ tenantId: "00000000-0000-0000-0000-000000000111", userId: "00000000-0000-0000-0000-000000000222" }),
 }));
 
+vi.mock("@/core/auth/authStore", () => ({
+  useAuth: {
+    getState: () => ({
+      hasPermission: () => true,
+    }),
+  },
+}));
+
 vi.mock("@/services/pharmacy/pharmacy.repository", () => ({
   pharmacyRepository: {
     getSummary: vi.fn(),

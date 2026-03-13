@@ -22,6 +22,12 @@ export const ProfileTab = () => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      toast({ title: t("common.error"), description: t("settings.avatarInvalidType"), variant: "destructive" });
+      return;
+    }
+
     if (file.size > 2 * 1024 * 1024) {
       toast({ title: t("settings.avatarTooLarge"), variant: "destructive" });
       return;

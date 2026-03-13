@@ -4,12 +4,22 @@ import { getTenantContext } from "@/services/supabase/tenant";
 import { auditLogRepository } from "./audit.repository";
 import { z } from "zod";
 
+const paginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(5).max(100).default(20),
+});
+
 export const auditLogService = {
-  async listRecent(limit = 50) {
+  async listPaged(input?: { page?: number; pageSize?: number }) {
     try {
+      const parsed = paginationSchema.parse(input ?? {});
       const { tenantId } = getTenantContext();
-      const result = await auditLogRepository.listRecent(tenantId, limit);
-      return z.array(auditLogSchema).parse(result);
+      const { data, count } = await auditLogRepository.listPaged(
+        tenantId,
+        parsed.pageSize,
+        (parsed.page - 1) * parsed.pageSize
+      );
+      return { data: z.array(auditLogSchema).parse(data), total: count };
     } catch (err) {
       throw toServiceError(err, "Failed to load audit logs");
     }

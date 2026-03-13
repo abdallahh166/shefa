@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Bell, CalendarDays, FlaskConical, DollarSign, AlertTriangle, X, Info } from "lucide-react";
+import { Bell, CalendarDays, FlaskConical, DollarSign, AlertTriangle, X, Info, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
 import { notificationService } from "@/services/notifications/notification.service";
+import { toast } from "@/hooks/use-toast";
 
 interface Notification {
   id: string;
@@ -37,13 +38,28 @@ export const NotificationCenter = () => {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const pageSize = 20;
 
   const loadNotifications = useCallback(async () => {
-    if (!user?.id) { setNotifications([]); return; }
-    const data = await notificationService.listRecent(user.id, 20);
-    setNotifications(data as Notification[]);
-  }, [user?.id]);
+    if (!user?.id) { setNotifications([]); setTotal(0); setPage(1); return; }
+    setLoading(true);
+    try {
+      const result = await notificationService.listPaged(user.id, { page: 1, pageSize });
+      setNotifications(result.data as Notification[]);
+      setTotal(result.total);
+      setPage(1);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("common.error");
+      toast({ title: t("common.error"), description: message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, pageSize, t]);
 
   useEffect(() => { loadNotifications(); }, [loadNotifications]);
 
@@ -51,6 +67,7 @@ export const NotificationCenter = () => {
     if (!user?.id) return;
     const subscription = notificationService.subscribe(user.id, (payload) => {
       setNotifications((prev) => [payload as Notification, ...prev]);
+      setTotal((prev) => prev + 1);
     });
     return () => { subscription.unsubscribe(); };
   }, [user?.id]);
@@ -61,14 +78,44 @@ export const NotificationCenter = () => {
     if (!user?.id) return;
     const unreadIds = notifications.filter((n) => !n.read).map((n) => n.id);
     if (unreadIds.length === 0) return;
-    await notificationService.markAllRead(user.id, unreadIds);
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    try {
+      await notificationService.markAllRead(user.id, unreadIds);
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("common.error");
+      toast({ title: t("common.error"), description: message, variant: "destructive" });
+    }
   };
 
   const dismiss = async (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    const prev = notifications;
+    setNotifications((current) => current.filter((n) => n.id !== id));
     if (!user?.id) return;
-    await notificationService.markRead(user.id, id);
+    try {
+      await notificationService.markRead(user.id, id);
+    } catch (err) {
+      setNotifications(prev);
+      const message = err instanceof Error ? err.message : t("common.error");
+      toast({ title: t("common.error"), description: message, variant: "destructive" });
+    }
+  };
+
+  const canLoadMore = notifications.length < total;
+  const loadMore = async () => {
+    if (!user?.id || loadingMore || !canLoadMore) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const result = await notificationService.listPaged(user.id, { page: nextPage, pageSize });
+      setNotifications((prev) => [...prev, ...(result.data as Notification[])]);
+      setTotal(result.total);
+      setPage(nextPage);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("common.error");
+      toast({ title: t("common.error"), description: message, variant: "destructive" });
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   useEffect(() => {
@@ -102,7 +149,12 @@ export const NotificationCenter = () => {
           </div>
 
           <div className="max-h-72 overflow-y-auto">
-            {notifications.length === 0 ? (
+            {loading ? (
+              <div className="p-8 text-center text-muted-foreground text-sm">
+                <Loader2 className="h-4 w-4 animate-spin inline-block mr-2" />
+                {t("common.loading")}
+              </div>
+            ) : notifications.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground text-sm">{t("common.noData")}</div>
             ) : (
               notifications.map((n) => {
@@ -131,6 +183,18 @@ export const NotificationCenter = () => {
               })
             )}
           </div>
+
+          {canLoadMore && (
+            <div className="border-t px-4 py-2">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="w-full text-xs text-primary hover:underline disabled:opacity-50"
+              >
+                {loadingMore ? t("common.loading") : t("common.loadMore") ?? "Load more"}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

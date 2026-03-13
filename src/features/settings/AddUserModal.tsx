@@ -36,7 +36,10 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!form.full_name || !form.email) {
+    const fullName = form.full_name.trim();
+    const email = form.email.trim().toLowerCase();
+
+    if (!fullName || !email) {
       toast({ title: t("common.missingFields"), description: t("common.pleaseFillAllFields"), variant: "destructive" });
       return;
     }
@@ -45,8 +48,8 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
 
     try {
       await userInviteService.inviteStaff({
-        email: form.email,
-        full_name: form.full_name,
+        email,
+        full_name: fullName,
         role: form.role as InviteStaffInput["role"],
       });
       toast({

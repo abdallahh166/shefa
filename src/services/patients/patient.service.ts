@@ -10,11 +10,13 @@ import type { PatientCreateInput, PatientListParams, PatientUpdateInput } from "
 import { emitDomainEvent } from "@/core/events";
 import { toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
+import { assertAnyPermission } from "@/services/supabase/permissions";
 import { patientRepository } from "./patient.repository";
 
 export const patientService = {
   async listPaged(params: PatientListParams) {
     try {
+      assertAnyPermission(["view_patients", "manage_patients"]);
       const parsed = patientListParamsSchema.parse(params);
       const { tenantId } = getTenantContext();
       const result = await patientRepository.listPaged(parsed, tenantId);
@@ -27,6 +29,7 @@ export const patientService = {
   },
   async getById(id: string) {
     try {
+      assertAnyPermission(["view_patients", "manage_patients"]);
       const parsedId = uuidSchema.parse(id);
       const { tenantId } = getTenantContext();
       const result = await patientRepository.getById(parsedId, tenantId);
@@ -37,6 +40,7 @@ export const patientService = {
   },
   async create(input: PatientCreateInput) {
     try {
+      assertAnyPermission(["manage_patients"]);
       const parsed = patientCreateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
       const result = await patientRepository.create(parsed, tenantId);
@@ -53,6 +57,7 @@ export const patientService = {
   },
   async update(id: string, input: PatientUpdateInput) {
     try {
+      assertAnyPermission(["manage_patients"]);
       const parsedId = uuidSchema.parse(id);
       const parsed = patientUpdateSchema.parse(input);
       const { tenantId } = getTenantContext();
@@ -64,6 +69,7 @@ export const patientService = {
   },
   async deleteBulk(ids: string[]) {
     try {
+      assertAnyPermission(["manage_patients"]);
       const parsed = uuidListSchema.parse(ids);
       const { tenantId, userId } = getTenantContext();
       return await patientRepository.deleteBulk(parsed, tenantId, userId);
@@ -73,6 +79,7 @@ export const patientService = {
   },
   async archive(id: string) {
     try {
+      assertAnyPermission(["manage_patients"]);
       const parsedId = uuidSchema.parse(id);
       const { tenantId, userId } = getTenantContext();
       const result = await patientRepository.archive(parsedId, tenantId, userId);
@@ -83,6 +90,7 @@ export const patientService = {
   },
   async restore(id: string) {
     try {
+      assertAnyPermission(["manage_patients"]);
       const parsedId = uuidSchema.parse(id);
       const { tenantId } = getTenantContext();
       const result = await patientRepository.restore(parsedId, tenantId);

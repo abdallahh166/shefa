@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
 import { useNavigate } from "react-router-dom";
@@ -20,6 +20,7 @@ import { toast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { adminService } from "@/services/admin/admin.service";
 import { queryKeys } from "@/services/queryKeys";
+import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 
 type AdminTab = "overview" | "clinics" | "users" | "subscriptions";
 
@@ -27,38 +28,103 @@ const PLAN_OPTIONS = ["free", "starter", "pro", "enterprise"] as const;
 const STATUS_OPTIONS = ["active", "trialing", "expired", "canceled"] as const;
 
 export const AdminDashboardPage = () => {
-  const { t, locale } = useI18n();
-  const { user, logout } = useAuth();
+  const { locale } = useI18n();
+  const { user, logout, setTenantOverride } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const [clinicFilter, setClinicFilter] = useState<string | null>(null);
   const [subFilter, setSubFilter] = useState<string | null>(null);
+  const [clinicPage, setClinicPage] = useState(1);
+  const [userPage, setUserPage] = useState(1);
+  const [subPage, setSubPage] = useState(1);
+  const [clinicSearch, setClinicSearch] = useState("");
+  const [userSearch, setUserSearch] = useState("");
+  const [subSearch, setSubSearch] = useState("");
+  const debouncedClinicSearch = useDebouncedValue(clinicSearch, 300);
+  const debouncedUserSearch = useDebouncedValue(userSearch, 300);
+  const debouncedSubSearch = useDebouncedValue(subSearch, 300);
   const [confirmAction, setConfirmAction] = useState<{ id: string; field: "plan" | "status"; value: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const pageSize = 20;
 
-  // Fetch all tenants
-  const { data: tenants = [], isLoading: loadingTenants } = useQuery({
-    queryKey: queryKeys.admin.tenants(),
-    queryFn: () => adminService.listTenants(),
+  useEffect(() => {
+    setClinicPage(1);
+  }, [debouncedClinicSearch, clinicFilter]);
+
+  useEffect(() => {
+    setUserPage(1);
+  }, [debouncedUserSearch]);
+
+  useEffect(() => {
+    setSubPage(1);
+  }, [debouncedSubSearch, subFilter]);
+
+  const { data: tenantsResponse, isLoading: loadingTenants } = useQuery({
+    queryKey: queryKeys.admin.tenants({
+      page: clinicPage,
+      pageSize,
+      search: debouncedClinicSearch.trim() || undefined,
+      plan: clinicFilter ?? undefined,
+    }),
+    queryFn: () =>
+      adminService.listTenantsPaged({
+        page: clinicPage,
+        pageSize,
+        search: debouncedClinicSearch.trim() || undefined,
+        plan: clinicFilter ?? undefined,
+      }),
   });
 
-  // Fetch all profiles with roles
-  const { data: profiles = [], isLoading: loadingProfiles } = useQuery({
-    queryKey: queryKeys.admin.profiles(),
-    queryFn: () => adminService.listProfilesWithRoles(),
+  const { data: profilesResponse, isLoading: loadingProfiles } = useQuery({
+    queryKey: queryKeys.admin.profiles({
+      page: userPage,
+      pageSize,
+      search: debouncedUserSearch.trim() || undefined,
+    }),
+    queryFn: () =>
+      adminService.listProfilesWithRolesPaged({
+        page: userPage,
+        pageSize,
+        search: debouncedUserSearch.trim() || undefined,
+      }),
   });
 
-  // Fetch all subscriptions
-  const { data: subscriptions = [], isLoading: loadingSubs } = useQuery({
-    queryKey: queryKeys.admin.subscriptions(),
-    queryFn: () => adminService.listSubscriptions(),
+  const { data: subscriptionsResponse, isLoading: loadingSubs } = useQuery({
+    queryKey: queryKeys.admin.subscriptions({
+      page: subPage,
+      pageSize,
+      search: debouncedSubSearch.trim() || undefined,
+      plan: subFilter ?? undefined,
+    }),
+    queryFn: () =>
+      adminService.listSubscriptionsPaged({
+        page: subPage,
+        pageSize,
+        search: debouncedSubSearch.trim() || undefined,
+        plan: subFilter ?? undefined,
+      }),
   });
 
-  const totalClinics = tenants.length;
-  const totalUsers = profiles.length;
-  const activeSubs = subscriptions.filter((s: any) => s.status === "active").length;
-  const totalRevenue = subscriptions.reduce((s: number, sub: any) => s + Number(sub.amount || 0), 0);
+  const { data: subscriptionStats } = useQuery({
+    queryKey: queryKeys.admin.subscriptionStats(),
+    queryFn: () => adminService.getSubscriptionStats(),
+  });
+
+  const { data: recentTenantsResponse } = useQuery({
+    queryKey: queryKeys.admin.tenants({ page: 1, pageSize: 5 }),
+    queryFn: () => adminService.listTenantsPaged({ page: 1, pageSize: 5 }),
+  });
+
+  const tenants = tenantsResponse?.data ?? [];
+  const profiles = profilesResponse?.data ?? [];
+  const subscriptions = subscriptionsResponse?.data ?? [];
+  const recentTenants = recentTenantsResponse?.data ?? [];
+
+  const totalClinics = tenantsResponse?.total ?? 0;
+  const totalUsers = profilesResponse?.total ?? 0;
+  const activeSubs = subscriptionStats?.active_count ?? 0;
+  const totalRevenue = subscriptionStats?.total_revenue ?? 0;
 
   const handleLogout = async () => {
     await logout();
@@ -75,7 +141,9 @@ export const AdminDashboardPage = () => {
           : { status: confirmAction.value as "active" | "canceled" | "expired" | "trialing" };
       await adminService.updateSubscription(confirmAction.id, updatePayload);
       toast({ title: "Updated", description: `Subscription ${confirmAction.field} changed to ${confirmAction.value}` });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.subscriptions() });
+      queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "tenants"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.subscriptionStats() });
     } catch (err: any) {
       toast({ title: "Error", description: err?.message || "Failed to update", variant: "destructive" });
     } finally {
@@ -103,13 +171,25 @@ export const AdminDashboardPage = () => {
     )},
     { key: "email", header: "Email", searchable: true, render: (c) => c.email || "—" },
     { key: "phone", header: "Phone", render: (c) => c.phone || "—" },
-    { key: "plan", header: "Plan", render: (c) => {
-      const sub = subscriptions.find((s: any) => s.tenant_id === c.id);
-      return <StatusBadge variant={sub?.plan === "pro" ? "success" : sub?.plan === "enterprise" ? "info" : "default"}>{sub?.plan || "free"}</StatusBadge>;
-    }},
+    {
+      key: "plan",
+      header: "Plan",
+      render: (c) => {
+        const plan = c.plan ?? "free";
+        const variant = plan === "pro" ? "success" : plan === "enterprise" ? "info" : "default";
+        return <StatusBadge variant={variant as any}>{plan}</StatusBadge>;
+      },
+    },
     { key: "created_at", header: "Created", render: (c) => formatDate(c.created_at, locale, "date") },
     { key: "actions", header: "", render: (c) => (
-      <Button variant="ghost" size="sm" onClick={() => navigate(`/tenant/${c.slug}/dashboard`)}>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          setTenantOverride({ id: c.id, slug: c.slug, name: c.name });
+          navigate(`/tenant/${c.slug}/dashboard`);
+        }}
+      >
         <Eye className="h-4 w-4" />
       </Button>
     )},
@@ -129,10 +209,7 @@ export const AdminDashboardPage = () => {
       const variant = role === "clinic_admin" ? "info" : role === "super_admin" ? "destructive" : "default";
       return <StatusBadge variant={variant as any}>{role.replace("_", " ")}</StatusBadge>;
     }},
-    { key: "tenant_id", header: "Clinic", render: (p) => {
-      const tenant = tenants.find((t: any) => t.id === p.tenant_id);
-      return tenant?.name || "—";
-    }},
+    { key: "tenant_id", header: "Clinic", render: (p) => p.tenants?.name || "—" },
     { key: "created_at", header: "Joined", render: (p) => formatDate(p.created_at, locale, "date") },
   ];
 
@@ -181,16 +258,12 @@ export const AdminDashboardPage = () => {
     { key: "expires_at", header: "Expires", render: (s) => s.expires_at ? formatDate(s.expires_at, locale, "date") : "—" },
   ];
 
-  const filteredClinics = clinicFilter ? tenants.filter((t: any) => {
-    const sub = subscriptions.find((s: any) => s.tenant_id === t.id);
-    return sub?.plan === clinicFilter;
-  }) : tenants;
-
-  const filteredSubs = subFilter ? subscriptions.filter((s: any) => s.plan === subFilter) : subscriptions;
+  const planCounts = subscriptionStats?.plan_counts ?? {};
+  const totalPlanCount = PLAN_OPTIONS.reduce((sum, plan) => sum + Number((planCounts as any)[plan] ?? 0), 0);
 
   const planBreakdown = PLAN_OPTIONS.map((plan) => {
-    const count = subscriptions.filter((s: any) => s.plan === plan).length;
-    const pct = subscriptions.length ? Math.round((count / subscriptions.length) * 100) : 0;
+    const count = Number((planCounts as any)[plan] ?? 0);
+    const pct = totalPlanCount ? Math.round((count / totalPlanCount) * 100) : 0;
     const variant = plan === "pro" ? "success" : plan === "enterprise" ? "info" : plan === "starter" ? "warning" : "default";
     return { plan, count, pct, variant };
   });
@@ -261,14 +334,21 @@ export const AdminDashboardPage = () => {
               <div className="overflow-x-auto">
                 <table className="data-table">
                   <thead><tr className="bg-muted/30">
-                    <th>Clinic</th><th>Plan</th><th>Users</th><th>Created</th>
+                    <th>Clinic</th><th>Plan</th><th>Created</th>
                   </tr></thead>
                   <tbody>
-                    {tenants.slice(0, 5).map((t: any) => {
-                      const sub = subscriptions.find((s: any) => s.tenant_id === t.id);
-                      const userCount = profiles.filter((p: any) => p.tenant_id === t.id).length;
+                    {recentTenants.map((t: any) => {
+                      const plan = t.plan ?? "free";
+                      const variant = plan === "pro" ? "success" : plan === "enterprise" ? "info" : "default";
                       return (
-                        <tr key={t.id} className="hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => navigate(`/tenant/${t.slug}/dashboard`)}>
+                        <tr
+                          key={t.id}
+                          className="hover:bg-muted/20 transition-colors cursor-pointer"
+                          onClick={() => {
+                            setTenantOverride({ id: t.id, slug: t.slug, name: t.name });
+                            navigate(`/tenant/${t.slug}/dashboard`);
+                          }}
+                        >
                           <td>
                             <div className="flex items-center gap-3">
                               <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">{t.name?.charAt(0)}</div>
@@ -278,8 +358,7 @@ export const AdminDashboardPage = () => {
                               </div>
                             </div>
                           </td>
-                          <td><StatusBadge variant={sub?.plan === "pro" ? "success" : sub?.plan === "enterprise" ? "info" : "default"}>{sub?.plan || "free"}</StatusBadge></td>
-                          <td>{userCount}</td>
+                          <td><StatusBadge variant={variant as any}>{plan}</StatusBadge></td>
                           <td className="text-muted-foreground">{formatDate(t.created_at, locale, "date")}</td>
                         </tr>
                       );
@@ -312,11 +391,18 @@ export const AdminDashboardPage = () => {
           <div className="animate-fade-in">
             <DataTable
               columns={clinicColumns}
-              data={filteredClinics}
+              data={tenants}
               keyExtractor={(c) => c.id}
               searchable
+              serverSearch
+              searchValue={clinicSearch}
+              onSearchChange={setClinicSearch}
               isLoading={loadingTenants}
               exportFileName="clinics"
+              page={clinicPage}
+              pageSize={pageSize}
+              total={tenantsResponse?.total}
+              onPageChange={setClinicPage}
               filterSlot={
                 <StatusFilter
                   options={PLAN_OPTIONS.map((p) => ({ value: p, label: p.charAt(0).toUpperCase() + p.slice(1) }))}
@@ -336,8 +422,15 @@ export const AdminDashboardPage = () => {
               data={profiles}
               keyExtractor={(p) => p.id}
               searchable
+              serverSearch
+              searchValue={userSearch}
+              onSearchChange={setUserSearch}
               isLoading={loadingProfiles}
               exportFileName="users"
+              page={userPage}
+              pageSize={pageSize}
+              total={profilesResponse?.total}
+              onPageChange={setUserPage}
             />
           </div>
         )}
@@ -347,11 +440,18 @@ export const AdminDashboardPage = () => {
           <div className="animate-fade-in">
             <DataTable
               columns={subColumns}
-              data={filteredSubs}
+              data={subscriptions}
               keyExtractor={(s) => s.id}
               searchable
+              serverSearch
+              searchValue={subSearch}
+              onSearchChange={setSubSearch}
               isLoading={loadingSubs}
               exportFileName="subscriptions"
+              page={subPage}
+              pageSize={pageSize}
+              total={subscriptionsResponse?.total}
+              onPageChange={setSubPage}
               filterSlot={
                 <StatusFilter
                   options={PLAN_OPTIONS.map((p) => ({ value: p, label: p.charAt(0).toUpperCase() + p.slice(1) }))}
@@ -379,3 +479,4 @@ export const AdminDashboardPage = () => {
     </div>
   );
 };
+
