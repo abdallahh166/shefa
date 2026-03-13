@@ -1,8 +1,11 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useI18n } from "@/core/i18n/i18nStore";
-import { useSupabaseTable } from "@/hooks/useSupabaseQuery";
-import { Tables } from "@/integrations/supabase/types";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/core/auth/authStore";
+import { searchService } from "@/services";
+import { queryKeys } from "@/services/queryKeys";
+import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import {
   CommandDialog,
   CommandEmpty,
@@ -11,18 +14,34 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Users, CalendarDays, Stethoscope, Receipt, Search } from "lucide-react";
+import { Users, Stethoscope, Receipt, Search } from "lucide-react";
 
 export const GlobalSearch = () => {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const { t } = useI18n();
   const navigate = useNavigate();
   const { clinicSlug } = useParams();
+  const { user } = useAuth();
+  const tenantId = user?.tenantId;
 
-  const { data: patients = [] } = useSupabaseTable<Tables<"patients">>("patients");
-  const { data: doctors = [] } = useSupabaseTable<Tables<"doctors">>("doctors");
-  const { data: appointments = [] } = useSupabaseTable<Tables<"appointments">>("appointments");
-  const { data: invoices = [] } = useSupabaseTable<Tables<"invoices">>("invoices");
+  const debouncedQuery = useDebouncedValue(query, 300);
+
+  const { data: results = [] } = useQuery({
+    queryKey: queryKeys.globalSearch.query(debouncedQuery, tenantId),
+    queryFn: async () => searchService.globalSearch({ term: debouncedQuery, limit: 8 }),
+    enabled: !!tenantId && debouncedQuery.trim().length >= 2,
+  });
+
+  const effectiveResults = query.trim().length < 2 ? [] : results;
+
+  const grouped = useMemo(() => {
+    return {
+      patients: effectiveResults.filter((r) => r.entity_type === "patient"),
+      doctors: effectiveResults.filter((r) => r.entity_type === "doctor"),
+      invoices: effectiveResults.filter((r) => r.entity_type === "invoice"),
+    };
+  }, [effectiveResults]);
 
   // Keyboard shortcut
   useEffect(() => {
@@ -58,41 +77,45 @@ export const GlobalSearch = () => {
       </button>
 
       <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder={t("common.search")} />
+        <CommandInput
+          placeholder={t("common.search")}
+          value={query}
+          onValueChange={setQuery}
+        />
         <CommandList>
-          <CommandEmpty>{t("common.noData")}</CommandEmpty>
+          <CommandEmpty>{query.trim().length < 2 ? t("common.search") : t("common.noData")}</CommandEmpty>
 
-          {patients.length > 0 && (
+          {grouped.patients.length > 0 && (
             <CommandGroup heading={t("common.patients")}>
-              {patients.slice(0, 8).map((p) => (
-                <CommandItem key={p.id} onSelect={() => go(`patients/${p.id}`)} className="gap-2">
+              {grouped.patients.map((p) => (
+                <CommandItem key={p.entity_id} onSelect={() => go(`patients/${p.entity_id}`)} className="gap-2">
                   <Users className="h-4 w-4 text-muted-foreground" />
-                  <span>{p.full_name}</span>
-                  <span className="text-xs text-muted-foreground ms-auto">{p.patient_code}</span>
+                  <span>{p.label}</span>
+                  <span className="text-xs text-muted-foreground ms-auto">{p.sublabel ?? ""}</span>
                 </CommandItem>
               ))}
             </CommandGroup>
           )}
 
-          {doctors.length > 0 && (
+          {grouped.doctors.length > 0 && (
             <CommandGroup heading={t("common.doctors")}>
-              {doctors.slice(0, 5).map((d) => (
-                <CommandItem key={d.id} onSelect={() => go("doctors")} className="gap-2">
+              {grouped.doctors.map((d) => (
+                <CommandItem key={d.entity_id} onSelect={() => go("doctors")} className="gap-2">
                   <Stethoscope className="h-4 w-4 text-muted-foreground" />
-                  <span>{d.full_name}</span>
-                  <span className="text-xs text-muted-foreground ms-auto">{d.specialty}</span>
+                  <span>{d.label}</span>
+                  <span className="text-xs text-muted-foreground ms-auto">{d.sublabel ?? ""}</span>
                 </CommandItem>
               ))}
             </CommandGroup>
           )}
 
-          {invoices.length > 0 && (
+          {grouped.invoices.length > 0 && (
             <CommandGroup heading={t("common.billing")}>
-              {invoices.slice(0, 5).map((inv) => (
-                <CommandItem key={inv.id} onSelect={() => go("billing")} className="gap-2">
+              {grouped.invoices.map((inv) => (
+                <CommandItem key={inv.entity_id} onSelect={() => go("billing")} className="gap-2">
                   <Receipt className="h-4 w-4 text-muted-foreground" />
-                  <span>{inv.invoice_code}</span>
-                  <span className="text-xs text-muted-foreground ms-auto">{inv.service}</span>
+                  <span>{inv.label}</span>
+                  <span className="text-xs text-muted-foreground ms-auto">{inv.sublabel ?? ""}</span>
                 </CommandItem>
               ))}
             </CommandGroup>

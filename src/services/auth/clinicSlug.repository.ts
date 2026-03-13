@@ -15,6 +15,9 @@ export const clinicSlugRepository: ClinicSlugRepository = {
     if (input.customSlug) {
       body.customSlug = input.customSlug;
     }
+    if (input.captchaToken) {
+      body.captchaToken = input.captchaToken;
+    }
 
     const { data, error } = await supabase.functions.invoke("check-slug", { body });
 

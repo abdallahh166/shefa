@@ -1,18 +1,23 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useI18n } from "@/core/i18n/i18nStore";
+import { useAuth } from "@/core/auth/authStore";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { labService } from "@/services/laboratory/lab.service";
+import { patientService } from "@/services/patients/patient.service";
+import { doctorService } from "@/services/doctors/doctor.service";
+import { queryKeys } from "@/services/queryKeys";
+import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import type { LabResultCreateInput } from "@/domain/lab/lab.types";
 
 interface NewLabOrderModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  patients: { id: string; full_name: string }[];
-  doctors: { id: string; full_name: string }[];
 }
 
 const TEST_OPTIONS = [
@@ -29,14 +34,55 @@ const TEST_OPTIONS = [
   "Hemoglobin",
 ];
 
-export const NewLabOrderModal = ({ open, onClose, onSuccess, patients, doctors }: NewLabOrderModalProps) => {
+export const NewLabOrderModal = ({ open, onClose, onSuccess }: NewLabOrderModalProps) => {
   const { t } = useI18n();
+  const { user } = useAuth();
+  const tenantId = user?.tenantId;
   const [loading, setLoading] = useState(false);
+  const [patientSearch, setPatientSearch] = useState("");
+  const [doctorSearch, setDoctorSearch] = useState("");
+  const debouncedPatientSearch = useDebouncedValue(patientSearch, 300);
+  const debouncedDoctorSearch = useDebouncedValue(doctorSearch, 300);
   const [form, setForm] = useState({
     patient_id: "",
     doctor_id: "",
     test_name: "Complete Blood Count (CBC)",
   });
+
+  const { data: patientPage } = useQuery({
+    queryKey: queryKeys.patients.list({
+      tenantId,
+      page: 1,
+      pageSize: 10,
+      search: debouncedPatientSearch.trim() || undefined,
+    }),
+    queryFn: async () =>
+      patientService.listPaged({
+        page: 1,
+        pageSize: 10,
+        search: debouncedPatientSearch.trim() || undefined,
+      }),
+    enabled: open && !!tenantId,
+  });
+
+  const { data: doctorPage } = useQuery({
+    queryKey: queryKeys.doctors.list({
+      tenantId,
+      page: 1,
+      pageSize: 10,
+      search: debouncedDoctorSearch.trim() || undefined,
+    }),
+    queryFn: async () =>
+      doctorService.listPaged({
+        page: 1,
+        pageSize: 10,
+        search: debouncedDoctorSearch.trim() || undefined,
+      }),
+    enabled: open && !!tenantId,
+  });
+
+  const patients = patientPage?.data ?? [];
+  const doctors = doctorPage?.data ?? [];
 
   if (!open) return null;
 
@@ -79,6 +125,11 @@ export const NewLabOrderModal = ({ open, onClose, onSuccess, patients, doctors }
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="space-y-2">
             <Label>{t("appointments.patient")} *</Label>
+            <Input
+              value={patientSearch}
+              onChange={(e) => setPatientSearch(e.target.value)}
+              placeholder={t("common.search")}
+            />
             <select
               value={form.patient_id}
               onChange={(e) => setForm({ ...form, patient_id: e.target.value })}
@@ -94,6 +145,11 @@ export const NewLabOrderModal = ({ open, onClose, onSuccess, patients, doctors }
           </div>
           <div className="space-y-2">
             <Label>{t("laboratory.orderedBy")} *</Label>
+            <Input
+              value={doctorSearch}
+              onChange={(e) => setDoctorSearch(e.target.value)}
+              placeholder={t("common.search")}
+            />
             <select
               value={form.doctor_id}
               onChange={(e) => setForm({ ...form, doctor_id: e.target.value })}

@@ -6,10 +6,12 @@ import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { ClinicNameField } from "@/features/auth/ClinicNameField";
 import { PasswordStrength } from "@/features/auth/PasswordStrength";
+import { authService } from "@/services/auth/auth.service";
+import { HCaptcha } from "@/shared/components/HCaptcha";
+import { env } from "@/core/env/env";
 
 type AuthMode = "login" | "signup";
 type SlugStatus = "idle" | "checking" | "available" | "taken" | "invalid";
@@ -26,6 +28,9 @@ export const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [slugStatus, setSlugStatus] = useState<SlugStatus>("idle");
   const [resolvedSlug, setResolvedSlug] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
+  const captchaSiteKey = env.VITE_CAPTCHA_SITE_KEY;
+  const captchaRequired = Boolean(captchaSiteKey);
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -45,13 +50,17 @@ export const LoginPage = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      toast({ title: t("auth.loginFailed"), description: error.message, variant: "destructive" });
+    try {
+      await authService.login(email, password);
+    } catch (err) {
+      toast({
+        title: t("auth.loginFailed"),
+        description: err instanceof Error ? err.message : t("common.error"),
+        variant: "destructive",
+      });
+    } finally {
       setLoading(false);
-      return;
     }
-    setLoading(false);
   };
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -80,24 +89,35 @@ export const LoginPage = () => {
       });
       return;
     }
-    setLoading(true);
-
-    const { data, error } = await supabase.functions.invoke("register-clinic", {
-      body: { clinicName, fullName, email, password, slug: resolvedSlug },
-    });
-
-    if (error || data?.error) {
+    if (captchaRequired && !captchaToken) {
       toast({
         title: t("auth.signupFailed"),
-        description: error?.message ?? data?.error ?? "Failed to create clinic",
+        description: t("auth.completeCaptcha") || "Please complete the captcha verification.",
         variant: "destructive",
       });
-      setLoading(false);
       return;
     }
-
-    toast({ title: t("auth.checkEmail"), description: t("auth.confirmationSent") });
-    setLoading(false);
+    setLoading(true);
+    try {
+      await authService.registerClinic({
+        clinicName,
+        fullName,
+        email,
+        password,
+        slug: resolvedSlug,
+        captchaToken,
+      });
+      toast({ title: t("auth.checkEmail"), description: t("auth.confirmationSent") });
+      setCaptchaToken("");
+    } catch (err) {
+      toast({
+        title: t("auth.signupFailed"),
+        description: err instanceof Error ? err.message : t("common.error"),
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const isSignupDisabled =
@@ -154,6 +174,8 @@ export const LoginPage = () => {
                   onClinicNameChange={setClinicName}
                   onSlugStatusChange={handleSlugStatusChange}
                   t={t}
+                  captchaToken={captchaToken}
+                  captchaRequired={captchaRequired}
                 />
               </>
             )}
@@ -176,6 +198,15 @@ export const LoginPage = () => {
               />
               {mode === "signup" && <PasswordStrength password={password} t={t} />}
             </div>
+            {mode === "signup" && captchaSiteKey && (
+              <div className="pt-2">
+                <HCaptcha
+                  siteKey={captchaSiteKey}
+                  onVerify={(token) => setCaptchaToken(token)}
+                  onExpire={() => setCaptchaToken("")}
+                />
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={mode === "signup" ? isSignupDisabled : loading}>
               {loading ? t("common.loading") : mode === "login" ? t("auth.login") : t("auth.createAccount")}
             </Button>

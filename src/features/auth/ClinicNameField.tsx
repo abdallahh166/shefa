@@ -11,6 +11,8 @@ interface ClinicNameFieldProps {
   onClinicNameChange: (name: string) => void;
   onSlugStatusChange: (status: SlugStatus, slug: string) => void;
   t: (key: string) => string;
+  captchaToken?: string;
+  captchaRequired?: boolean;
 }
 
 export const ClinicNameField = ({
@@ -18,6 +20,8 @@ export const ClinicNameField = ({
   onClinicNameChange,
   onSlugStatusChange,
   t,
+  captchaToken,
+  captchaRequired,
 }: ClinicNameFieldProps) => {
   const [slugStatus, setSlugStatus] = useState<SlugStatus>("idle");
   const [slugPreview, setSlugPreview] = useState("");
@@ -42,6 +46,11 @@ export const ClinicNameField = ({
         setSuggestions([]);
         return;
       }
+      if (captchaRequired && !captchaToken) {
+        updateStatus("idle", "");
+        setSuggestions([]);
+        return;
+      }
 
       setSlugStatus("checking");
 
@@ -49,6 +58,7 @@ export const ClinicNameField = ({
         const data = await clinicSlugService.checkSlug({
           clinicName: name.trim(),
           customSlug: slug,
+          captchaToken: captchaToken || undefined,
         });
 
         if (data?.error || !data?.slug) {
@@ -66,7 +76,7 @@ export const ClinicNameField = ({
         updateStatus("idle", "");
       }
     },
-    [updateStatus],
+    [updateStatus, captchaRequired, captchaToken],
   );
 
   const handleClinicNameChange = (value: string) => {

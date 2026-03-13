@@ -14,10 +14,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { formatDate, formatCurrency } from "@/shared/utils/formatDate";
 import { billingService } from "@/services/billing/billing.service";
-import { patientService } from "@/services/patients/patient.service";
 import { queryKeys } from "@/services/queryKeys";
 import type { InvoiceWithPatient } from "@/domain/billing/billing.types";
-import type { Patient } from "@/domain/patient/patient.types";
 
 const statusVariant = { paid: "success", pending: "warning", overdue: "destructive" } as const;
 
@@ -65,14 +63,6 @@ export const BillingPage = () => {
     }),
     enabled: !!user?.tenantId,
   });
-
-  const { data: patientPage } = useQuery({
-    queryKey: queryKeys.patients.list({ tenantId: user?.tenantId, page: 1, pageSize: 500 }),
-    queryFn: async () => patientService.listPaged({ page: 1, pageSize: 500, sort: { column: "full_name", ascending: true } }),
-    enabled: !!user?.tenantId,
-  });
-
-  const patients: Patient[] = patientPage?.data ?? [];
 
   useEffect(() => {
     setPage(1);
@@ -214,7 +204,6 @@ export const BillingPage = () => {
         onSuccess={() => {
           invalidateInvoices();
         }}
-        patients={patients.map((p) => ({ id: p.id, full_name: p.full_name }))}
       />
     </div>
   );

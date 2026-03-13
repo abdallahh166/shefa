@@ -10,3 +10,8 @@ export interface ListParams {
   filters?: Record<string, unknown>;
   sort?: { column: string; ascending?: boolean };
 }
+
+export interface LimitOffsetParams {
+  limit?: number;
+  offset?: number;
+}

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/core/auth/authStore";
+import { subscriptionService } from "@/services/subscription/subscription.service";
 
 export type PlanType = "free" | "starter" | "pro" | "enterprise";
 
@@ -64,20 +64,10 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     const fetchSubscription = async () => {
       setState((s) => ({ ...s, isLoading: true }));
 
-      try {
-        const { data, error } = await supabase
-          .from("subscriptions")
-          .select("plan, status, expires_at")
-          .eq("tenant_id", user.tenantId)
-          .single();
+        try {
+        const data = await subscriptionService.getByTenant(user.tenantId);
 
         if (controller.signal.aborted) return;
-
-        if (error) {
-          console.warn("Subscription fetch error:", error.message);
-          setState({ ...defaultState, isLoading: false });
-          return;
-        }
 
         if (!data) {
           setState({ ...defaultState, isLoading: false });

@@ -6,7 +6,7 @@ import type {
   InvoiceUpdateInput,
   InvoiceWithPatient,
 } from "@/domain/billing/billing.types";
-import type { PagedResult } from "@/domain/shared/pagination.types";
+import type { LimitOffsetParams, PagedResult } from "@/domain/shared/pagination.types";
 import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
@@ -33,7 +33,8 @@ export interface BillingRepository {
   listPagedWithRelations(params: InvoiceListParams, tenantId: string): Promise<PagedResult<InvoiceWithPatient>>;
   getSummary(tenantId: string): Promise<InvoiceSummary>;
   countInRange(start: string, end: string, tenantId: string): Promise<number>;
-  listByPatient(patientId: string, tenantId: string): Promise<Invoice[]>;
+  listByDateRange(start: string, end: string, tenantId: string, params?: LimitOffsetParams): Promise<Invoice[]>;
+  listByPatient(patientId: string, tenantId: string, params?: LimitOffsetParams): Promise<Invoice[]>;
   create(input: InvoiceCreateInput, tenantId: string): Promise<Invoice>;
   update(id: string, input: InvoiceUpdateInput, tenantId: string): Promise<Invoice>;
 }
@@ -157,13 +158,37 @@ export const billingRepository: BillingRepository = {
 
     return count ?? 0;
   },
-  async listByPatient(patientId, tenantId) {
+  async listByDateRange(start, end, tenantId, params) {
+    const limit = params?.limit ?? 50;
+    const offset = params?.offset ?? 0;
+    const { data, error } = await supabase
+      .from("invoices")
+      .select(INVOICE_COLUMNS)
+      .eq("tenant_id", tenantId)
+      .gte("invoice_date", start)
+      .lte("invoice_date", end)
+      .order("invoice_date", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to load invoices", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return (data ?? []) as Invoice[];
+  },
+  async listByPatient(patientId, tenantId, params) {
+    const limit = params?.limit ?? 50;
+    const offset = params?.offset ?? 0;
     const { data, error } = await supabase
       .from("invoices")
       .select(INVOICE_COLUMNS)
       .eq("tenant_id", tenantId)
       .eq("patient_id", patientId)
-      .order("invoice_date", { ascending: false });
+      .order("invoice_date", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load patient invoices", {

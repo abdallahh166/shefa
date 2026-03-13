@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { enforceCors, getAllowedOriginsFromEnv } from "../_shared/cors.ts";
+import { enforceCors, getAllowedOriginsFromEnv, buildRedirectUrl } from "../_shared/cors.ts";
+import { verifyCaptcha } from "../_shared/captcha.ts";
 
 const allowedOrigins = getAllowedOriginsFromEnv();
 
@@ -16,9 +17,46 @@ function isValidSlug(value: string) {
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
 }
 
+async function sendVerificationEmail(
+  apiKey: string,
+  to: string,
+  actionLink: string,
+  clinicName: string,
+  fullName: string,
+) {
+  const subject = "Confirm your clinic account";
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>Welcome to ${clinicName}</h2>
+      <p>Hi ${fullName},</p>
+      <p>Please confirm your email address to activate your clinic account.</p>
+      <p><a href="${actionLink}" target="_blank" rel="noreferrer">Verify your email</a></p>
+      <p>If you did not request this, you can ignore this email.</p>
+    </div>
+  `;
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "Clinic Onboarding <onboarding@resend.dev>",
+      to: [to],
+      subject,
+      html,
+    }),
+  });
+
+  return res.ok;
+}
+
 // --- Durable rate limiter (DB-backed) ---
 const RATE_LIMIT_WINDOW_SECONDS = 60;
-const RATE_LIMIT_MAX = 5; // stricter for signup
+const RATE_LIMIT_MAX = 3; // stricter for signup
+const EMAIL_RATE_LIMIT_WINDOW_SECONDS = 60 * 60; // 1 hour
+const EMAIL_RATE_LIMIT_MAX = 2;
 
 Deno.serve(async (req) => {
   const { corsHeaders, errorResponse } = enforceCors(req, {
@@ -80,10 +118,24 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { clinicName, fullName, email, password, slug: requestedSlug } =
-      await req.json();
+    const {
+      clinicName,
+      fullName,
+      email,
+      password,
+      slug: requestedSlug,
+      captchaToken,
+    } = await req.json();
     if (!clinicName || !fullName || !email || !password) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const captchaResult = await verifyCaptcha(captchaToken, clientIp);
+    if (!captchaResult.ok) {
+      return new Response(JSON.stringify({ error: captchaResult.error ?? "Captcha verification failed" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -95,6 +147,36 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    const { data: emailAllowed, error: emailRateError } = await adminClient.rpc(
+      "check_rate_limit",
+      {
+        _key: `register-clinic-email:${normalizedEmail}`,
+        _max_hits: EMAIL_RATE_LIMIT_MAX,
+        _window_seconds: EMAIL_RATE_LIMIT_WINDOW_SECONDS,
+      },
+    );
+
+    if (emailRateError) {
+      return new Response(JSON.stringify({ error: "Rate limiter unavailable" }), {
+        status: 503,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!emailAllowed) {
+      return new Response(
+        JSON.stringify({ error: "Too many requests for this email. Please try again later." }),
+        {
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "Retry-After": "3600",
+          },
+        },
+      );
     }
 
     const normalizedFullName = String(fullName).trim();
@@ -176,20 +258,53 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { error: createErr } = await adminClient.auth.admin.createUser({
+    const resendApiKey = Deno.env.get("RESEND_API_KEY");
+    if (!resendApiKey) {
+      await adminClient.from("tenants").delete().eq("id", tenant.id);
+      return new Response(JSON.stringify({ error: "Email provider not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const redirectTo = buildRedirectUrl(req, "/login", allowedOrigins);
+
+    const { data: linkData, error: linkErr } = await adminClient.auth.admin.generateLink({
+      type: "signup",
       email: normalizedEmail,
       password: passwordStr,
-      email_confirm: false,
-      user_metadata: {
-        full_name: normalizedFullName,
-        tenant_id: tenant.id,
+      options: {
+        data: {
+          full_name: normalizedFullName,
+          tenant_id: tenant.id,
+        },
+        redirectTo,
       },
     });
 
-    if (createErr) {
+    if (linkErr || !linkData?.action_link) {
       await adminClient.from("tenants").delete().eq("id", tenant.id);
-      return new Response(JSON.stringify({ error: createErr.message }), {
+      return new Response(JSON.stringify({ error: linkErr?.message ?? "Failed to create user" }), {
         status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const emailSent = await sendVerificationEmail(
+      resendApiKey,
+      normalizedEmail,
+      linkData.action_link,
+      normalizedClinicName,
+      normalizedFullName,
+    );
+
+    if (!emailSent) {
+      if (linkData?.user?.id) {
+        await adminClient.auth.admin.deleteUser(linkData.user.id);
+      }
+      await adminClient.from("tenants").delete().eq("id", tenant.id);
+      return new Response(JSON.stringify({ error: "Failed to send verification email" }), {
+        status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -197,7 +312,7 @@ Deno.serve(async (req) => {
     // Audit log
     await adminClient.rpc("log_audit_event", {
       _tenant_id: tenant.id,
-      _user_id: "00000000-0000-0000-0000-000000000000",
+      _user_id: linkData?.user?.id ?? "00000000-0000-0000-0000-000000000000",
       _action: "clinic_created",
       _entity_type: "tenant",
       _entity_id: tenant.id,

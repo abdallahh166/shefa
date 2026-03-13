@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
 import { useI18n } from "@/core/i18n/i18nStore";
+import { authService } from "@/services/auth/auth.service";
 
 export const ForgotPasswordPage = () => {
   const { t } = useI18n();
@@ -19,15 +19,18 @@ export const ForgotPasswordPage = () => {
     e.preventDefault();
     if (!email) return;
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    if (error) {
-      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
-    } else {
+    try {
+      await authService.resetPassword(email, `${window.location.origin}/reset-password`);
       setSent(true);
+    } catch (err) {
+      toast({
+        title: t("common.error"),
+        description: err instanceof Error ? err.message : t("common.error"),
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (

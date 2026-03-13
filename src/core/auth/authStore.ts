@@ -1,10 +1,14 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { supabase } from "@/integrations/supabase/client";
-import type { User as SupaUser } from "@supabase/supabase-js";
 import { profileStorage } from "@/services/settings/profile.storage";
+import { authService } from "@/services/auth/auth.service";
 
 export type Role = "super_admin" | "clinic_admin" | "doctor" | "receptionist" | "nurse" | "accountant";
+
+type SupaUser = {
+  id: string;
+  email?: string | null;
+};
 
 export type Permission =
   | "manage_clinic" | "manage_users" | "view_dashboard"
@@ -86,7 +90,7 @@ export const useAuth = create<AuthState>()(
       }),
       setLoading: (isLoading) => set({ isLoading }),
       logout: async () => {
-        await supabase.auth.signOut();
+        await authService.logout();
         set({ user: null, supabaseUser: null, isAuthenticated: false });
       },
       hasPermission: (permission) => {
@@ -102,13 +106,13 @@ export const useAuth = create<AuthState>()(
         );
         try {
           const sessionResult = await Promise.race([
-            supabase.auth.getSession(),
+            authService.getSessionUser(),
             timeout,
           ]);
-          const session = (sessionResult as any).data?.session;
-          if (session?.user) {
+          const supaUser = sessionResult as SupaUser | null;
+          if (supaUser) {
             await Promise.race([
-              loadUserProfile(session.user, set),
+              loadUserProfile(supaUser, set),
               timeout,
             ]);
           } else {
@@ -135,21 +139,8 @@ async function loadUserProfile(
   supaUser: SupaUser,
   set: (partial: Partial<AuthState>) => void
 ) {
-  // Get profile
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, user_id, tenant_id, full_name, avatar_url, tenants:tenant_id(name, slug)")
-    .eq("user_id", supaUser.id)
-    .single();
-
-  // Get role
-  const { data: roleData } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", supaUser.id)
-    .single();
-
-  if (profile && roleData) {
+  const { profile, role } = await authService.loadUserProfile(supaUser.id);
+  if (profile && role) {
     const tenant = profile.tenants as any;
     let avatarUrl: string | undefined = profile.avatar_url ?? undefined;
 
@@ -166,7 +157,7 @@ async function loadUserProfile(
         id: supaUser.id,
         name: profile.full_name,
         email: supaUser.email ?? "",
-        role: roleData.role as Role,
+        role: role as Role,
         tenantId: profile.tenant_id,
         tenantSlug: tenant?.slug ?? "default",
         tenantName: tenant?.name ?? "Clinic",
@@ -181,11 +172,11 @@ async function loadUserProfile(
 }
 
 // Listen for auth changes
-supabase.auth.onAuthStateChange(async (event, session) => {
+authService.onAuthStateChange(async (event, sessionUser) => {
   const { setUser, setLoading } = useAuth.getState();
-  if (event === "SIGNED_IN" && session?.user) {
+  if (event === "SIGNED_IN" && sessionUser) {
     setLoading(true);
-    await loadUserProfile(session.user, (partial) => {
+    await loadUserProfile(sessionUser as SupaUser, (partial) => {
       if (partial.user) {
         setUser(partial.user, partial.supabaseUser);
       } else {

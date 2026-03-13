@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enforceCors, getAllowedOriginsFromEnv } from "../_shared/cors.ts";
+import { verifyCaptcha } from "../_shared/captcha.ts";
 
 const allowedOrigins = getAllowedOriginsFromEnv();
 
@@ -14,7 +15,7 @@ const SUFFIXES = ["clinic", "health", "med", "care", "plus"];
 
 // --- Durable rate limiter (DB-backed) ---
 const RATE_LIMIT_WINDOW_SECONDS = 60; // 1 minute
-const RATE_LIMIT_MAX = 20; // max requests per IP per window
+const RATE_LIMIT_MAX = 10; // max requests per IP per window
 
 async function findAvailableSlugs(
   adminClient: ReturnType<typeof createClient>,
@@ -102,6 +103,15 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const clinicName = body.clinicName;
     const customSlug = body.customSlug; // optional: user-provided custom slug
+    const captchaToken = body.captchaToken;
+
+    const captchaResult = await verifyCaptcha(captchaToken, clientIp);
+    if (!captchaResult.ok) {
+      return new Response(JSON.stringify({ error: captchaResult.error ?? "Captcha verification failed" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const slugToCheck = customSlug
       ? slugify(String(customSlug).trim())
@@ -137,7 +147,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (data) {
-      // Slug is taken — generate suggestions
+      // Slug is taken â€” generate suggestions
       const baseSlug = customSlug ? slugToCheck : slugify(String(clinicName).trim());
       const suggestions = await findAvailableSlugs(adminClient, baseSlug);
       return new Response(
@@ -157,3 +167,4 @@ Deno.serve(async (req) => {
     );
   }
 });
+

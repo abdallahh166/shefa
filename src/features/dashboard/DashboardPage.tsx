@@ -1,24 +1,17 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { StatCard } from "@/shared/components/StatCard";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { Users, CalendarDays, Stethoscope, DollarSign, Activity } from "lucide-react";
-import { useSupabaseTable } from "@/hooks/useSupabaseQuery";
 import { useAuth } from "@/core/auth/authStore";
-import { Tables } from "@/integrations/supabase/types";
-import { formatDate, formatCurrency } from "@/shared/utils/formatDate";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { formatCurrency } from "@/shared/utils/formatDate";
+import { reportService } from "@/services";
+import { queryKeys } from "@/services/queryKeys";
 import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
-
-type Appointment = Tables<"appointments"> & {
-  patients?: { full_name: string } | null;
-  doctors?: { full_name: string } | null;
-};
-
-type DateRange = "today" | "week" | "month" | "all";
 
 const statusVariant: Record<string, "success" | "info" | "default" | "destructive"> = {
   completed: "success",
@@ -32,70 +25,48 @@ const COLORS = [
   "hsl(38, 92%, 50%)", "hsl(0, 72%, 51%)",
 ];
 
-function getDateRangeStart(range: DateRange): Date | null {
-  const now = new Date();
-  switch (range) {
-    case "today": return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    case "week": { const d = new Date(now); d.setDate(d.getDate() - 7); return d; }
-    case "month": { const d = new Date(now); d.setMonth(d.getMonth() - 1); return d; }
-    case "all": return null;
-  }
-}
-
 export const DashboardPage = () => {
-  const { t, locale, calendarType } = useI18n();
+  const { t, locale } = useI18n();
   const { user } = useAuth();
-  const [dateRange, setDateRange] = useState<DateRange>("month");
-
-  const { data: patients = [] } = useSupabaseTable<Tables<"patients">>("patients");
-  const { data: doctors = [] } = useSupabaseTable<Tables<"doctors">>("doctors");
-  const { data: appointments = [] } = useSupabaseTable<Appointment>("appointments", {
-    select: "*, patients(full_name), doctors(full_name)",
-    orderBy: { column: "appointment_date", ascending: false },
+  const tenantId = user?.tenantId;
+  const { data: overview } = useQuery({
+    queryKey: queryKeys.reports.overview(tenantId),
+    queryFn: () => reportService.getOverview(),
+    enabled: !!tenantId,
   });
-  const { data: invoices = [] } = useSupabaseTable<Tables<"invoices">>("invoices");
 
-  const rangeStart = getDateRangeStart(dateRange);
+  const { data: revenueTrend = [] } = useQuery({
+    queryKey: queryKeys.reports.revenueByMonth(tenantId),
+    queryFn: () => reportService.getRevenueByMonth(6),
+    enabled: !!tenantId,
+  });
 
-  const filteredAppointments = useMemo(() => {
-    if (!rangeStart) return appointments;
-    return appointments.filter((a) => new Date(a.appointment_date) >= rangeStart);
-  }, [appointments, rangeStart]);
+  const { data: apptTypes = [] } = useQuery({
+    queryKey: queryKeys.reports.appointmentTypes(tenantId),
+    queryFn: () => reportService.getAppointmentTypes(),
+    enabled: !!tenantId,
+  });
 
-  const filteredInvoices = useMemo(() => {
-    if (!rangeStart) return invoices;
-    return invoices.filter((i) => new Date(i.invoice_date) >= rangeStart);
-  }, [invoices, rangeStart]);
+  const { data: statusCounts = { scheduled: 0, in_progress: 0, completed: 0, cancelled: 0 } } = useQuery({
+    queryKey: queryKeys.reports.appointmentStatuses(tenantId),
+    queryFn: () => reportService.getAppointmentStatusCounts(),
+    enabled: !!tenantId,
+  });
 
-  const totalPatients = String(patients.length);
-  const periodAppointments = String(filteredAppointments.length);
-  const activeDoctors = String(doctors.filter((d) => d.status === "available").length);
-  const revenue = formatCurrency(
-    filteredInvoices.filter((i) => i.status === "paid").reduce((s, i) => s + Number(i.amount), 0),
-    locale,
+  const totalPatients = overview?.total_patients ?? 0;
+  const totalAppointments = overview?.total_appointments ?? 0;
+  const averageRating = overview?.avg_doctor_rating ?? 0;
+  const totalRevenue = overview?.total_revenue ?? 0;
+
+  const statusRows = useMemo(
+    () => ([
+      { status: "scheduled", label: t("appointments.scheduled"), count: statusCounts.scheduled },
+      { status: "in_progress", label: t("appointments.inProgress"), count: statusCounts.in_progress },
+      { status: "completed", label: t("appointments.completed"), count: statusCounts.completed },
+      { status: "cancelled", label: t("appointments.cancelled"), count: statusCounts.cancelled },
+    ]),
+    [statusCounts, t],
   );
-
-  const recentList = filteredAppointments.slice(0, 5).map((a) => ({
-  id: a.id,
-  patient: a.patients?.full_name ?? "-",
-  doctor: a.doctors?.full_name ?? "-",
-  time: formatDate(a.appointment_date, locale, "time", calendarType),
-  status: a.status,
-}));
-  const revenueTrend = useMemo(() => {    const months: Record<string, number> = {};
-    invoices.forEach((inv) => {
-      if (inv.status === "paid") {
-        const key = new Date(inv.invoice_date).toLocaleString("en", { month: "short" });
-        months[key] = (months[key] || 0) + Number(inv.amount);
-      }
-    });
-    return Object.entries(months).map(([month, revenue]) => ({ month, revenue }));
-  }, [invoices]);
-
-  const apptTypes = useMemo(() => {    const types: Record<string, number> = {};
-    appointments.forEach((a) => { types[a.type] = (types[a.type] || 0) + 1; });
-    return Object.entries(types).map(([name, value]) => ({ name: name.replace("_", " "), value }));
-  }, [appointments]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -104,24 +75,13 @@ export const DashboardPage = () => {
           <h1 className="page-title">{t("dashboard.title")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{t("dashboard.welcomeBack") || "Welcome back"}, {user?.name?.split(" ")[0] ?? ""}</p>
         </div>
-        <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="today">{t("dashboard.rangeToday")}</SelectItem>
-            <SelectItem value="week">{t("dashboard.rangeWeek")}</SelectItem>
-            <SelectItem value="month">{t("dashboard.rangeMonth")}</SelectItem>
-            <SelectItem value="all">{t("dashboard.rangeAll")}</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title={t("dashboard.totalPatients")} value={totalPatients} icon={Users} accent="primary" />
-        <StatCard title={t("dashboard.periodAppointments")} value={periodAppointments} icon={CalendarDays} accent="info" />
-        <StatCard title={t("dashboard.activeDoctors")} value={activeDoctors} icon={Stethoscope} accent="success" />
-        <StatCard title={t("dashboard.periodRevenue")} value={revenue} icon={DollarSign} accent="warning" />
+        <StatCard title={t("reports.totalAppointments")} value={String(totalAppointments)} icon={CalendarDays} accent="info" />
+        <StatCard title={t("reports.avgDoctorRating")} value={averageRating ? Number(averageRating).toFixed(1) : "0.0"} icon={Stethoscope} accent="success" />
+        <StatCard title={t("dashboard.periodRevenue")} value={formatCurrency(Number(totalRevenue), locale)} icon={DollarSign} accent="warning" />
       </div>
 
       {/* Charts Row */}
@@ -166,48 +126,24 @@ export const DashboardPage = () => {
         </div>
       </div>
 
-      {/* Recent Appointments */}
-      <div className="bg-card rounded-xl border">
-        <div className="px-5 py-4 border-b flex items-center justify-between">
-          <h2 className="font-semibold">{t("dashboard.recentAppointments")}</h2>
-          <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">{recentList.length} {t("common.appointments").toLowerCase()}</span>
+      {/* Appointment Status Summary */}
+      <div className="bg-card rounded-xl border p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold">{t("reports.appointmentStatusDistribution")}</h2>
+          <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
+            {String(totalAppointments)} {t("reports.appointments")}
+          </span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead>
-              <tr className="bg-muted/30">
-                <th>{t("appointments.patient")}</th>
-                <th>{t("appointments.doctor")}</th>
-                <th>{t("appointments.dateTime")}</th>
-                <th>{t("common.status")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentList.map((apt) => (
-                <tr key={apt.id} className="hover:bg-muted/20 transition-colors">
-                  <td className="font-medium">{apt.patient}</td>
-                  <td>{apt.doctor}</td>
-                  <td className="text-muted-foreground">{apt.time}</td>
-                  <td>
-                    <StatusBadge variant={statusVariant[apt.status] ?? "default"}>
-                      {apt.status === "completed"
-                        ? t("appointments.completed")
-                        : apt.status === "in_progress"
-                          ? t("appointments.inProgress")
-                          : apt.status === "cancelled"
-                            ? t("appointments.cancelled")
-                            : t("appointments.scheduled")}
-                    </StatusBadge>
-                  </td>
-                </tr>
-              ))}
-              {recentList.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="text-center py-8 text-muted-foreground">{t("common.noData")}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="space-y-3">
+          {statusRows.map((row) => (
+            <div key={row.status} className="flex items-center justify-between">
+              <StatusBadge variant={statusVariant[row.status] ?? "default"}>{row.label}</StatusBadge>
+              <span className="text-sm font-semibold">{row.count}</span>
+            </div>
+          ))}
+          {statusRows.every((r) => r.count === 0) && (
+            <div className="text-sm text-muted-foreground">{t("common.noData")}</div>
+          )}
         </div>
       </div>
     </div>

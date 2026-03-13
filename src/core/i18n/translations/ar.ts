@@ -363,6 +363,7 @@ export const ar = {
 
     loginFailed: "فشل تسجيل الدخول",
     signupFailed: "فشل إنشاء الحساب",
+    completeCaptcha: "يرجى إكمال التحقق من الكابتشا.",
     passwordStrength: "قوة كلمة المرور",
     strength: {
       veryWeak: "ضعيفة جداً",

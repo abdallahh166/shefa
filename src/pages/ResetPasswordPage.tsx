@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
+import { authService } from "@/services/auth/auth.service";
 
 export const ResetPasswordPage = () => {
   const { t } = useI18n();
@@ -24,15 +24,13 @@ export const ResetPasswordPage = () => {
     }
 
     // Listen for PASSWORD_RECOVERY event
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
+    const unsubscribe = authService.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") {
         setIsRecovery(true);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,14 +44,19 @@ export const ResetPasswordPage = () => {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    if (error) {
-      toast({ title: t("common.error"), description: error.message, variant: "destructive" });
-    } else {
+    try {
+      await authService.updatePassword(password);
       toast({ title: t("auth.passwordUpdated"), description: t("auth.passwordUpdatedDesc") });
       navigate("/login");
+    } catch (err) {
+      toast({
+        title: t("common.error"),
+        description: err instanceof Error ? err.message : t("common.error"),
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (!isRecovery) {

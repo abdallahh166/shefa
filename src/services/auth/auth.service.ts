@@ -1,0 +1,98 @@
+import { z } from "zod";
+import { toServiceError } from "@/services/supabase/errors";
+import { uuidSchema } from "@/domain/shared/identifiers.schema";
+import { authRepository } from "./auth.repository";
+import { env } from "@/core/env/env";
+
+const emailSchema = z.string().trim().email();
+const passwordSchema = z.string().min(8).max(128);
+const nonEmptySchema = z.string().trim().min(2).max(120);
+const slugSchema = z.string().trim().min(2).max(60);
+
+export const authService = {
+  async login(email: string, password: string) {
+    try {
+      const parsedEmail = emailSchema.parse(email);
+      const parsedPassword = z.string().min(1).parse(password);
+      await authRepository.signInWithPassword(parsedEmail, parsedPassword);
+    } catch (err) {
+      throw toServiceError(err, "Login failed");
+    }
+  },
+  async logout() {
+    try {
+      await authRepository.signOut();
+    } catch (err) {
+      throw toServiceError(err, "Failed to sign out");
+    }
+  },
+  async getSessionUser() {
+    try {
+      const result = await authRepository.getSession();
+      return result.user ?? null;
+    } catch (err) {
+      throw toServiceError(err, "Failed to load session");
+    }
+  },
+  onAuthStateChange(handler: (event: string, user?: { id: string; email?: string | null } | null) => void) {
+    return authRepository.onAuthStateChange(handler);
+  },
+  async resetPassword(email: string, redirectTo: string) {
+    try {
+      const parsedEmail = emailSchema.parse(email);
+      await authRepository.resetPasswordForEmail(parsedEmail, redirectTo);
+    } catch (err) {
+      throw toServiceError(err, "Failed to send reset email");
+    }
+  },
+  async updatePassword(password: string) {
+    try {
+      const parsedPassword = passwordSchema.parse(password);
+      await authRepository.updatePassword(parsedPassword);
+    } catch (err) {
+      throw toServiceError(err, "Failed to update password");
+    }
+  },
+  async loadUserProfile(userId: string) {
+    try {
+      const parsedUserId = uuidSchema.parse(userId);
+      const profile = await authRepository.getProfileByUserId(parsedUserId);
+      const role = await authRepository.getRoleByUserId(parsedUserId);
+      return { profile, role };
+    } catch (err) {
+      throw toServiceError(err, "Failed to load user profile");
+    }
+  },
+  async registerClinic(input: {
+    clinicName: string;
+    fullName: string;
+    email: string;
+    password: string;
+    slug: string;
+    captchaToken?: string;
+  }) {
+    try {
+      const captchaRequired = Boolean(env.VITE_CAPTCHA_SITE_KEY);
+      const token = typeof input.captchaToken === "string" ? input.captchaToken.trim() : "";
+      if (captchaRequired && !token) {
+        throw new Error("Captcha verification required");
+      }
+      const payload = {
+        clinicName: nonEmptySchema.parse(input.clinicName),
+        fullName: nonEmptySchema.parse(input.fullName),
+        email: emailSchema.parse(input.email),
+        password: passwordSchema.parse(input.password),
+        slug: slugSchema.parse(input.slug),
+        captchaToken: token || undefined,
+      };
+      const data = await authRepository.registerClinic(payload);
+      const error = (data as any)?.error;
+      if (error) {
+        throw new Error(error);
+      }
+      return data;
+    } catch (err) {
+      throw toServiceError(err, "Failed to create clinic");
+    }
+  },
+};

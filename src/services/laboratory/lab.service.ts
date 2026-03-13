@@ -9,6 +9,8 @@ import {
 } from "@/domain/lab/lab.schema";
 import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import type { LabResultCreateInput, LabResultListParams, LabResultUpdateInput } from "@/domain/lab/lab.types";
+import type { LimitOffsetParams } from "@/domain/shared/pagination.types";
+import { limitOffsetSchema } from "@/domain/shared/pagination.schema";
 import { toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { labRepository } from "./lab.repository";
@@ -53,11 +55,12 @@ export const labService = {
       throw toServiceError(err, "Failed to load lab order counts");
     }
   },
-  async listByPatient(patientId: string) {
+  async listByPatient(patientId: string, params?: LimitOffsetParams) {
     try {
       const parsedId = uuidSchema.parse(patientId);
+      const paging = limitOffsetSchema.parse(params ?? {});
       const { tenantId } = getTenantContext();
-      const result = await labRepository.listByPatient(parsedId, tenantId);
+      const result = await labRepository.listByPatient(parsedId, tenantId, paging);
       return z.array(labOrderWithDoctorSchema).parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to load patient lab orders");

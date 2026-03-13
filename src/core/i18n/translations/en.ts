@@ -364,6 +364,7 @@ export const en = {
     slugUrl: "Your clinic URL:",
     loginFailed: "Login failed",
     signupFailed: "Signup failed",
+    completeCaptcha: "Please complete the captcha verification.",
     passwordStrength: "Password strength",
     strength: {
       veryWeak: "Very weak",

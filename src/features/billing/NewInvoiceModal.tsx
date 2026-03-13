@@ -1,28 +1,54 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useI18n } from "@/core/i18n/i18nStore";
+import { useAuth } from "@/core/auth/authStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { billingService } from "@/services/billing/billing.service";
+import { patientService } from "@/services/patients/patient.service";
+import { queryKeys } from "@/services/queryKeys";
+import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import type { InvoiceCreateInput } from "@/domain/billing/billing.types";
 
 interface NewInvoiceModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  patients: { id: string; full_name: string }[];
 }
 
-export const NewInvoiceModal = ({ open, onClose, onSuccess, patients }: NewInvoiceModalProps) => {
+export const NewInvoiceModal = ({ open, onClose, onSuccess }: NewInvoiceModalProps) => {
   const { t } = useI18n();
+  const { user } = useAuth();
+  const tenantId = user?.tenantId;
   const [loading, setLoading] = useState(false);
+  const [patientSearch, setPatientSearch] = useState("");
+  const debouncedPatientSearch = useDebouncedValue(patientSearch, 300);
   const [form, setForm] = useState({
     patient_id: "",
     service: "",
     amount: "",
   });
+
+  const { data: patientPage } = useQuery({
+    queryKey: queryKeys.patients.list({
+      tenantId,
+      page: 1,
+      pageSize: 10,
+      search: debouncedPatientSearch.trim() || undefined,
+    }),
+    queryFn: async () =>
+      patientService.listPaged({
+        page: 1,
+        pageSize: 10,
+        search: debouncedPatientSearch.trim() || undefined,
+      }),
+    enabled: open && !!tenantId,
+  });
+
+  const patients = patientPage?.data ?? [];
 
   if (!open) return null;
 
@@ -64,6 +90,11 @@ export const NewInvoiceModal = ({ open, onClose, onSuccess, patients }: NewInvoi
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="space-y-2">
             <Label>{t("appointments.patient")} *</Label>
+            <Input
+              value={patientSearch}
+              onChange={(e) => setPatientSearch(e.target.value)}
+              placeholder={t("common.search")}
+            />
             <select
               value={form.patient_id}
               onChange={(e) => setForm({ ...form, patient_id: e.target.value })}

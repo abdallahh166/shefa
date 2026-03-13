@@ -25,7 +25,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["src/features/**/*.{ts,tsx}"],
+    files: ["src/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -33,15 +33,29 @@ export default tseslint.config(
           paths: [
             {
               name: "@/integrations/supabase/client",
-              message: "Use the services layer (src/services/*) instead of importing Supabase directly in features.",
+              message: "Supabase client imports are restricted. Use repositories/services instead.",
             },
             {
               name: "@/services/supabase/client",
-              message: "Use the services layer (src/services/*) instead of importing Supabase directly in features.",
+              message: "Supabase client imports are restricted. Use repositories/services instead.",
+            },
+            {
+              name: "@supabase/supabase-js",
+              message: "Supabase SDK should only be instantiated in services/supabase/client.ts.",
             },
           ],
         },
       ],
+    },
+  },
+  {
+    files: [
+      "src/services/**/*repository.{ts,tsx}",
+      "src/services/supabase/**/*.{ts,tsx}",
+      "src/integrations/supabase/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": "off",
     },
   },
 );
