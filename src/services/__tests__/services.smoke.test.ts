@@ -1,0 +1,288 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const now = new Date().toISOString();
+const tenantId = "00000000-0000-0000-0000-000000000111";
+const userId = "00000000-0000-0000-0000-000000000222";
+const recordId = "00000000-0000-0000-0000-000000000333";
+
+const adminRepository = vi.hoisted(() => ({
+  listTenantsPaged: vi.fn(),
+  listProfilesWithRolesPaged: vi.fn(),
+  listSubscriptionsPaged: vi.fn(),
+  getSubscriptionStats: vi.fn(),
+  updateSubscription: vi.fn(),
+}));
+
+const clinicSlugRepository = vi.hoisted(() => ({ checkSlug: vi.fn() }));
+const notificationRepository = vi.hoisted(() => ({
+  listByUserPaged: vi.fn(),
+  markRead: vi.fn(),
+  markManyRead: vi.fn(),
+  create: vi.fn(),
+  subscribeToUser: vi.fn(),
+}));
+const medicalRecordsRepository = vi.hoisted(() => ({ listByPatient: vi.fn() }));
+const tenantRepository = vi.hoisted(() => ({ getById: vi.fn(), update: vi.fn() }));
+const profileRepository = vi.hoisted(() => ({ updateByUserId: vi.fn() }));
+const notificationPreferencesRepository = vi.hoisted(() => ({ getByUserId: vi.fn(), upsert: vi.fn() }));
+const auditLogRepository = vi.hoisted(() => ({ listPaged: vi.fn(), logEvent: vi.fn() }));
+const securityRepository = vi.hoisted(() => ({ updatePassword: vi.fn() }));
+const userInviteRepository = vi.hoisted(() => ({ inviteStaff: vi.fn() }));
+const userPreferencesRepository = vi.hoisted(() => ({ getByUserId: vi.fn(), upsert: vi.fn() }));
+const settingsUsersRepository = vi.hoisted(() => ({ listProfilesWithRolesPaged: vi.fn() }));
+const subscriptionRepository = vi.hoisted(() => ({ getByTenant: vi.fn() }));
+const clientErrorLogRepository = vi.hoisted(() => ({ insert: vi.fn() }));
+const realtimeRepository = vi.hoisted(() => ({ subscribeToTenantTables: vi.fn() }));
+const jobRepository = vi.hoisted(() => ({ invoke: vi.fn() }));
+
+vi.mock("@/core/env/env", () => ({
+  env: {
+    VITE_SUPABASE_URL: "http://localhost",
+    VITE_SUPABASE_PUBLISHABLE_KEY: "key",
+    VITE_SUPABASE_PROJECT_ID: "",
+    VITE_CAPTCHA_SITE_KEY: "",
+    VITE_SENTRY_DSN: "",
+    VITE_APP_VERSION: "",
+  },
+}));
+
+vi.mock("@/core/auth/authStore", () => ({
+  useAuth: {
+    getState: () => ({
+      hasPermission: () => true,
+      user: { id: userId, role: "super_admin" },
+    }),
+  },
+}));
+
+vi.mock("@/services/supabase/tenant", () => ({
+  getTenantContext: () => ({ tenantId, userId }),
+}));
+
+vi.mock("@/core/events", () => ({ emitDomainEvent: vi.fn() }));
+
+vi.mock("@/services/admin/admin.repository", () => ({ adminRepository }));
+vi.mock("@/services/auth/clinicSlug.repository", () => ({ clinicSlugRepository }));
+vi.mock("@/services/notifications/notification.repository", () => ({ notificationRepository }));
+vi.mock("@/services/patients/medicalRecords.repository", () => ({ medicalRecordsRepository }));
+vi.mock("@/services/settings/tenant.repository", () => ({ tenantRepository }));
+vi.mock("@/services/settings/profile.repository", () => ({ profileRepository }));
+vi.mock("@/services/settings/notification.repository", () => ({ notificationPreferencesRepository }));
+vi.mock("@/services/settings/audit.repository", () => ({ auditLogRepository }));
+vi.mock("@/services/settings/security.repository", () => ({ securityRepository }));
+vi.mock("@/services/settings/userInvite.repository", () => ({ userInviteRepository }));
+vi.mock("@/services/settings/userPreferences.repository", () => ({ userPreferencesRepository }));
+vi.mock("@/services/settings/users.repository", () => ({ settingsUsersRepository }));
+vi.mock("@/services/subscription/subscription.repository", () => ({ subscriptionRepository }));
+vi.mock("@/services/observability/clientErrorLog.repository", () => ({ clientErrorLogRepository }));
+vi.mock("@/services/realtime/realtime.repository", () => ({ realtimeRepository }));
+vi.mock("@/services/jobs/job.repository", () => ({ jobRepository }));
+
+import { adminService } from "@/services/admin/admin.service";
+import { clinicSlugService } from "@/services/auth/clinicSlug.service";
+import { notificationService } from "@/services/notifications/notification.service";
+import { medicalRecordsService } from "@/services/patients/medicalRecords.service";
+import { tenantService } from "@/services/settings/tenant.service";
+import { profileService } from "@/services/settings/profile.service";
+import { notificationPreferencesService } from "@/services/settings/notification.service";
+import { auditLogService } from "@/services/settings/audit.service";
+import { securityService } from "@/services/settings/security.service";
+import { userInviteService } from "@/services/settings/userInvite.service";
+import { userPreferencesService } from "@/services/settings/userPreferences.service";
+import { settingsUsersService } from "@/services/settings/users.service";
+import { subscriptionService } from "@/services/subscription/subscription.service";
+import { clientErrorLogService } from "@/services/observability/clientErrorLog.service";
+import { realtimeService } from "@/services/realtime/realtime.service";
+import { jobService } from "@/services/jobs/job.service";
+import { queryKeys } from "@/services/queryKeys";
+import * as servicesIndex from "@/services";
+
+describe("services smoke", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    adminRepository.listTenantsPaged.mockResolvedValue({ data: [], count: 0 });
+    adminRepository.listProfilesWithRolesPaged.mockResolvedValue({ data: [], count: 0 });
+    adminRepository.listSubscriptionsPaged.mockResolvedValue({ data: [], count: 0 });
+    adminRepository.getSubscriptionStats.mockResolvedValue({
+      active_count: 0,
+      total_revenue: 0,
+      plan_counts: { free: 0, starter: 0, pro: 0, enterprise: 0 },
+    });
+    adminRepository.updateSubscription.mockResolvedValue({
+      id: recordId,
+      tenant_id: tenantId,
+      plan: "pro",
+      status: "active",
+      amount: 0,
+      currency: "USD",
+      billing_cycle: "monthly",
+      expires_at: null,
+      created_at: now,
+      tenants: { name: "Clinic", slug: "clinic" },
+    });
+    clinicSlugRepository.checkSlug.mockResolvedValue({ available: true, slug: "clinic", suggestions: [] });
+    notificationRepository.listByUserPaged.mockResolvedValue({ data: [], count: 0 });
+    notificationRepository.markRead.mockResolvedValue(undefined);
+    notificationRepository.markManyRead.mockResolvedValue(undefined);
+    notificationRepository.create.mockResolvedValue({
+      id: recordId,
+      tenant_id: tenantId,
+      user_id: userId,
+      title: "Hello",
+      body: null,
+      type: "system",
+      read: false,
+      created_at: now,
+    });
+    notificationRepository.subscribeToUser.mockReturnValue({ unsubscribe: vi.fn() });
+    medicalRecordsRepository.listByPatient.mockResolvedValue([]);
+    tenantRepository.getById.mockResolvedValue({
+      id: tenantId,
+      slug: "clinic",
+      name: "Clinic",
+      phone: null,
+      email: "clinic@example.com",
+      address: "Street 1",
+      logo_url: null,
+      created_at: now,
+      updated_at: now,
+    });
+    tenantRepository.update.mockResolvedValue({
+      id: tenantId,
+      slug: "clinic",
+      name: "Clinic Updated",
+      phone: null,
+      email: "clinic@example.com",
+      address: "Street 1",
+      logo_url: null,
+      created_at: now,
+      updated_at: now,
+    });
+    profileRepository.updateByUserId.mockResolvedValue({
+      id: recordId,
+      user_id: userId,
+      tenant_id: tenantId,
+      full_name: "Test User",
+      avatar_url: null,
+      created_at: now,
+      updated_at: now,
+    });
+    notificationPreferencesRepository.getByUserId.mockResolvedValue(null);
+    notificationPreferencesRepository.upsert.mockResolvedValue({
+      id: recordId,
+      user_id: userId,
+      tenant_id: tenantId,
+      appointment_reminders: true,
+      lab_results_ready: true,
+      billing_alerts: true,
+      system_updates: false,
+      created_at: now,
+      updated_at: now,
+    });
+    auditLogRepository.listPaged.mockResolvedValue({ data: [], count: 0 });
+    auditLogRepository.logEvent.mockResolvedValue(undefined);
+    securityRepository.updatePassword.mockResolvedValue(undefined);
+    userInviteRepository.inviteStaff.mockResolvedValue(undefined);
+    userPreferencesRepository.getByUserId.mockResolvedValue({
+      id: recordId,
+      user_id: userId,
+      dark_mode: false,
+      created_at: now,
+      updated_at: now,
+    });
+    userPreferencesRepository.upsert.mockResolvedValue({
+      id: recordId,
+      user_id: userId,
+      dark_mode: true,
+      created_at: now,
+      updated_at: now,
+    });
+    settingsUsersRepository.listProfilesWithRolesPaged.mockResolvedValue({ data: [], count: 0 });
+    subscriptionRepository.getByTenant.mockResolvedValue({
+      id: recordId,
+      tenant_id: tenantId,
+      plan: "pro",
+      status: "active",
+      amount: 0,
+      currency: "USD",
+      billing_cycle: "monthly",
+      started_at: now,
+      expires_at: null,
+    });
+    clientErrorLogRepository.insert.mockResolvedValue(undefined);
+    realtimeRepository.subscribeToTenantTables.mockReturnValue({ unsubscribe: vi.fn() });
+    jobRepository.invoke.mockResolvedValue(undefined);
+  });
+
+  it("executes key service flows", async () => {
+    await adminService.listTenantsPaged({ page: 1, pageSize: 10, search: "clinic", plan: "pro" });
+    await adminService.listProfilesWithRolesPaged({ page: 1, pageSize: 10, search: "john" });
+    await adminService.listSubscriptionsPaged({ page: 1, pageSize: 10, search: "clinic", plan: "pro", status: "active" });
+    await adminService.getSubscriptionStats();
+    await adminService.updateSubscription(recordId, { plan: "pro" });
+
+    await clinicSlugService.checkSlug({ clinicName: "Clinic", customSlug: "clinic" });
+
+    await notificationService.listRecent(userId);
+    await notificationService.listPaged(userId, { page: 1, pageSize: 10 });
+    await notificationService.markRead(userId, recordId);
+    await notificationService.markAllRead(userId, [recordId]);
+    await notificationService.create({
+      tenant_id: tenantId,
+      user_id: userId,
+      title: "Hello",
+      body: null,
+      type: "system",
+      read: false,
+    });
+    const notifSub = notificationService.subscribe(userId, () => undefined);
+    notifSub.unsubscribe();
+
+    await medicalRecordsService.listByPatient(recordId, { limit: 10, offset: 0 });
+
+    await tenantService.getCurrentTenant();
+    await tenantService.updateCurrentTenant({ name: "Clinic Updated" });
+
+    await profileService.updateProfile(userId, { full_name: "Test User" });
+
+    const prefs = await notificationPreferencesService.getCurrentUserPreferences(userId);
+    expect(prefs).toBeDefined();
+    await notificationPreferencesService.saveCurrentUserPreferences(userId, { appointment_reminders: true });
+
+    await auditLogService.listPaged({ page: 1, pageSize: 10 });
+    await auditLogService.logEvent({
+      tenant_id: tenantId,
+      user_id: userId,
+      action: "test",
+      entity_type: "test",
+    });
+
+    await securityService.updatePassword("password123");
+    await userInviteService.inviteStaff({ email: "new@example.com", full_name: "Nurse One", role: "nurse" });
+
+    await userPreferencesService.getByUserId(userId);
+    await userPreferencesService.upsert({ user_id: userId, dark_mode: true });
+    await userPreferencesService.setDarkMode(userId, false);
+
+    await settingsUsersService.listProfilesWithRolesPaged({ page: 1, pageSize: 10, search: "john" });
+
+    await subscriptionService.getByTenant(tenantId);
+
+    await clientErrorLogService.log({
+      tenant_id: tenantId,
+      user_id: userId,
+      message: "Error",
+      request_id: null,
+      action_type: null,
+      resource_type: null,
+    });
+
+    const sub = realtimeService.subscribeToTenantTables(tenantId, ["patients"], () => undefined);
+    sub.unsubscribe();
+
+    await jobService.invoke("refresh-materialized-views", { tenantId });
+
+    expect(queryKeys.patients.root(tenantId)).toEqual(["patients", tenantId]);
+    expect(servicesIndex.authService).toBeDefined();
+  });
+});

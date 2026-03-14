@@ -32,6 +32,12 @@ vi.mock("@/services/patients/patientDocuments.storage", () => ({
   downloadPatientDocument: vi.fn(),
 }));
 
+vi.mock("@/services/security/rateLimit.service", () => ({
+  rateLimitService: {
+    assertAllowed: vi.fn(),
+  },
+}));
+
 const repo = vi.mocked(patientDocumentsRepository, true);
 const storageUpload = vi.mocked(uploadPatientDocument, true);
 const storageRemove = vi.mocked(removePatientDocument, true);

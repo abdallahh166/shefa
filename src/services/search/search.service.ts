@@ -16,8 +16,8 @@ export const searchService = {
       const canSeePatients = hasPermission("view_patients") || hasPermission("manage_patients");
       const canSeeBilling = hasPermission("view_billing") || hasPermission("manage_billing");
       const canSeeDoctors =
-        hasPermission("view_patients") ||
-        hasPermission("manage_patients") ||
+        hasPermission("view_doctors") ||
+        hasPermission("manage_doctors") ||
         hasPermission("view_appointments") ||
         hasPermission("manage_appointments") ||
         hasPermission("manage_clinic");

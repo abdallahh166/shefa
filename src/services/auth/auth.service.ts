@@ -20,7 +20,7 @@ export const authService = {
       const userConfirmedAt = (user as { email_confirmed_at?: string | null; confirmed_at?: string | null } | null) ?? null;
       const isVerified = Boolean(userConfirmedAt?.email_confirmed_at ?? userConfirmedAt?.confirmed_at);
       if (user && !isVerified) {
-        await authRepository.signOut().catch(() => undefined);
+        await Promise.resolve(authRepository.signOut()).catch(() => undefined);
         throw new AuthorizationError("Please verify your email before logging in.");
       }
     } catch (err) {

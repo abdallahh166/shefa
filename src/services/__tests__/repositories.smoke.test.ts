@@ -1,0 +1,707 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+type MockResponse = { data?: any; error?: any; count?: number };
+
+const mockState = vi.hoisted(() => ({
+  response: { data: [], error: null, count: 2 } as MockResponse,
+  responseSingle: { data: {}, error: null } as MockResponse,
+  responseRpc: { data: [], error: null } as MockResponse,
+  responseAuth: {
+    data: { user: { id: "user-1", email: "user@example.com" }, session: { user: { id: "user-1" } } },
+    error: null,
+  } as MockResponse,
+  responseFunctions: { data: {}, error: null } as MockResponse,
+  responseStorage: { data: { signedUrl: "https://example.com/file" }, error: null } as MockResponse,
+}));
+
+function createQueryBuilder() {
+  let useSingle = false;
+  const builder: any = {
+    select: () => builder,
+    eq: () => builder,
+    is: () => builder,
+    or: () => builder,
+    order: () => builder,
+    range: () => builder,
+    in: () => builder,
+    gte: () => builder,
+    lte: () => builder,
+    lt: () => builder,
+    gt: () => builder,
+    neq: () => builder,
+    ilike: () => builder,
+    update: () => builder,
+    insert: () => builder,
+    upsert: () => builder,
+    delete: () => builder,
+    single: () => {
+      useSingle = true;
+      return builder;
+    },
+    maybeSingle: () => {
+      useSingle = true;
+      return builder;
+    },
+    then: (resolve: (value: MockResponse) => unknown, reject: (reason?: any) => unknown) => {
+      const result = useSingle ? mockState.responseSingle : mockState.response;
+      return Promise.resolve(result).then(resolve, reject);
+    },
+  };
+  return builder;
+}
+
+const mockSupabase = vi.hoisted(() => ({
+  from: vi.fn(() => createQueryBuilder()),
+  rpc: vi.fn(async () => mockState.responseRpc),
+  auth: {
+    signInWithPassword: vi.fn(async () => mockState.responseAuth),
+    signOut: vi.fn(async () => ({ error: null })),
+    getSession: vi.fn(async () => mockState.responseAuth),
+    onAuthStateChange: vi.fn((callback: (event: string, session: any) => void) => {
+      callback("SIGNED_IN", mockState.responseAuth.data?.session ?? null);
+      return { data: { subscription: { unsubscribe: vi.fn() } } };
+    }),
+    resetPasswordForEmail: vi.fn(async () => ({ error: null })),
+    updateUser: vi.fn(async () => ({ error: null })),
+  },
+  functions: {
+    invoke: vi.fn(async () => mockState.responseFunctions),
+  },
+  storage: {
+    from: vi.fn(() => ({
+      upload: vi.fn(async () => ({ error: null })),
+      createSignedUrl: vi.fn(async () => mockState.responseStorage),
+      remove: vi.fn(async () => ({ error: null })),
+    })),
+  },
+  channel: vi.fn(() => {
+    const channel = {
+      on: vi.fn().mockReturnThis(),
+      subscribe: vi.fn().mockReturnThis(),
+    };
+    return channel;
+  }),
+  removeChannel: vi.fn(),
+}));
+
+vi.mock("@/services/supabase/client", () => ({ supabase: mockSupabase }));
+
+import { adminRepository } from "@/services/admin/admin.repository";
+import { appointmentRepository } from "@/services/appointments/appointment.repository";
+import { authRepository } from "@/services/auth/auth.repository";
+import { clinicSlugRepository } from "@/services/auth/clinicSlug.repository";
+import { billingRepository } from "@/services/billing/billing.repository";
+import { doctorRepository } from "@/services/doctors/doctor.repository";
+import { doctorScheduleRepository } from "@/services/doctors/doctorSchedule.repository";
+import { featureFlagRepository } from "@/services/featureFlags/featureFlag.repository";
+import { insuranceRepository } from "@/services/insurance/insurance.repository";
+import { jobRepository } from "@/services/jobs/job.repository";
+import { labRepository } from "@/services/laboratory/lab.repository";
+import { notificationRepository } from "@/services/notifications/notification.repository";
+import { clientErrorLogRepository } from "@/services/observability/clientErrorLog.repository";
+import { medicalRecordsRepository } from "@/services/patients/medicalRecords.repository";
+import { patientRepository } from "@/services/patients/patient.repository";
+import { patientDocumentsRepository } from "@/services/patients/patientDocuments.repository";
+import { patientDocumentsStorageRepository } from "@/services/patients/patientDocuments.storage.repository";
+import { pharmacyRepository } from "@/services/pharmacy/pharmacy.repository";
+import { prescriptionRepository } from "@/services/prescriptions/prescription.repository";
+import { realtimeRepository } from "@/services/realtime/realtime.repository";
+import { reportRepository } from "@/services/reports/report.repository";
+import { searchRepository } from "@/services/search/search.repository";
+import { rateLimitRepository } from "@/services/security/rateLimit.repository";
+import { auditLogRepository } from "@/services/settings/audit.repository";
+import { notificationPreferencesRepository } from "@/services/settings/notification.repository";
+import { profileRepository } from "@/services/settings/profile.repository";
+import { profileStorageRepository } from "@/services/settings/profile.storage.repository";
+import { securityRepository } from "@/services/settings/security.repository";
+import { tenantRepository } from "@/services/settings/tenant.repository";
+import { userInviteRepository } from "@/services/settings/userInvite.repository";
+import { userPreferencesRepository } from "@/services/settings/userPreferences.repository";
+import { settingsUsersRepository } from "@/services/settings/users.repository";
+import { subscriptionRepository } from "@/services/subscription/subscription.repository";
+
+const tenantId = "00000000-0000-0000-0000-000000000111";
+const userId = "00000000-0000-0000-0000-000000000222";
+const recordId = "00000000-0000-0000-0000-000000000333";
+
+describe("repositories smoke", () => {
+  beforeEach(() => {
+    mockState.response = { data: [], error: null, count: 2 };
+    mockState.responseSingle = { data: {}, error: null };
+    mockState.responseRpc = { data: [], error: null };
+    mockState.responseAuth = {
+      data: { user: { id: userId, email: "user@example.com" }, session: { user: { id: userId } } },
+      error: null,
+    };
+    mockState.responseFunctions = { data: {}, error: null };
+    mockState.responseStorage = { data: { signedUrl: "https://example.com/file" }, error: null };
+    (globalThis as any).fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      blob: async () => new Blob(["test"]),
+    });
+  });
+
+  it("executes repository methods without throwing", async () => {
+    await adminRepository.listTenantsPaged({ limit: 10, offset: 0, search: "clinic", plan: "pro" });
+    await adminRepository.listProfilesWithRolesPaged({ limit: 10, offset: 0, search: "john" });
+    await adminRepository.listSubscriptionsPaged({ limit: 10, offset: 0, search: "clinic", plan: "starter", status: "active" });
+    await adminRepository.getSubscriptionStats();
+    await adminRepository.updateSubscription(recordId, { plan: "pro" });
+    await adminRepository.listTenantsPaged({ limit: 5, offset: 0 });
+    await adminRepository.listTenantsPaged({ limit: 5, offset: 0, plan: "pro" });
+    await adminRepository.listProfilesWithRolesPaged({ limit: 5, offset: 0 });
+    await adminRepository.listSubscriptionsPaged({ limit: 5, offset: 0 });
+    await adminRepository.listSubscriptionsPaged({ limit: 5, offset: 0, plan: "starter", status: "canceled" });
+
+    await authRepository.signInWithPassword("user@example.com", "password");
+    await authRepository.signOut();
+    await authRepository.getSession();
+    const unsubscribe = authRepository.onAuthStateChange(() => undefined);
+    unsubscribe();
+    await authRepository.resetPasswordForEmail("user@example.com", "http://localhost/reset");
+    await authRepository.updatePassword("password123");
+    await authRepository.getProfileByUserId(userId);
+    await authRepository.getRoleByUserId(userId);
+    await authRepository.registerClinic({ name: "Clinic" });
+
+    await clinicSlugRepository.checkSlug({ clinicName: "My Clinic", customSlug: "my-clinic" });
+
+    await appointmentRepository.listPaged({
+      page: 1,
+      pageSize: 10,
+      search: "follow",
+      filters: {
+        status: "scheduled",
+        doctor_id: recordId,
+        patient_id: recordId,
+        date_from: "2026-03-01T00:00:00Z",
+        date_to: "2026-03-31T23:59:59Z",
+      },
+      sort: { column: "created_at", ascending: true },
+    }, tenantId);
+    await appointmentRepository.listPaged({ page: 1, pageSize: 5 }, tenantId);
+    await appointmentRepository.listPaged({
+      page: 1,
+      pageSize: 5,
+      sort: { column: "invalid" as any },
+    } as any, tenantId);
+    await appointmentRepository.listPagedWithRelations({
+      page: 1,
+      pageSize: 10,
+      search: "doc",
+      filters: { status: "scheduled" },
+      sort: { column: "appointment_date", ascending: false },
+    }, tenantId);
+    await appointmentRepository.listPagedWithRelations({ page: 1, pageSize: 5 }, tenantId);
+    await appointmentRepository.listByDateRange("2026-03-01T00:00:00Z", "2026-03-31T23:59:59Z", tenantId, { limit: 5, offset: 0 });
+    await appointmentRepository.listByPatient(recordId, tenantId, { limit: 5, offset: 0 });
+    await appointmentRepository.countByStatus(tenantId);
+    await appointmentRepository.getById(recordId, tenantId);
+    await appointmentRepository.hasConflict(recordId, "2026-03-14T10:00:00Z", tenantId, recordId);
+    await appointmentRepository.hasConflict(recordId, "2026-03-14T10:00:00Z", tenantId);
+    await appointmentRepository.create({
+      patient_id: recordId,
+      doctor_id: recordId,
+      appointment_date: "2026-03-14T10:00:00Z",
+      type: "checkup",
+      status: "scheduled",
+      duration_minutes: 30,
+    }, tenantId);
+    await appointmentRepository.create({
+      patient_id: recordId,
+      doctor_id: recordId,
+      appointment_date: "2026-03-14T11:00:00Z",
+      type: "follow_up",
+      status: "scheduled",
+      duration_minutes: 20,
+      notes: "Follow-up note",
+    }, tenantId);
+    await appointmentRepository.create({
+      patient_id: recordId,
+      doctor_id: recordId,
+      appointment_date: "2026-03-14T12:00:00Z",
+      type: "checkup",
+    }, tenantId);
+    await appointmentRepository.update(recordId, {}, tenantId);
+    await appointmentRepository.update(recordId, { status: "cancelled" }, tenantId);
+    await appointmentRepository.update(recordId, {
+      patient_id: recordId,
+      doctor_id: recordId,
+      appointment_date: "2026-03-14T13:00:00Z",
+      duration_minutes: 25,
+      type: "consultation",
+      status: "completed",
+      notes: "Updated",
+    }, tenantId);
+    await appointmentRepository.archive(recordId, tenantId, userId);
+    await appointmentRepository.restore(recordId, tenantId);
+
+    await billingRepository.listPaged({
+      page: 1,
+      pageSize: 10,
+      search: "INV",
+      filters: { status: "paid", patient_id: recordId },
+      sort: { column: "invoice_date", ascending: true },
+    }, tenantId);
+    await billingRepository.listPaged({ page: 1, pageSize: 5 }, tenantId);
+    await billingRepository.listPagedWithRelations({
+      page: 1,
+      pageSize: 10,
+      search: "Service",
+      filters: { status: "pending" },
+    }, tenantId);
+    await billingRepository.listPagedWithRelations({ page: 1, pageSize: 5 }, tenantId);
+    await billingRepository.getSummary(tenantId);
+    await billingRepository.countInRange("2026-03-01", "2026-04-01", tenantId);
+    await billingRepository.listByDateRange("2026-03-01", "2026-04-01", tenantId, { limit: 5, offset: 0 });
+    await billingRepository.listByPatient(recordId, tenantId, { limit: 5, offset: 0 });
+    await billingRepository.create({
+      patient_id: recordId,
+      invoice_code: "INV-1",
+      service: "Consult",
+      amount: 100,
+      status: "paid",
+    }, tenantId);
+    await billingRepository.create({
+      patient_id: recordId,
+      invoice_code: "INV-2",
+      service: "Follow-up",
+      amount: 150,
+      status: "pending",
+      invoice_date: "2026-03-15",
+    }, tenantId);
+    await billingRepository.create({
+      patient_id: recordId,
+      invoice_code: "INV-3",
+      service: "Exam",
+      amount: 200,
+    }, tenantId);
+    await billingRepository.update(recordId, {}, tenantId);
+    await billingRepository.update(recordId, { status: "overdue" }, tenantId);
+    await billingRepository.update(recordId, {
+      patient_id: recordId,
+      invoice_code: "INV-4",
+      service: "Updated",
+      amount: 250,
+      invoice_date: "2026-03-16",
+      status: "paid",
+    }, tenantId);
+    await billingRepository.archive(recordId, tenantId, userId);
+    await billingRepository.restore(recordId, tenantId);
+
+    await doctorRepository.listPaged({
+      page: 1,
+      pageSize: 10,
+      search: "Dr",
+      filters: { status: "available", specialty: "general" },
+      sort: { column: "full_name", ascending: true },
+    }, tenantId);
+    await doctorRepository.listPaged({ page: 1, pageSize: 5 }, tenantId);
+    await doctorRepository.create({ full_name: "Dr Test", specialty: "general", status: "available" }, tenantId);
+    await doctorRepository.create({
+      full_name: "Dr Optional",
+      specialty: "surgery",
+      phone: "123",
+      email: "doc@example.com",
+      rating: 4.5,
+      status: "busy",
+    }, tenantId);
+    await doctorRepository.update(recordId, {}, tenantId);
+    await doctorRepository.update(recordId, { status: "on_leave" }, tenantId);
+    await doctorRepository.update(recordId, {
+      full_name: "Dr Updated",
+      specialty: "cardiology",
+      phone: "555",
+      email: "updated@example.com",
+      rating: 4.7,
+      status: "available",
+    }, tenantId);
+    await doctorRepository.archive(recordId, tenantId, userId);
+    await doctorRepository.restore(recordId, tenantId);
+    await doctorRepository.remove(recordId, tenantId, userId);
+
+    await doctorScheduleRepository.listByDoctor(recordId, tenantId);
+    await doctorScheduleRepository.upsertMany(recordId, [
+      {
+        day_of_week: 1,
+        start_time: "09:00",
+        end_time: "12:00",
+        is_active: true,
+      },
+    ], tenantId);
+
+    await featureFlagRepository.listByTenant(tenantId);
+    await featureFlagRepository.get(tenantId, "lab_module");
+    await featureFlagRepository.upsert(tenantId, {
+      feature_key: "lab_module",
+      enabled: true,
+    });
+
+    await insuranceRepository.listPaged({
+      page: 1,
+      pageSize: 10,
+      search: "claim",
+      filters: { status: "pending", patient_id: recordId },
+      sort: { column: "claim_date", ascending: true } as any,
+    }, tenantId);
+    await insuranceRepository.listPaged({ page: 1, pageSize: 5 }, tenantId);
+    await insuranceRepository.listPagedWithRelations({
+      page: 1,
+      pageSize: 10,
+      search: "claim",
+      filters: { status: "approved" },
+    }, tenantId);
+    await insuranceRepository.listPagedWithRelations({ page: 1, pageSize: 5 }, tenantId);
+    await insuranceRepository.getSummary(tenantId);
+    await insuranceRepository.create({
+      patient_id: recordId,
+      provider: "Provider",
+      service: "Service",
+      amount: 100,
+      claim_date: "2026-03-10",
+      status: "pending",
+    }, tenantId);
+    await insuranceRepository.create({
+      patient_id: recordId,
+      provider: "Provider Two",
+      service: "Follow-up",
+      amount: 120,
+      claim_date: "2026-03-12",
+      status: "approved",
+    }, tenantId);
+    await insuranceRepository.create({
+      patient_id: recordId,
+      provider: "Provider Three",
+      service: "Exam",
+      amount: 80,
+    }, tenantId);
+    await insuranceRepository.update(recordId, {}, tenantId);
+    await insuranceRepository.update(recordId, { status: "approved" }, tenantId);
+    await insuranceRepository.update(recordId, {
+      patient_id: recordId,
+      provider: "Updated Provider",
+      service: "Updated Service",
+      amount: 140,
+      claim_date: "2026-03-18",
+      status: "rejected",
+    }, tenantId);
+    await insuranceRepository.archive(recordId, tenantId, userId);
+    await insuranceRepository.restore(recordId, tenantId);
+
+    await jobRepository.invoke("refresh-materialized-views", { tenantId });
+
+    await labRepository.listPaged({
+      page: 1,
+      pageSize: 10,
+      search: "lab",
+      filters: { status: "pending", patient_id: recordId },
+      sort: { column: "order_date", ascending: true } as any,
+    }, tenantId);
+    await labRepository.listPaged({ page: 1, pageSize: 5 }, tenantId);
+    await labRepository.listPagedWithRelations({
+      page: 1,
+      pageSize: 10,
+      search: "lab",
+      filters: { status: "pending", patient_id: recordId, doctor_id: recordId },
+      sort: { column: "order_date", ascending: true } as any,
+    }, tenantId);
+    await labRepository.listPagedWithRelations({ page: 1, pageSize: 5 }, tenantId);
+    await labRepository.listByPatient(recordId, tenantId, { limit: 5, offset: 0 });
+    await labRepository.countByStatus(tenantId);
+    await labRepository.create({
+      patient_id: recordId,
+      doctor_id: recordId,
+      order_date: "2026-03-10",
+      test_name: "CBC",
+      status: "pending",
+    }, tenantId);
+    await labRepository.create({
+      patient_id: recordId,
+      doctor_id: recordId,
+      test_name: "BMP",
+      order_date: "2026-03-11",
+      status: "processing",
+      result: "Pending",
+    } as any, tenantId);
+    await labRepository.create({
+      patient_id: recordId,
+      doctor_id: recordId,
+      test_name: "XR",
+    } as any, tenantId);
+    await labRepository.update(recordId, {}, tenantId);
+    await labRepository.update(recordId, { status: "completed" }, tenantId);
+    await labRepository.update(recordId, {
+      patient_id: recordId,
+      doctor_id: recordId,
+      test_name: "Updated",
+      order_date: "2026-03-12",
+      status: "completed",
+      result: "Normal",
+    } as any, tenantId);
+    await labRepository.archive(recordId, tenantId, userId);
+    await labRepository.restore(recordId, tenantId);
+
+    await notificationRepository.listByUserPaged(tenantId, userId, 10, 0);
+    await notificationRepository.markRead(recordId, tenantId, userId);
+    await notificationRepository.markManyRead([recordId], tenantId, userId);
+    await notificationRepository.create({
+      tenant_id: tenantId,
+      user_id: userId,
+      title: "Hello",
+      body: null,
+      type: "system",
+      read: false,
+    });
+    const notificationSub = notificationRepository.subscribeToUser(tenantId, userId, () => undefined);
+    notificationSub.unsubscribe();
+
+    await clientErrorLogRepository.insert({
+      tenant_id: tenantId,
+      user_id: userId,
+      message: "Error",
+      request_id: null,
+      action_type: null,
+      resource_type: null,
+      stack: null,
+      component_stack: null,
+      url: null,
+      user_agent: null,
+    });
+
+    await medicalRecordsRepository.listByPatient(recordId, tenantId, { limit: 5, offset: 0 });
+
+    await patientRepository.listPaged({
+      page: 1,
+      pageSize: 10,
+      search: "Jane",
+      filters: { status: "in_stock" },
+      sort: { column: "full_name", ascending: true },
+    }, tenantId);
+    await patientRepository.listPaged({ page: 1, pageSize: 5 }, tenantId);
+    await patientRepository.getById(recordId, tenantId);
+    await patientRepository.create({ full_name: "Jane Doe", status: "active" }, tenantId);
+    await patientRepository.create({
+      full_name: "John Doe",
+      date_of_birth: "1990-01-01",
+      gender: "male",
+      blood_type: "A+",
+      phone: "555-1234",
+      email: "john@example.com",
+      address: "Street",
+      insurance_provider: "InsureCo",
+      status: "inactive",
+    } as any, tenantId);
+    await patientRepository.update(recordId, {}, tenantId);
+    await patientRepository.update(recordId, { status: "inactive" }, tenantId);
+    await patientRepository.update(recordId, {
+      full_name: "Updated Name",
+      date_of_birth: "1991-01-01",
+      gender: "female",
+      blood_type: "B+",
+      phone: "555-5678",
+      email: "updated@example.com",
+      address: "New Street",
+      insurance_provider: "NewInsurer",
+      status: "active",
+    } as any, tenantId);
+    await patientRepository.archive(recordId, tenantId, userId);
+    await patientRepository.restore(recordId, tenantId);
+    await patientRepository.deleteBulk([], tenantId, userId);
+    await patientRepository.deleteBulk([recordId], tenantId, userId);
+
+    await patientDocumentsRepository.createMetadata({
+      patient_id: recordId,
+      file_path: `${tenantId}/patients/${recordId}/file.pdf`,
+      file_name: "file.pdf",
+      file_type: "application/pdf",
+      file_size: 100,
+      uploaded_by: userId,
+    }, tenantId);
+    await patientDocumentsRepository.listByPatient(recordId, tenantId, { limit: 5, offset: 0 });
+    await patientDocumentsRepository.archive(recordId, tenantId, userId);
+    await patientDocumentsRepository.restore(recordId, tenantId);
+
+    const file = new File(["test"], "doc.pdf", { type: "application/pdf" });
+    await patientDocumentsStorageRepository.upload(`${tenantId}/patients/${recordId}/doc.pdf`, file, "application/pdf");
+    await patientDocumentsStorageRepository.download(`${tenantId}/patients/${recordId}/doc.pdf`);
+    await patientDocumentsStorageRepository.remove(`${tenantId}/patients/${recordId}/doc.pdf`);
+
+    await pharmacyRepository.listPaged({
+      page: 1,
+      pageSize: 10,
+      search: "med",
+      filters: { status: "in_stock" },
+      sort: { column: "name", ascending: true } as any,
+    }, tenantId);
+    await pharmacyRepository.listPaged({ page: 1, pageSize: 5 }, tenantId);
+    await pharmacyRepository.getSummary(tenantId);
+    await pharmacyRepository.create({ name: "Test Med", stock: 10, status: "in_stock" }, tenantId);
+    await pharmacyRepository.create({
+      name: "Optional Med",
+      category: "pain",
+      stock: 5,
+      unit: "mg",
+      price: 10,
+      status: "out_of_stock",
+    }, tenantId);
+    await pharmacyRepository.create({ name: "Minimal Med" }, tenantId);
+    await pharmacyRepository.update(recordId, {}, tenantId);
+    await pharmacyRepository.update(recordId, { status: "low_stock" }, tenantId);
+    await pharmacyRepository.update(recordId, {
+      name: "Updated Med",
+      category: "antibiotic",
+      stock: 20,
+      unit: "ml",
+      price: 25,
+      status: "in_stock",
+    }, tenantId);
+    await pharmacyRepository.remove(recordId, tenantId);
+
+    await prescriptionRepository.listPaged({
+      page: 1,
+      pageSize: 10,
+      search: "rx",
+      filters: { status: "active", patient_id: recordId, doctor_id: recordId },
+      sort: { column: "prescribed_date", ascending: true } as any,
+    }, tenantId);
+    await prescriptionRepository.listPaged({ page: 1, pageSize: 5 }, tenantId);
+    await prescriptionRepository.listByPatient(recordId, tenantId, { limit: 5, offset: 0 });
+    await prescriptionRepository.create({
+      patient_id: recordId,
+      doctor_id: recordId,
+      prescribed_date: "2026-03-10",
+      medication: "Test",
+      dosage: "1x",
+      status: "active",
+    }, tenantId);
+    await prescriptionRepository.create({
+      patient_id: recordId,
+      doctor_id: recordId,
+      medication: "Optional",
+      dosage: "2x",
+      status: "completed",
+      prescribed_date: "2026-03-11",
+    }, tenantId);
+    await prescriptionRepository.create({
+      patient_id: recordId,
+      doctor_id: recordId,
+      medication: "Minimal",
+      dosage: "1x",
+    }, tenantId);
+    await prescriptionRepository.update(recordId, {}, tenantId);
+    await prescriptionRepository.update(recordId, { status: "completed" }, tenantId);
+    await prescriptionRepository.update(recordId, {
+      patient_id: recordId,
+      doctor_id: recordId,
+      medication: "Updated",
+      dosage: "3x",
+      status: "completed",
+      prescribed_date: "2026-03-12",
+    }, tenantId);
+    await prescriptionRepository.archive(recordId, tenantId, userId);
+    await prescriptionRepository.restore(recordId, tenantId);
+
+    const sub = realtimeRepository.subscribeToTenantTables(tenantId, ["patients", "appointments"], () => undefined);
+    sub.unsubscribe();
+
+    await reportRepository.assertAccess(tenantId);
+    await reportRepository.getOverview(tenantId);
+    await reportRepository.getRevenueByMonth(tenantId, 6);
+    await reportRepository.getPatientGrowth(tenantId, 6);
+    await reportRepository.getAppointmentTypes(tenantId);
+    await reportRepository.getAppointmentStatuses(tenantId);
+    await reportRepository.getRevenueByService(tenantId, 5);
+    await reportRepository.getDoctorPerformance(tenantId);
+
+    await searchRepository.searchGlobal(tenantId, "term", 10);
+
+    await rateLimitRepository.check("login:user@example.com", 5, 60);
+
+    await auditLogRepository.listPaged(tenantId, 10, 0);
+    await auditLogRepository.logEvent({
+      tenant_id: tenantId,
+      user_id: userId,
+      action: "test",
+      action_type: "test",
+      entity_type: "test",
+      entity_id: recordId,
+      request_id: null,
+      resource_type: null,
+      details: {},
+    });
+
+    await notificationPreferencesRepository.getByUserId(userId, tenantId);
+    await notificationPreferencesRepository.upsert(userId, tenantId, {
+      appointment_reminders: true,
+      lab_results_ready: true,
+      billing_alerts: true,
+      system_updates: false,
+    });
+
+    await profileRepository.updateByUserId(userId, tenantId, { full_name: "Test User" });
+
+    const avatarFile = new File(["avatar"], "avatar.png", { type: "image/png" });
+    await profileStorageRepository.upload(`${userId}/avatar.png`, avatarFile);
+    await profileStorageRepository.createSignedUrl(`${userId}/avatar.png`, 60);
+    await profileStorageRepository.remove([`${userId}/avatar.png`]);
+
+    await securityRepository.updatePassword("password123");
+
+    await tenantRepository.getById(tenantId);
+    await tenantRepository.update(tenantId, { name: "Clinic" });
+
+    await userInviteRepository.inviteStaff({ email: "new@example.com", full_name: "Nurse", role: "nurse" });
+
+    await userPreferencesRepository.getByUserId(userId);
+    await userPreferencesRepository.upsert({ user_id: userId, dark_mode: false });
+
+    await settingsUsersRepository.listProfilesWithRolesPaged(tenantId, { limit: 10, offset: 0, search: "john" });
+
+    await subscriptionRepository.getByTenant(tenantId);
+
+    expect(mockSupabase.from).toHaveBeenCalled();
+  });
+
+  it("covers admin role mapping branch", async () => {
+    mockState.response = {
+      data: [{ id: recordId, user_id: userId, role: "nurse" }],
+      error: null,
+      count: 1,
+    };
+
+    await adminRepository.listProfilesWithRolesPaged({ limit: 5, offset: 0, search: "Nurse" });
+  });
+
+  it("throws on repository errors", async () => {
+    const error = { message: "boom", code: "ERR" };
+    mockState.response = { data: null, error };
+    mockState.responseSingle = { data: null, error };
+    mockState.responseRpc = { data: null, error };
+
+    await expect(appointmentRepository.listPaged({ page: 1, pageSize: 5 }, tenantId)).rejects.toThrow("boom");
+    await expect(appointmentRepository.listByDateRange("2026-03-01", "2026-03-02", tenantId)).rejects.toThrow("boom");
+    await expect(appointmentRepository.getById(recordId, tenantId)).rejects.toThrow("boom");
+
+    await expect(billingRepository.listPaged({ page: 1, pageSize: 5 }, tenantId)).rejects.toThrow("boom");
+    await expect(billingRepository.getSummary(tenantId)).rejects.toThrow("boom");
+
+    await expect(insuranceRepository.listPaged({ page: 1, pageSize: 5 }, tenantId)).rejects.toThrow("boom");
+    await expect(insuranceRepository.getSummary(tenantId)).rejects.toThrow("boom");
+
+    await expect(labRepository.listPaged({ page: 1, pageSize: 5 }, tenantId)).rejects.toThrow("boom");
+
+    await expect(patientRepository.listPaged({ page: 1, pageSize: 5 }, tenantId)).rejects.toThrow("boom");
+
+    await expect(doctorRepository.listPaged({ page: 1, pageSize: 5 }, tenantId)).rejects.toThrow("boom");
+
+    await expect(pharmacyRepository.listPaged({ page: 1, pageSize: 5 }, tenantId)).rejects.toThrow("boom");
+    await expect(pharmacyRepository.getSummary(tenantId)).rejects.toThrow("boom");
+
+    await expect(prescriptionRepository.listPaged({ page: 1, pageSize: 5 }, tenantId)).rejects.toThrow("boom");
+
+    await expect(reportRepository.getOverview(tenantId)).rejects.toThrow("boom");
+    await expect(rateLimitRepository.check("login:user@example.com", 5, 60)).rejects.toThrow("boom");
+    await expect(adminRepository.getSubscriptionStats()).rejects.toThrow("boom");
+  });
+});

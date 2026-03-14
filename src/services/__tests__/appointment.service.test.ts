@@ -80,6 +80,7 @@ describe("appointmentService permissions", () => {
       patient_id: "00000000-0000-0000-0000-000000000aaa",
       doctor_id: "00000000-0000-0000-0000-000000000bbb",
       appointment_date: "2026-03-14T10:00:00Z",
+      duration_minutes: 30,
       status: "scheduled",
       type: "checkup",
       created_at: "2026-03-14T10:00:00Z",
