@@ -10,6 +10,7 @@ Production-grade clinic management system built with React, Vite, Supabase (Auth
 - Materialized views power reports; refresh is scheduled via pg_cron.
 - Storage is tenant-scoped with private buckets and signed URL access.
 - Rate limiting is enforced for auth and upload workflows.
+- Production deployment targets Cloudflare Pages via GitHub Actions (build output: `dist`).
 
 ## Overview
 
@@ -297,6 +298,7 @@ Required variables:
 Optional variables:
 - `VITE_SUPABASE_PROJECT_ID`
 - `VITE_CAPTCHA_SITE_KEY`
+- `VITE_SENTRY_DSN`
 
 Templates:
 - `.env.example` (remote)
@@ -371,6 +373,14 @@ supabase test db
 - Database policy + RPC tests: `supabase test db`
 - Build validation: `npm run build`
 
+## CI/CD
+
+GitHub Actions workflows:
+- `ci.yml`: lint, unit tests, coverage gate.
+- `migrations.yml`: apply migrations to remote with approval.
+- `backup-verify.yml`: backup verification checks.
+- `cloudflare-deploy.yml`: deploy to Cloudflare Pages on `main`.
+
 ## Scripts
 
 - `npm run dev` - start Vite
@@ -409,7 +419,22 @@ src/
 
 ## Deployment
 
-This repo is framework-agnostic; deploy with your preferred platform.
+This repo deploys to Cloudflare Pages.
+
+Requirements:
+- Cloudflare Pages project created for the repo.
+- GitHub Actions secrets:
+  - `CLOUDFLARE_API_TOKEN`
+  - `CLOUDFLARE_ACCOUNT_ID`
+  - `CLOUDFLARE_PAGES_PROJECT_NAME`
+
+Cloudflare Pages environment variables (set in the dashboard for Production and Preview):
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `VITE_SUPABASE_PROJECT_ID` (optional)
+- `VITE_CAPTCHA_SITE_KEY` (optional)
+- `VITE_SENTRY_DSN` (optional)
+
 Before production:
 - `npm run build`
 - `supabase db diff` against production
@@ -584,6 +609,12 @@ supabase db push
 ```
 supabase test db
 ```
+
+### Cloudflare Pages Deploy
+
+1. Push to `main` to trigger `.github/workflows/cloudflare-deploy.yml`.
+2. Confirm build output `dist` is deployed.
+3. For preview builds, ensure the same env vars exist under Preview environment.
 
 ### Backup & Restore
 
