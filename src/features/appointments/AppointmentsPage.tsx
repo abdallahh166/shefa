@@ -269,7 +269,7 @@ export const AppointmentsPage = () => {
             </button>
           </div>
           <PermissionGuard permission="manage_appointments">
-            <Button size="sm" onClick={() => setShowModal(true)}>
+            <Button size="sm" onClick={() => setShowModal(true)} data-testid="appointments-add-button">
               <CalendarPlus className="h-3.5 w-3.5 mr-1" />
               {t("appointments.newAppointment")}
             </Button>

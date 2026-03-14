@@ -114,7 +114,7 @@ export const PatientsPage = () => {
             <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
               <Upload className="h-3.5 w-3.5 mr-1" /> {t("patients.importCSV")}
             </Button>
-            <Button size="sm" onClick={() => setShowAdd(true)}>
+            <Button size="sm" onClick={() => setShowAdd(true)} data-testid="patients-add-button">
               <UserPlus className="h-3.5 w-3.5 mr-1" />{t("patients.addPatient")}
             </Button>
           </PermissionGuard>

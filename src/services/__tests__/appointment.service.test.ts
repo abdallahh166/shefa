@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { appointmentRepository } from "@/services/appointments/appointment.repository";
 
 vi.mock("@/services/appointments/appointment.repository", () => ({
   appointmentRepository: {
@@ -64,5 +65,38 @@ describe("appointmentService permissions", () => {
         type: "checkup",
       } as any),
     ).rejects.toThrow("Not authorized");
+  });
+
+  it("passes tenant context when creating an appointment", async () => {
+    vi.doMock("@/core/auth/authStore", () => ({
+      useAuth: {
+        getState: () => ({ hasPermission: () => true }),
+      },
+    }));
+    const repo = vi.mocked(appointmentRepository, true);
+    repo.create.mockResolvedValue({
+      id: "00000000-0000-0000-0000-000000000333",
+      tenant_id: "00000000-0000-0000-0000-000000000111",
+      patient_id: "00000000-0000-0000-0000-000000000aaa",
+      doctor_id: "00000000-0000-0000-0000-000000000bbb",
+      appointment_date: "2026-03-14T10:00:00Z",
+      status: "scheduled",
+      type: "checkup",
+      created_at: "2026-03-14T10:00:00Z",
+      updated_at: "2026-03-14T10:00:00Z",
+    } as any);
+
+    const { appointmentService } = await import("@/services/appointments/appointment.service");
+    await appointmentService.create({
+      patient_id: "00000000-0000-0000-0000-000000000aaa",
+      doctor_id: "00000000-0000-0000-0000-000000000bbb",
+      appointment_date: "2026-03-14T10:00:00Z",
+      type: "checkup",
+    } as any);
+
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "checkup" }),
+      "00000000-0000-0000-0000-000000000111",
+    );
   });
 });

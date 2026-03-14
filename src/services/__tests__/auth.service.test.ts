@@ -56,3 +56,14 @@ describe("authService.login", () => {
     expect(limiter.assertAllowed).toHaveBeenCalledWith("login", ["user@example.com"]);
   });
 });
+
+describe("authService.resetPassword", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("enforces rate limits for password reset", async () => {
+    await authService.resetPassword("reset@example.com", "http://localhost/reset");
+    expect(limiter.assertAllowed).toHaveBeenCalledWith("password_reset", ["reset@example.com"]);
+  });
+});

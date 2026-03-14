@@ -1,5 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enforceCors, getAllowedOriginsFromEnv } from "../_shared/cors.ts";
+import { initSentry } from "../_shared/sentry.ts";
+import { logError, logInfo } from "../_shared/logger.ts";
+import { createRequestId } from "../_shared/request.ts";
 
 const allowedOrigins = getAllowedOriginsFromEnv();
 
@@ -18,10 +21,13 @@ interface AppointmentRow {
 }
 
 Deno.serve(async (req) => {
+  initSentry();
   const { corsHeaders, errorResponse } = enforceCors(req, {
     allowedOrigins,
     allowNoOrigin: true,
   });
+  const requestId = createRequestId(req);
+  const baseHeaders = { ...corsHeaders, "Content-Type": "application/json", "x-request-id": requestId };
 
   if (errorResponse) {
     return errorResponse;
@@ -34,23 +40,28 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: baseHeaders,
     });
   }
 
   try {
+    logInfo("appointment_reminders_request", {
+      request_id: requestId,
+      action_type: "appointment_reminders",
+      resource_type: "appointment",
+    });
     const cronSecret = Deno.env.get("REMINDER_CRON_SECRET");
     const incomingSecret = req.headers.get("x-cron-secret");
     if (!cronSecret) {
       return new Response(JSON.stringify({ error: "REMINDER_CRON_SECRET is not configured" }), {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
     if (incomingSecret !== cronSecret) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -167,7 +178,12 @@ Deno.serve(async (req) => {
         });
 
         if (!res.ok) {
-          console.error("Resend API error:", await res.text());
+          logError("appointment_reminder_email_failed", {
+            request_id: requestId,
+            action_type: "appointment_reminders",
+            resource_type: "appointment",
+            metadata: { error: await res.text() },
+          });
           continue;
         }
 
@@ -179,7 +195,12 @@ Deno.serve(async (req) => {
         });
         emailsSent++;
       } catch (err) {
-        console.error("Failed to send email via Resend:", err);
+        logError("appointment_reminder_email_exception", {
+          request_id: requestId,
+          action_type: "appointment_reminders",
+          resource_type: "appointment",
+          metadata: { error: err instanceof Error ? err.message : String(err) },
+        });
       }
     }
 
@@ -192,17 +213,23 @@ Deno.serve(async (req) => {
       }),
       {
         status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       },
     );
   } catch (err) {
+    logError("appointment_reminders_failed", {
+      request_id: requestId,
+      action_type: "appointment_reminders",
+      resource_type: "appointment",
+      metadata: { error: err instanceof Error ? err.message : String(err) },
+    });
     return new Response(
       JSON.stringify({
         error: err instanceof Error ? err.message : "Internal server error",
       }),
       {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       },
     );
   }

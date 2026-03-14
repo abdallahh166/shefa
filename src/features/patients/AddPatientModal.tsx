@@ -67,7 +67,11 @@ export const AddPatientModal = ({ open, onClose, onSuccess }: AddPatientModalPro
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2 space-y-2">
               <Label>{t("patients.fullName")} *</Label>
-              <Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+              <Input
+                value={form.full_name}
+                onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                data-testid="patient-full-name"
+              />
             </div>
             <div className="space-y-2">
               <Label>{t("patients.dateOfBirth")}</Label>
@@ -99,7 +103,9 @@ export const AddPatientModal = ({ open, onClose, onSuccess }: AddPatientModalPro
           </div>
           <div className="flex justify-end gap-3 pt-4">
             <Button type="button" variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
-            <Button type="submit" disabled={loading}>{loading ? "..." : t("common.save")}</Button>
+            <Button type="submit" disabled={loading} data-testid="patient-save">
+              {loading ? "..." : t("common.save")}
+            </Button>
           </div>
         </form>
       </div>

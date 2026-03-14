@@ -1,6 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enforceCors, getAllowedOriginsFromEnv, buildRedirectUrl } from "../_shared/cors.ts";
 import { verifyCaptcha } from "../_shared/captcha.ts";
+import { initSentry } from "../_shared/sentry.ts";
+import { logError, logInfo } from "../_shared/logger.ts";
+import { createRequestId, getClientIp } from "../_shared/request.ts";
 
 const allowedOrigins = getAllowedOriginsFromEnv();
 
@@ -59,9 +62,12 @@ const EMAIL_RATE_LIMIT_WINDOW_SECONDS = 60 * 60; // 1 hour
 const EMAIL_RATE_LIMIT_MAX = 2;
 
 Deno.serve(async (req) => {
+  initSentry();
   const { corsHeaders, errorResponse } = enforceCors(req, {
     allowedOrigins,
   });
+  const requestId = createRequestId(req);
+  const baseHeaders = { ...corsHeaders, "Content-Type": "application/json", "x-request-id": requestId };
 
   if (errorResponse) {
     return errorResponse;
@@ -74,13 +80,17 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: baseHeaders,
     });
   }
 
-  const clientIp =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    req.headers.get("cf-connecting-ip") ?? "unknown";
+  const clientIp = getClientIp(req);
+  logInfo("register_clinic_request", {
+    request_id: requestId,
+    action_type: "register_clinic",
+    resource_type: "tenant",
+    metadata: { client_ip: clientIp },
+  });
 
   try {
     const adminClient = createClient(
@@ -98,9 +108,15 @@ Deno.serve(async (req) => {
     );
 
     if (rateError) {
+      logError("register_clinic_rate_limit_error", {
+        request_id: requestId,
+        action_type: "register_clinic",
+        resource_type: "tenant",
+        metadata: { error: rateError.message },
+      });
       return new Response(JSON.stringify({ error: "Rate limiter unavailable" }), {
         status: 503,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -110,8 +126,7 @@ Deno.serve(async (req) => {
         {
           status: 429,
           headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
+            ...baseHeaders,
             "Retry-After": "30",
           },
         },
@@ -129,7 +144,7 @@ Deno.serve(async (req) => {
     if (!clinicName || !fullName || !email || !password) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -137,7 +152,7 @@ Deno.serve(async (req) => {
     if (!captchaResult.ok) {
       return new Response(JSON.stringify({ error: captchaResult.error ?? "Captcha verification failed" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -145,7 +160,7 @@ Deno.serve(async (req) => {
     if (!EMAIL_REGEX.test(normalizedEmail)) {
       return new Response(JSON.stringify({ error: "Invalid email" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -159,9 +174,15 @@ Deno.serve(async (req) => {
     );
 
     if (emailRateError) {
+      logError("register_clinic_email_rate_limit_error", {
+        request_id: requestId,
+        action_type: "register_clinic",
+        resource_type: "tenant",
+        metadata: { error: emailRateError.message },
+      });
       return new Response(JSON.stringify({ error: "Rate limiter unavailable" }), {
         status: 503,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -171,8 +192,7 @@ Deno.serve(async (req) => {
         {
           status: 429,
           headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
+            ...baseHeaders,
             "Retry-After": "3600",
           },
         },
@@ -183,7 +203,7 @@ Deno.serve(async (req) => {
     if (normalizedFullName.length < 2 || normalizedFullName.length > 100) {
       return new Response(JSON.stringify({ error: "Invalid full name" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -191,7 +211,7 @@ Deno.serve(async (req) => {
     if (normalizedClinicName.length < 2 || normalizedClinicName.length > 120) {
       return new Response(JSON.stringify({ error: "Invalid clinic name" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -199,7 +219,7 @@ Deno.serve(async (req) => {
     if (passwordStr.length < 8 || passwordStr.length > 128) {
       return new Response(JSON.stringify({ error: "Invalid password" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -210,7 +230,7 @@ Deno.serve(async (req) => {
     if (!slug || !isValidSlug(slug) || slug.length < 2 || slug.length > 60) {
       return new Response(JSON.stringify({ error: "Invalid clinic URL slug" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -231,7 +251,7 @@ Deno.serve(async (req) => {
 
       return new Response(JSON.stringify({ error: errorMessage }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -253,7 +273,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: "Failed to initialize subscription" }),
         {
           status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: baseHeaders,
         },
       );
     }
@@ -263,7 +283,7 @@ Deno.serve(async (req) => {
       await adminClient.from("tenants").delete().eq("id", tenant.id);
       return new Response(JSON.stringify({ error: "Email provider not configured" }), {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -286,7 +306,7 @@ Deno.serve(async (req) => {
       await adminClient.from("tenants").delete().eq("id", tenant.id);
       return new Response(JSON.stringify({ error: linkErr?.message ?? "Failed to create user" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -305,7 +325,7 @@ Deno.serve(async (req) => {
       await adminClient.from("tenants").delete().eq("id", tenant.id);
       return new Response(JSON.stringify({ error: "Failed to send verification email" }), {
         status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -323,15 +343,21 @@ Deno.serve(async (req) => {
       JSON.stringify({ success: true, tenant_id: tenant.id, slug }),
       {
         status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       },
     );
   } catch (err) {
+    logError("register_clinic_failed", {
+      request_id: requestId,
+      action_type: "register_clinic",
+      resource_type: "tenant",
+      metadata: { error: err instanceof Error ? err.message : String(err) },
+    });
     return new Response(
       JSON.stringify({
         error: err instanceof Error ? err.message : "Internal server error",
       }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: 500, headers: baseHeaders },
     );
   }
 });

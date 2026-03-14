@@ -23,14 +23,24 @@ export const patientDocumentsStorageRepository: PatientDocumentsStorageRepositor
     }
   },
   async download(filePath) {
-    const { data, error } = await supabase.storage.from(BUCKET).download(filePath);
-    if (error || !data) {
-      throw new ServiceError(error?.message ?? "Failed to download document", {
-        code: error?.code,
-        details: error,
+    const { data: signed, error: signError } = await supabase.storage
+      .from(BUCKET)
+      .createSignedUrl(filePath, 60);
+    if (signError || !signed?.signedUrl) {
+      throw new ServiceError(signError?.message ?? "Failed to create signed URL", {
+        code: signError?.code,
+        details: signError,
       });
     }
-    return data;
+
+    const response = await fetch(signed.signedUrl);
+    if (!response.ok) {
+      throw new ServiceError("Failed to download document", {
+        code: "download_failed",
+        details: { status: response.status },
+      });
+    }
+    return await response.blob();
   },
   async remove(filePath) {
     const { error } = await supabase.storage.from(BUCKET).remove([filePath]);

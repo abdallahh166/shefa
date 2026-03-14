@@ -1,6 +1,6 @@
 begin;
 
-select plan(7);
+select plan(11);
 
 set local role postgres;
 set local session_replication_role = replica;
@@ -46,6 +46,11 @@ values
   ('patient-documents', '00000000-0000-0000-0000-000000000011/doc-a.pdf', '00000000-0000-0000-0000-000000000011'),
   ('patient-documents', '00000000-0000-0000-0000-000000000022/doc-b.pdf', '00000000-0000-0000-0000-000000000022');
 
+insert into storage.objects (bucket_id, name, owner)
+values
+  ('avatars', '00000000-0000-0000-0000-000000000011/avatar.png', '00000000-0000-0000-0000-000000000011'),
+  ('avatars', '00000000-0000-0000-0000-000000000022/avatar.png', '00000000-0000-0000-0000-000000000022');
+
 set local session_replication_role = origin;
 
 select public.refresh_report_materialized_views();
@@ -85,6 +90,12 @@ select is(
 );
 
 select is(
+  (select count(*) from storage.objects where bucket_id = 'avatars'),
+  1::bigint,
+  'Storage policies restrict avatars to tenant users'
+);
+
+select is(
   (select count(*) from public.search_global('Patient', 10)),
   1::bigint,
   'Global search returns tenant-scoped patients only'
@@ -94,6 +105,21 @@ select is(
   (select count(*) from public.search_global('INV', 10)),
   2::bigint,
   'Global search returns tenant-scoped invoices only'
+);
+
+select ok(
+  public.check_rate_limit('test-key', 2, 60),
+  'Rate limit allows first hit'
+);
+
+select ok(
+  public.check_rate_limit('test-key', 2, 60),
+  'Rate limit allows second hit'
+);
+
+select ok(
+  not public.check_rate_limit('test-key', 2, 60),
+  'Rate limit blocks third hit'
 );
 
 select * from finish();
