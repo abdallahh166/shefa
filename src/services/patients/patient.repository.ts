@@ -25,7 +25,14 @@ export interface PatientRepository {
   listPaged(params: PatientListParams, tenantId: string): Promise<PagedResult<Patient>>;
   getById(id: string, tenantId: string): Promise<Patient>;
   create(input: PatientCreateInput, tenantId: string): Promise<Patient>;
-  update(id: string, input: PatientUpdateInput, tenantId: string): Promise<Patient>;
+  update(
+    id: string,
+    input: PatientUpdateInput,
+    tenantId: string,
+    expectedUpdatedAt?: string,
+  ): Promise<Patient | null>;
+  findByNameAndDOB(fullName: string, dateOfBirth: string, tenantId: string): Promise<Pick<Patient, "id" | "patient_code" | "full_name" | "date_of_birth">[]>;
+  hasActiveAppointments(patientId: string, tenantId: string): Promise<boolean>;
   archive(id: string, tenantId: string, userId: string): Promise<Patient>;
   restore(id: string, tenantId: string): Promise<Patient>;
   deleteBulk(ids: string[], tenantId: string, userId: string): Promise<void>;
@@ -89,7 +96,7 @@ export const patientRepository: PatientRepository = {
   async create(input, tenantId) {
     const payload = {
       tenant_id: tenantId,
-      patient_code: "",
+      patient_code: null,
       full_name: input.full_name,
       date_of_birth: input.date_of_birth ?? null,
       gender: input.gender ?? null,
@@ -109,7 +116,7 @@ export const patientRepository: PatientRepository = {
 
     return assertOk(result) as Patient;
   },
-  async update(id, input, tenantId) {
+  async update(id, input, tenantId, expectedUpdatedAt) {
     const payload: Record<string, unknown> = {};
 
     if (input.full_name !== undefined) payload.full_name = input.full_name;
@@ -126,15 +133,60 @@ export const patientRepository: PatientRepository = {
       return patientRepository.getById(id, tenantId);
     }
 
-    const result = await supabase
+    let query = supabase
       .from("patients")
       .update(payload)
       .eq("id", id)
-      .eq("tenant_id", tenantId)
-      .select(PATIENT_COLUMNS)
-      .single();
+      .eq("tenant_id", tenantId);
 
-    return assertOk(result) as Patient;
+    if (expectedUpdatedAt) {
+      query = query.eq("updated_at", expectedUpdatedAt);
+    }
+
+    const { data, error } = await query.select(PATIENT_COLUMNS).maybeSingle();
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to update patient", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return (data ?? null) as Patient | null;
+  },
+  async findByNameAndDOB(fullName, dateOfBirth, tenantId) {
+    const { data, error } = await supabase
+      .from("patients")
+      .select("id, patient_code, full_name, date_of_birth")
+      .eq("tenant_id", tenantId)
+      .eq("date_of_birth", dateOfBirth)
+      .ilike("full_name", fullName)
+      .is("deleted_at", null);
+
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to check duplicates", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return (data ?? []) as Pick<Patient, "id" | "patient_code" | "full_name" | "date_of_birth">[];
+  },
+  async hasActiveAppointments(patientId, tenantId) {
+    const { count, error } = await supabase
+      .from("appointments")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .eq("patient_id", patientId)
+      .in("status", ["scheduled", "in_progress"]);
+
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to check appointments", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return (count ?? 0) > 0;
   },
   async archive(id, tenantId, userId) {
     const result = await supabase

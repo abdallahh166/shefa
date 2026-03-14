@@ -22,6 +22,19 @@ export const doctorService = {
       throw toServiceError(err, "Failed to load doctors");
     }
   },
+  async listForMedicalRecords(params: DoctorListParams) {
+    try {
+      assertAnyPermission(["view_medical_records", "manage_medical_records"]);
+      const parsed = doctorListParamsSchema.parse(params);
+      const { tenantId } = getTenantContext();
+      const result = await doctorRepository.listPaged(parsed, tenantId);
+      const data = z.array(doctorSchema).parse(result.data);
+      const count = z.number().int().nonnegative().parse(result.count);
+      return { data, count };
+    } catch (err) {
+      throw toServiceError(err, "Failed to load doctors");
+    }
+  },
   async create(input: DoctorCreateInput) {
     try {
       assertAnyPermission(["manage_users", "manage_clinic"]);

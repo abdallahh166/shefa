@@ -1,18 +1,23 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   ArrowLeft, FileText, Pill, Activity, Stethoscope,
   Calendar, Phone, Mail, Droplets, User, Loader2,
   FlaskConical, Receipt, CalendarDays, Clock, CheckCircle2, XCircle,
-  Printer,
+  Printer, Pencil, Trash2, Plus,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { formatDate, formatCurrency } from "@/shared/utils/formatDate";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PatientDocuments } from "./PatientDocuments";
 import { generatePatientReportPDF, generatePrescriptionsListPDF } from "@/shared/utils/pdfGenerator";
 import { patientService } from "@/services/patients/patient.service";
@@ -23,6 +28,9 @@ import { prescriptionService } from "@/services/prescriptions/prescription.servi
 import { labService } from "@/services/laboratory/lab.service";
 import { billingService } from "@/services/billing/billing.service";
 import { tenantService } from "@/services/settings/tenant.service";
+import { doctorService } from "@/services/doctors/doctor.service";
+import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
+import { toast } from "@/hooks/use-toast";
 
 type Tab = "overview" | "history" | "prescriptions" | "notes" | "lab_orders" | "invoices" | "appointments" | "documents";
 
@@ -40,9 +48,26 @@ const apptStatusVariant: Record<string, "default" | "warning" | "success" | "des
 export const PatientDetailPage = () => {
   const { t, locale, calendarType } = useI18n();
   const { clinicSlug, patientId } = useParams();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const canManageRecords = hasPermission("manage_medical_records");
+  const [recordModalOpen, setRecordModalOpen] = useState(false);
+  const [recordMode, setRecordMode] = useState<"create" | "edit">("create");
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
+  const [recordForm, setRecordForm] = useState({
+    doctor_id: "",
+    record_date: new Date().toISOString().slice(0, 10),
+    record_type: "progress_note",
+    diagnosis: "",
+    notes: "",
+  });
+  const [doctorSearch, setDoctorSearch] = useState("");
+  const debouncedDoctorSearch = useDebouncedValue(doctorSearch, 300);
+  const [savingRecord, setSavingRecord] = useState(false);
+  const [deleteRecordId, setDeleteRecordId] = useState<string | null>(null);
+  const [deletingRecord, setDeletingRecord] = useState(false);
 
   const { data: tenant } = useQuery({
     queryKey: queryKeys.settings.tenant(user?.tenantId),
@@ -79,6 +104,51 @@ export const PatientDetailPage = () => {
     enabled: !!patientId && !!user?.tenantId,
   });
 
+  const { data: doctorPage } = useQuery({
+    queryKey: queryKeys.doctors.list({
+      tenantId: user?.tenantId,
+      page: 1,
+      pageSize: 10,
+      search: debouncedDoctorSearch.trim() || undefined,
+    }),
+    queryFn: async () =>
+      doctorService.listForMedicalRecords({
+        page: 1,
+        pageSize: 10,
+        search: debouncedDoctorSearch.trim() || undefined,
+      }),
+    enabled: recordModalOpen && !!user?.tenantId,
+  });
+
+  const doctors = doctorPage?.data ?? [];
+
+  useEffect(() => {
+    if (!recordModalOpen || recordMode !== "create") return;
+    if (recordForm.doctor_id || !user?.id) return;
+    const match = doctors.find((d: any) => d.user_id === user.id);
+    if (match?.id) {
+      setRecordForm((prev) => ({ ...prev, doctor_id: match.id }));
+    }
+  }, [recordModalOpen, recordMode, recordForm.doctor_id, doctors, user?.id]);
+
+  const recordTypeOptions = useMemo(
+    () => [
+      { value: "progress_note", label: "Progress Note" },
+      { value: "lab_review", label: "Lab Review" },
+      { value: "acute_visit", label: "Acute Visit" },
+      { value: "annual_physical", label: "Annual Physical" },
+    ],
+    [],
+  );
+  const editingRecord = useMemo(
+    () => medicalRecords.find((record: any) => record.id === editingRecordId),
+    [medicalRecords, editingRecordId],
+  );
+  const getRecordTypeLabel = (value?: string) => {
+    if (!value) return "-";
+    return recordTypeOptions.find((option) => option.value === value)?.label ?? value.replace("_", " ");
+  };
+
   const { data: prescriptions = [] } = useQuery({
     queryKey: queryKeys.prescriptions.list({ tenantId: user?.tenantId, filters: { patient_id: patientId } }),
     queryFn: async () => {
@@ -114,6 +184,92 @@ export const PatientDetailPage = () => {
     },
     enabled: !!patientId && !!user?.tenantId,
   });
+
+  const openCreateRecord = () => {
+    setRecordMode("create");
+    setEditingRecordId(null);
+    setRecordForm({
+      doctor_id: "",
+      record_date: new Date().toISOString().slice(0, 10),
+      record_type: "progress_note",
+      diagnosis: "",
+      notes: "",
+    });
+    setDoctorSearch("");
+    setRecordModalOpen(true);
+  };
+
+  const openEditRecord = (record: any) => {
+    setRecordMode("edit");
+    setEditingRecordId(record.id);
+    setRecordForm({
+      doctor_id: record.doctor_id ?? "",
+      record_date: record.record_date ?? new Date().toISOString().slice(0, 10),
+      record_type: record.record_type ?? "progress_note",
+      diagnosis: record.diagnosis ?? "",
+      notes: record.notes ?? "",
+    });
+    setDoctorSearch("");
+    setRecordModalOpen(true);
+  };
+
+  const handleSaveRecord = async () => {
+    if (!patientId) return;
+    if (recordMode === "create" && !recordForm.doctor_id) {
+      toast({
+        title: t("common.missingFields"),
+        description: t("common.pleaseFillAllRequiredFields"),
+        variant: "destructive",
+      });
+      return;
+    }
+    setSavingRecord(true);
+    try {
+      if (recordMode === "create") {
+        await medicalRecordsService.create({
+          patient_id: patientId,
+          doctor_id: recordForm.doctor_id,
+          record_date: recordForm.record_date || undefined,
+          record_type: recordForm.record_type as any,
+          diagnosis: recordForm.diagnosis || null,
+          notes: recordForm.notes || null,
+        });
+        toast({ title: t("common.saved") });
+      } else if (editingRecordId) {
+        await medicalRecordsService.update(editingRecordId, {
+          record_date: recordForm.record_date || undefined,
+          record_type: recordForm.record_type as any,
+          diagnosis: recordForm.diagnosis || null,
+          notes: recordForm.notes || null,
+        });
+        toast({ title: t("common.saved") });
+      }
+      setRecordModalOpen(false);
+      setEditingRecordId(null);
+      queryClient.invalidateQueries({ queryKey: queryKeys.patients.medicalRecords(patientId, user?.tenantId) });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("common.error");
+      toast({ title: t("common.error"), description: message, variant: "destructive" });
+    } finally {
+      setSavingRecord(false);
+    }
+  };
+
+  const handleDeleteRecord = async () => {
+    if (!patientId || !deleteRecordId) return;
+    setDeletingRecord(true);
+    try {
+      await medicalRecordsService.remove(deleteRecordId);
+      toast({ title: t("common.deleted") });
+      setDeleteRecordId(null);
+      queryClient.invalidateQueries({ queryKey: queryKeys.patients.medicalRecords(patientId, user?.tenantId) });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("common.error");
+      toast({ title: t("common.error"), description: message, variant: "destructive" });
+    } finally {
+      setDeletingRecord(false);
+    }
+  };
 
   const getLabStatusLabel = (s: string) =>
     s === "pending" ? t("billing.pending") : s === "processing" ? t("laboratory.processing") : t("appointments.completed");
@@ -376,23 +532,59 @@ export const PatientDetailPage = () => {
       {/* ── MEDICAL HISTORY ── */}
       {activeTab === "history" && (
         <div className="bg-card rounded-lg border overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b bg-muted/20">
+            <h3 className="font-semibold">{t("patients.medicalHistory")}</h3>
+            {canManageRecords && (
+              <Button size="sm" onClick={openCreateRecord} className="gap-2">
+                <Plus className="h-4 w-4" />
+                {t("common.add")}
+              </Button>
+            )}
+          </div>
           {medicalRecords.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">{t("patients.noMedicalHistoryFound")}</div>
           ) : (
             <table className="data-table">
               <thead><tr className="bg-muted/50">
                 <th>{t("common.date")}</th>
+                <th>{t("appointments.type")}</th>
                 <th>{t("common.result")}</th>
                 <th>{t("appointments.doctor")}</th>
                 <th>{t("appointments.notes")}</th>
+                {canManageRecords && <th className="text-right">{t("common.actions")}</th>}
               </tr></thead>
               <tbody>
-                {medicalRecords.map((h: any, i: number) => (
-                  <tr key={i} className="hover:bg-muted/30 transition-colors">
-                    <td className="text-muted-foreground whitespace-nowrap">{formatDate(h.record_date, locale, "date", calendarType)}</td>
-                    <td className="font-medium">{h.diagnosis ?? "—"}</td>
-                    <td>{h.doctors?.full_name ?? "—"}</td>
-                    <td className="text-sm text-muted-foreground max-w-xs truncate">{h.notes}</td>
+                {medicalRecords.map((h: any) => (
+                  <tr key={h.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="text-muted-foreground whitespace-nowrap">
+                      {formatDate(h.record_date, locale, "date", calendarType)}
+                    </td>
+                    <td className="text-sm font-medium">{getRecordTypeLabel(h.record_type)}</td>
+                    <td className="font-medium">{h.diagnosis ?? "-"}</td>
+                    <td>{h.doctors?.full_name ?? "-"}</td>
+                    <td className="text-sm text-muted-foreground max-w-xs truncate">{h.notes ?? "-"}</td>
+                    {canManageRecords && (
+                      <td className="text-right">
+                        <div className="inline-flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="p-2 rounded-md hover:bg-muted"
+                            onClick={() => openEditRecord(h)}
+                            aria-label={t("common.edit")}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            className="p-2 rounded-md hover:bg-muted text-destructive"
+                            onClick={() => setDeleteRecordId(h.id)}
+                            aria-label={t("common.delete")}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -454,19 +646,50 @@ export const PatientDetailPage = () => {
       {/* ── CLINICAL NOTES ── */}
       {activeTab === "notes" && (
         <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold">{t("patients.clinicalNotes")}</h3>
+            {canManageRecords && (
+              <Button size="sm" onClick={openCreateRecord} className="gap-2">
+                <Plus className="h-4 w-4" />
+                {t("common.add")}
+              </Button>
+            )}
+          </div>
           {medicalRecords.length === 0 ? (
             <div className="bg-card rounded-lg border p-8 text-center text-muted-foreground">{t("patients.noClinicalNotesFound")}</div>
           ) : (
-            medicalRecords.map((note: any, i: number) => (
-              <div key={i} className="bg-card rounded-lg border p-5">
-                <div className="flex items-center justify-between mb-3">
+            medicalRecords.map((note: any) => (
+              <div key={note.id} className="bg-card rounded-lg border p-5">
+                <div className="flex items-start justify-between mb-3 gap-3">
                   <div>
-                    <StatusBadge variant="info">{note.record_type?.replace("_", " ") ?? "Note"}</StatusBadge>
-                    <span className="text-sm text-muted-foreground ms-3">{note.doctors?.full_name}</span>
+                    <StatusBadge variant="info">{getRecordTypeLabel(note.record_type)}</StatusBadge>
+                    <span className="text-sm text-muted-foreground ms-3">{note.doctors?.full_name ?? "-"}</span>
                   </div>
-                  <span className="text-sm text-muted-foreground">{formatDate(note.record_date, locale, "date", calendarType)}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{formatDate(note.record_date, locale, "date", calendarType)}</span>
+                    {canManageRecords && (
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          type="button"
+                          className="p-2 rounded-md hover:bg-muted"
+                          onClick={() => openEditRecord(note)}
+                          aria-label={t("common.edit")}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          className="p-2 rounded-md hover:bg-muted text-destructive"
+                          onClick={() => setDeleteRecordId(note.id)}
+                          aria-label={t("common.delete")}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <p className="text-sm leading-relaxed">{note.notes}</p>
+                <p className="text-sm leading-relaxed">{note.notes ?? "-"}</p>
               </div>
             ))
           )}
@@ -590,6 +813,104 @@ export const PatientDetailPage = () => {
       {activeTab === "documents" && (
         <PatientDocuments patientId={patientId ?? ""} />
       )}
+      <Dialog open={recordModalOpen} onOpenChange={(open) => !open && setRecordModalOpen(false)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {recordMode === "create"
+                ? `${t("common.add")} ${t("patients.medicalHistory")}`
+                : `${t("common.edit")} ${t("patients.medicalHistory")}`}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {recordMode === "create" ? (
+              <div className="space-y-2">
+                <Label>{t("appointments.doctor")} *</Label>
+                <Input
+                  value={doctorSearch}
+                  onChange={(e) => setDoctorSearch(e.target.value)}
+                  placeholder={t("common.search")}
+                />
+                <select
+                  value={recordForm.doctor_id}
+                  onChange={(e) => setRecordForm((prev) => ({ ...prev, doctor_id: e.target.value }))}
+                  className="w-full h-10 px-3 rounded-md border bg-background text-sm"
+                >
+                  <option value="">{t("appointments.selectDoctor")}</option>
+                  {doctors.map((doctor: any) => (
+                    <option key={doctor.id} value={doctor.id}>
+                      {doctor.full_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>{t("appointments.doctor")}</Label>
+                <Input value={editingRecord?.doctors?.full_name ?? "-"} disabled />
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>{t("common.date")}</Label>
+                <Input
+                  type="date"
+                  value={recordForm.record_date}
+                  onChange={(e) => setRecordForm((prev) => ({ ...prev, record_date: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("appointments.type")}</Label>
+                <select
+                  value={recordForm.record_type}
+                  onChange={(e) => setRecordForm((prev) => ({ ...prev, record_type: e.target.value }))}
+                  className="w-full h-10 px-3 rounded-md border bg-background text-sm"
+                >
+                  {recordTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>{t("common.result")}</Label>
+              <Input
+                value={recordForm.diagnosis}
+                onChange={(e) => setRecordForm((prev) => ({ ...prev, diagnosis: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{t("appointments.notes")}</Label>
+              <Textarea
+                value={recordForm.notes}
+                onChange={(e) => setRecordForm((prev) => ({ ...prev, notes: e.target.value }))}
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRecordModalOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={handleSaveRecord} disabled={savingRecord}>
+              {savingRecord ? t("common.loading") : t("common.save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={!!deleteRecordId}
+        title={t("common.delete")}
+        message={t("common.confirm")}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
+        variant="danger"
+        loading={deletingRecord}
+        onConfirm={handleDeleteRecord}
+        onCancel={() => setDeleteRecordId(null)}
+      />
     </div>
   );
 };

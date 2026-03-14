@@ -6,6 +6,8 @@ vi.mock("@/services/patients/patient.repository", () => ({
     getById: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+    findByNameAndDOB: vi.fn(),
+    hasActiveAppointments: vi.fn(),
     deleteBulk: vi.fn(),
     archive: vi.fn(),
     restore: vi.fn(),
@@ -56,6 +58,7 @@ describe("patientService permissions", () => {
       },
     }));
     const repo = vi.mocked(patientRepository, true);
+    repo.findByNameAndDOB.mockResolvedValue([]);
     repo.create.mockResolvedValue({
       id: "00000000-0000-0000-0000-000000000333",
       tenant_id: "00000000-0000-0000-0000-000000000111",
@@ -73,5 +76,42 @@ describe("patientService permissions", () => {
       expect.objectContaining({ full_name: "Test Patient" }),
       "00000000-0000-0000-0000-000000000111",
     );
+  });
+
+  it("prevents duplicate patients with same name and DOB", async () => {
+    vi.doMock("@/core/auth/authStore", () => ({
+      useAuth: {
+        getState: () => ({ hasPermission: () => true }),
+      },
+    }));
+    const repo = vi.mocked(patientRepository, true);
+    repo.findByNameAndDOB.mockResolvedValue([
+      {
+        id: "00000000-0000-0000-0000-000000000777",
+        patient_code: "PT-1007",
+        full_name: "Jane Smith",
+        date_of_birth: "1990-01-15",
+      } as any,
+    ]);
+
+    const { patientService: service } = await import("@/services/patients/patient.service");
+    await expect(
+      service.create({ full_name: "Jane Smith", date_of_birth: "1990-01-15" } as any),
+    ).rejects.toThrow("already exists");
+  });
+
+  it("blocks deactivation when patient has active appointments", async () => {
+    vi.doMock("@/core/auth/authStore", () => ({
+      useAuth: {
+        getState: () => ({ hasPermission: () => true }),
+      },
+    }));
+    const repo = vi.mocked(patientRepository, true);
+    repo.hasActiveAppointments.mockResolvedValue(true);
+
+    const { patientService: service } = await import("@/services/patients/patient.service");
+    await expect(
+      service.update("00000000-0000-0000-0000-000000000333", { status: "inactive" } as any),
+    ).rejects.toThrow("active appointments");
   });
 });

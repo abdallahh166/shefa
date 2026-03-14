@@ -21,7 +21,12 @@ const notificationRepository = vi.hoisted(() => ({
   create: vi.fn(),
   subscribeToUser: vi.fn(),
 }));
-const medicalRecordsRepository = vi.hoisted(() => ({ listByPatient: vi.fn() }));
+const medicalRecordsRepository = vi.hoisted(() => ({
+  listByPatient: vi.fn(),
+  create: vi.fn(),
+  update: vi.fn(),
+  remove: vi.fn(),
+}));
 const tenantRepository = vi.hoisted(() => ({ getById: vi.fn(), update: vi.fn() }));
 const profileRepository = vi.hoisted(() => ({ updateByUserId: vi.fn() }));
 const notificationPreferencesRepository = vi.hoisted(() => ({ getByUserId: vi.fn(), upsert: vi.fn() }));
@@ -136,6 +141,41 @@ describe("services smoke", () => {
     });
     notificationRepository.subscribeToUser.mockReturnValue({ unsubscribe: vi.fn() });
     medicalRecordsRepository.listByPatient.mockResolvedValue([]);
+    medicalRecordsRepository.create.mockResolvedValue({
+      id: recordId,
+      tenant_id: tenantId,
+      patient_id: recordId,
+      doctor_id: recordId,
+      record_date: "2026-03-14",
+      diagnosis: null,
+      notes: null,
+      record_type: "progress_note",
+      created_at: now,
+      doctors: { full_name: "Dr Test" },
+    });
+    medicalRecordsRepository.update.mockResolvedValue({
+      id: recordId,
+      tenant_id: tenantId,
+      patient_id: recordId,
+      doctor_id: recordId,
+      record_date: "2026-03-14",
+      diagnosis: "Updated",
+      notes: "Note",
+      record_type: "progress_note",
+      created_at: now,
+      doctors: { full_name: "Dr Test" },
+    });
+    medicalRecordsRepository.remove.mockResolvedValue({
+      id: recordId,
+      tenant_id: tenantId,
+      patient_id: recordId,
+      doctor_id: recordId,
+      record_date: "2026-03-14",
+      diagnosis: null,
+      notes: null,
+      record_type: "progress_note",
+      created_at: now,
+    });
     tenantRepository.getById.mockResolvedValue({
       id: tenantId,
       slug: "clinic",
@@ -239,6 +279,14 @@ describe("services smoke", () => {
     notifSub.unsubscribe();
 
     await medicalRecordsService.listByPatient(recordId, { limit: 10, offset: 0 });
+    await medicalRecordsService.create({
+      patient_id: recordId,
+      doctor_id: recordId,
+      record_type: "progress_note",
+      record_date: "2026-03-14",
+    });
+    await medicalRecordsService.update(recordId, { notes: "Note" });
+    await medicalRecordsService.remove(recordId);
 
     await tenantService.getCurrentTenant();
     await tenantService.updateCurrentTenant({ name: "Clinic Updated" });

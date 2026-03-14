@@ -6,6 +6,8 @@ import {
   patientListParamsSchema,
   medicalRecordSchema,
   medicalRecordWithDoctorSchema,
+  medicalRecordCreateSchema,
+  medicalRecordUpdateSchema,
   patientDocumentSchema,
   patientDocumentCreateSchema,
   patientDocumentUploadSchema,
@@ -17,6 +19,8 @@ export type PatientUpdateInput = z.infer<typeof patientUpdateSchema>;
 export type PatientListParams = z.infer<typeof patientListParamsSchema>;
 export type MedicalRecord = z.infer<typeof medicalRecordSchema>;
 export type MedicalRecordWithDoctor = z.infer<typeof medicalRecordWithDoctorSchema>;
+export type MedicalRecordCreateInput = z.infer<typeof medicalRecordCreateSchema>;
+export type MedicalRecordUpdateInput = z.infer<typeof medicalRecordUpdateSchema>;
 export type PatientDocument = z.infer<typeof patientDocumentSchema>;
 export type PatientDocumentCreateInput = z.infer<typeof patientDocumentCreateSchema>;
 export type PatientDocumentUploadInput = z.infer<typeof patientDocumentUploadSchema>;

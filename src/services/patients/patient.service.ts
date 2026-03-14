@@ -8,7 +8,7 @@ import {
 import { uuidListSchema, uuidSchema } from "@/domain/shared/identifiers.schema";
 import type { PatientCreateInput, PatientListParams, PatientUpdateInput } from "@/domain/patient/patient.types";
 import { emitDomainEvent } from "@/core/events";
-import { toServiceError } from "@/services/supabase/errors";
+import { BusinessRuleError, ConflictError, NotFoundError, toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { assertAnyPermission } from "@/services/supabase/permissions";
 import { patientRepository } from "./patient.repository";
@@ -43,6 +43,29 @@ export const patientService = {
       assertAnyPermission(["manage_patients"]);
       const parsed = patientCreateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
+      if (parsed.full_name && parsed.date_of_birth) {
+        const duplicates = await patientRepository.findByNameAndDOB(
+          parsed.full_name,
+          parsed.date_of_birth,
+          tenantId,
+        );
+        if (duplicates.length > 0) {
+          throw new ConflictError(
+            `Patient "${parsed.full_name}" born on ${parsed.date_of_birth} already exists`,
+            {
+              code: "DUPLICATE_PATIENT",
+              details: {
+                possibleDuplicates: duplicates.map((item) => ({
+                  id: item.id,
+                  patient_code: item.patient_code,
+                  full_name: item.full_name,
+                  date_of_birth: item.date_of_birth,
+                })),
+              },
+            },
+          );
+        }
+      }
       const result = await patientRepository.create(parsed, tenantId);
       const patient = patientSchema.parse(result);
       await emitDomainEvent(
@@ -61,7 +84,24 @@ export const patientService = {
       const parsedId = uuidSchema.parse(id);
       const parsed = patientUpdateSchema.parse(input);
       const { tenantId } = getTenantContext();
-      const result = await patientRepository.update(parsedId, parsed, tenantId);
+      if (parsed.status === "inactive") {
+        const hasActive = await patientRepository.hasActiveAppointments(parsedId, tenantId);
+        if (hasActive) {
+          throw new BusinessRuleError("Cannot deactivate patient with active appointments", {
+            code: "PATIENT_HAS_ACTIVE_APPOINTMENTS",
+          });
+        }
+      }
+      const { expected_updated_at, ...updates } = parsed;
+      const result = await patientRepository.update(parsedId, updates, tenantId, expected_updated_at);
+      if (!result) {
+        if (expected_updated_at) {
+          throw new ConflictError("Patient was modified by another user", {
+            code: "CONCURRENT_UPDATE",
+          });
+        }
+        throw new NotFoundError("Patient not found");
+      }
       return patientSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to update patient");
@@ -82,6 +122,12 @@ export const patientService = {
       assertAnyPermission(["manage_patients"]);
       const parsedId = uuidSchema.parse(id);
       const { tenantId, userId } = getTenantContext();
+      const hasActive = await patientRepository.hasActiveAppointments(parsedId, tenantId);
+      if (hasActive) {
+        throw new BusinessRuleError("Cannot archive patient with active appointments", {
+          code: "PATIENT_HAS_ACTIVE_APPOINTMENTS",
+        });
+      }
       const result = await patientRepository.archive(parsedId, tenantId, userId);
       return patientSchema.parse(result);
     } catch (err) {

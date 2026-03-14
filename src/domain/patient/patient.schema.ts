@@ -49,7 +49,9 @@ export const patientCreateSchema = patientSchema
     status: patientStatusEnum.optional(),
   });
 
-export const patientUpdateSchema = patientCreateSchema.partial();
+export const patientUpdateSchema = patientCreateSchema.partial().extend({
+  expected_updated_at: dateTimeStringSchema.optional(),
+});
 
 export const patientListParamsSchema = listParamsSchema;
 
@@ -74,6 +76,24 @@ export const medicalRecordSchema = z.object({
 
 export const medicalRecordWithDoctorSchema = medicalRecordSchema.extend({
   doctors: z.object({ full_name: z.string().trim().min(1) }).optional().nullable(),
+});
+
+export const medicalRecordCreateSchema = medicalRecordSchema
+  .omit({
+    id: true,
+    tenant_id: true,
+    created_at: true,
+  })
+  .extend({
+    record_date: dateStringSchema.optional(),
+    record_type: medicalRecordTypeEnum.optional(),
+  });
+
+export const medicalRecordUpdateSchema = z.object({
+  record_date: dateStringSchema.optional(),
+  diagnosis: z.string().trim().max(500).optional().nullable(),
+  notes: z.string().trim().max(5000).optional().nullable(),
+  record_type: medicalRecordTypeEnum.optional(),
 });
 
 const fileSchema = z.custom<File>((value) => {
