@@ -16,6 +16,10 @@ dist-ssr
 .env.*.local
 .npm-cache/
 
+# Bun (avoid Railpack picking bun lockfiles)
+bun.lock
+bun.lockb
+
 
 # Supabase CLI local state (may contain connection info)
 supabase/.temp/

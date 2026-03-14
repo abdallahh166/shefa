@@ -1,7 +1,7 @@
 project_id = "owfuzrsfagufcchrxpvm"
 
 [db.pooler]
-enabled = true
+enabled = false
 pool_mode = "transaction"
 default_pool_size = 20
 max_client_conn = 100
