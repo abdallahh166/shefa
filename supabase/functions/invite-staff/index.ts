@@ -4,6 +4,9 @@ import {
   enforceCors,
   getAllowedOriginsFromEnv,
 } from "../_shared/cors.ts";
+import { initSentry } from "../_shared/sentry.ts";
+import { logError, logInfo } from "../_shared/logger.ts";
+import { createRequestId, getClientIp } from "../_shared/request.ts";
 
 const allowedOrigins = getAllowedOriginsFromEnv();
 
@@ -14,9 +17,12 @@ const RATE_LIMIT_MAX = 10;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 Deno.serve(async (req) => {
+  initSentry();
   const { corsHeaders, errorResponse } = enforceCors(req, {
     allowedOrigins,
   });
+  const requestId = createRequestId(req);
+  const baseHeaders = { ...corsHeaders, "Content-Type": "application/json", "x-request-id": requestId };
 
   if (errorResponse) {
     return errorResponse;
@@ -29,20 +35,24 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: baseHeaders,
     });
   }
 
-  const clientIp =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    req.headers.get("cf-connecting-ip") ?? "unknown";
+  const clientIp = getClientIp(req);
+  logInfo("invite_staff_request", {
+    request_id: requestId,
+    action_type: "invite_staff",
+    resource_type: "user_invite",
+    metadata: { client_ip: clientIp },
+  });
 
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -64,9 +74,15 @@ Deno.serve(async (req) => {
     );
 
     if (rateError) {
+      logError("invite_staff_rate_limit_error", {
+        request_id: requestId,
+        action_type: "invite_staff",
+        resource_type: "user_invite",
+        metadata: { error: rateError.message },
+      });
       return new Response(JSON.stringify({ error: "Rate limiter unavailable" }), {
         status: 503,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -76,8 +92,7 @@ Deno.serve(async (req) => {
         {
           status: 429,
           headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
+            ...baseHeaders,
             "Retry-After": "15",
           },
         },
@@ -94,7 +109,7 @@ Deno.serve(async (req) => {
     if (claimsError || !claimsData?.claims?.sub) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -111,7 +126,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: "Only clinic admins can invite staff" }),
         {
           status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: baseHeaders,
         },
       );
     }
@@ -125,7 +140,7 @@ Deno.serve(async (req) => {
     if (!callerProfile) {
       return new Response(JSON.stringify({ error: "Caller profile not found" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -133,7 +148,7 @@ Deno.serve(async (req) => {
     if (!email || !full_name || !role) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -141,7 +156,7 @@ Deno.serve(async (req) => {
     if (!EMAIL_REGEX.test(normalizedEmail)) {
       return new Response(JSON.stringify({ error: "Invalid email" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -149,7 +164,7 @@ Deno.serve(async (req) => {
     if (normalizedName.length < 2 || normalizedName.length > 100) {
       return new Response(JSON.stringify({ error: "Invalid full name" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -163,7 +178,7 @@ Deno.serve(async (req) => {
     if (!validRoles.includes(role)) {
       return new Response(JSON.stringify({ error: "Invalid role" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -178,9 +193,17 @@ Deno.serve(async (req) => {
     });
 
     if (inviteErr) {
+      logError("invite_staff_failed", {
+        request_id: requestId,
+        tenant_id: callerProfile.tenant_id,
+        user_id: callerId,
+        action_type: "invite_staff",
+        resource_type: "user_invite",
+        metadata: { error: inviteErr.message },
+      });
       return new Response(JSON.stringify({ error: inviteErr.message }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -205,9 +228,17 @@ Deno.serve(async (req) => {
         .eq("invite_code", inviteCode)
         .is("consumed_at", null);
 
+      logError("invite_staff_create_user_failed", {
+        request_id: requestId,
+        tenant_id: callerProfile.tenant_id,
+        user_id: callerId,
+        action_type: "invite_staff",
+        resource_type: "user_invite",
+        metadata: { error: createErr.message },
+      });
       return new Response(JSON.stringify({ error: createErr.message }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -225,15 +256,21 @@ Deno.serve(async (req) => {
       JSON.stringify({ success: true, user_id: inviteUserData.user?.id }),
       {
         status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       },
     );
   } catch (err) {
+    logError("invite_staff_unhandled", {
+      request_id: requestId,
+      action_type: "invite_staff",
+      resource_type: "user_invite",
+      metadata: { error: err instanceof Error ? err.message : String(err) },
+    });
     return new Response(
       JSON.stringify({
         error: err instanceof Error ? err.message : "Internal server error",
       }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: 500, headers: baseHeaders },
     );
   }
 });

@@ -186,6 +186,7 @@ export const LoginPage = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
+                data-testid="login-email"
               />
             </div>
             <div className="space-y-2">
@@ -195,6 +196,7 @@ export const LoginPage = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
+                data-testid="login-password"
               />
               {mode === "signup" && <PasswordStrength password={password} t={t} />}
             </div>
@@ -207,7 +209,7 @@ export const LoginPage = () => {
                 />
               </div>
             )}
-            <Button type="submit" className="w-full" disabled={mode === "signup" ? isSignupDisabled : loading}>
+            <Button type="submit" className="w-full" disabled={mode === "signup" ? isSignupDisabled : loading} data-testid="login-submit">
               {loading ? t("common.loading") : mode === "login" ? t("auth.login") : t("auth.createAccount")}
             </Button>
           </form>
@@ -253,3 +255,5 @@ export const LoginPage = () => {
     </div>
   );
 };
+
+

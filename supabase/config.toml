@@ -1,5 +1,11 @@
 project_id = "owfuzrsfagufcchrxpvm"
 
+[db.pooler]
+enabled = true
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
 [functions.invite-staff]
 verify_jwt = true
 

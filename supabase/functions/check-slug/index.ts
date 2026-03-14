@@ -1,6 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enforceCors, getAllowedOriginsFromEnv } from "../_shared/cors.ts";
 import { verifyCaptcha } from "../_shared/captcha.ts";
+import { initSentry } from "../_shared/sentry.ts";
+import { logError, logInfo } from "../_shared/logger.ts";
+import { createRequestId, getClientIp } from "../_shared/request.ts";
 
 const allowedOrigins = getAllowedOriginsFromEnv();
 
@@ -39,9 +42,13 @@ async function findAvailableSlugs(
 }
 
 Deno.serve(async (req) => {
+  initSentry();
   const { corsHeaders, errorResponse } = enforceCors(req, {
     allowedOrigins,
   });
+  const requestId = createRequestId(req);
+  const clientIp = getClientIp(req);
+  const baseHeaders = { ...corsHeaders, "Content-Type": "application/json", "x-request-id": requestId };
 
   if (errorResponse) {
     return errorResponse;
@@ -54,15 +61,17 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: baseHeaders,
     });
   }
 
   // Rate limit by client IP
-  const clientIp =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    req.headers.get("cf-connecting-ip") ??
-    "unknown";
+  logInfo("check_slug_request", {
+    request_id: requestId,
+    action_type: "check_slug",
+    resource_type: "tenant",
+    metadata: { client_ip: clientIp },
+  });
 
   try {
     const adminClient = createClient(
@@ -80,9 +89,15 @@ Deno.serve(async (req) => {
     );
 
     if (rateError) {
+      logError("check_slug_rate_limit_error", {
+        request_id: requestId,
+        action_type: "check_slug",
+        resource_type: "tenant",
+        metadata: { error: rateError.message },
+      });
       return new Response(JSON.stringify({ error: "Rate limiter unavailable" }), {
         status: 503,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -92,8 +107,7 @@ Deno.serve(async (req) => {
         {
           status: 429,
           headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
+            ...baseHeaders,
             "Retry-After": "10",
           },
         },
@@ -109,7 +123,7 @@ Deno.serve(async (req) => {
     if (!captchaResult.ok) {
       return new Response(JSON.stringify({ error: captchaResult.error ?? "Captcha verification failed" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: baseHeaders,
       });
     }
 
@@ -126,7 +140,7 @@ Deno.serve(async (req) => {
           slug: "",
           error: "Clinic name produces an invalid URL. Use letters or numbers.",
         }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 200, headers: baseHeaders },
       );
     }
 
@@ -136,7 +150,7 @@ Deno.serve(async (req) => {
     ) {
       return new Response(
         JSON.stringify({ error: "Clinic name must be at least 2 characters" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 400, headers: baseHeaders },
       );
     }
 
@@ -152,18 +166,24 @@ Deno.serve(async (req) => {
       const suggestions = await findAvailableSlugs(adminClient, baseSlug);
       return new Response(
         JSON.stringify({ available: false, slug: slugToCheck, suggestions }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 200, headers: baseHeaders },
       );
     }
 
     return new Response(
       JSON.stringify({ available: true, slug: slugToCheck, suggestions: [] }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: 200, headers: baseHeaders },
     );
   } catch (err) {
+    logError("check_slug_failed", {
+      request_id: requestId,
+      action_type: "check_slug",
+      resource_type: "tenant",
+      metadata: { error: err instanceof Error ? err.message : String(err) },
+    });
     return new Response(
       JSON.stringify({ error: err instanceof Error ? err.message : "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: 500, headers: baseHeaders },
     );
   }
 });

@@ -1,10 +1,16 @@
 import { enforceCors, getAllowedOriginsFromEnv } from "../_shared/cors.ts";
 import { requireAdmin } from "../_shared/auth.ts";
+import { initSentry } from "../_shared/sentry.ts";
+import { logError, logInfo } from "../_shared/logger.ts";
+import { createRequestId } from "../_shared/request.ts";
 
 const allowedOrigins = getAllowedOriginsFromEnv();
 
 Deno.serve(async (req) => {
+  initSentry();
   const { corsHeaders, errorResponse } = enforceCors(req, { allowedOrigins });
+  const requestId = createRequestId(req);
+  const baseHeaders = { ...corsHeaders, "Content-Type": "application/json", "x-request-id": requestId };
   if (errorResponse) return errorResponse;
 
   if (req.method === "OPTIONS") {
@@ -14,7 +20,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: baseHeaders,
     });
   }
 
@@ -22,11 +28,18 @@ Deno.serve(async (req) => {
   if ("error" in auth) {
     return new Response(auth.error.body, {
       status: auth.error.status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: baseHeaders,
     });
   }
 
   const { adminClient, tenantId, userId } = auth;
+  logInfo("send_invoice_emails_request", {
+    request_id: requestId,
+    tenant_id: tenantId,
+    user_id: userId,
+    action_type: "send_invoice_emails",
+    resource_type: "job",
+  });
 
   const { data: invoices, error } = await adminClient
     .from("invoices")
@@ -36,9 +49,17 @@ Deno.serve(async (req) => {
     .limit(25);
 
   if (error) {
+    logError("send_invoice_emails_failed", {
+      request_id: requestId,
+      tenant_id: tenantId,
+      user_id: userId,
+      action_type: "send_invoice_emails",
+      resource_type: "job",
+      metadata: { error: error.message ?? "Failed to load invoices" },
+    });
     return new Response(JSON.stringify({ error: error.message ?? "Failed to load invoices" }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: baseHeaders,
     });
   }
 
@@ -53,6 +74,6 @@ Deno.serve(async (req) => {
 
   return new Response(JSON.stringify({ success: true, pending: invoices?.length ?? 0 }), {
     status: 200,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: baseHeaders,
   });
 });

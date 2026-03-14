@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { patientRepository } from "@/services/patients/patient.repository";
 vi.mock("@/services/patients/patient.repository", () => ({
   patientRepository: {
     listPaged: vi.fn(),
@@ -46,5 +47,31 @@ describe("patientService permissions", () => {
     await expect(
       service.create({ full_name: "Patient X" } as any),
     ).rejects.toThrow("Not authorized");
+  });
+
+  it("passes tenant context when creating a patient", async () => {
+    vi.doMock("@/core/auth/authStore", () => ({
+      useAuth: {
+        getState: () => ({ hasPermission: () => true }),
+      },
+    }));
+    const repo = vi.mocked(patientRepository, true);
+    repo.create.mockResolvedValue({
+      id: "00000000-0000-0000-0000-000000000333",
+      tenant_id: "00000000-0000-0000-0000-000000000111",
+      patient_code: "PT-1001",
+      full_name: "Test Patient",
+      status: "active",
+      created_at: "2026-03-14T10:00:00Z",
+      updated_at: "2026-03-14T10:00:00Z",
+    } as any);
+
+    const { patientService: service } = await import("@/services/patients/patient.service");
+    await service.create({ full_name: "Test Patient" } as any);
+
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ full_name: "Test Patient" }),
+      "00000000-0000-0000-0000-000000000111",
+    );
   });
 });

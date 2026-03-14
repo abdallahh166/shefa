@@ -120,11 +120,13 @@ export const NewAppointmentModal = ({ open, onClose, onSuccess }: NewAppointment
               value={patientSearch}
               onChange={(e) => setPatientSearch(e.target.value)}
               placeholder={t("common.search")}
+              data-testid="appointment-patient-search"
             />
             <select
               value={form.patient_id}
               onChange={(e) => setForm({ ...form, patient_id: e.target.value })}
               className="w-full h-10 px-3 rounded-md border bg-background text-sm"
+              data-testid="appointment-patient-select"
             >
               <option value="">{t("appointments.selectPatient")}</option>
               {patients.map((p) => (
@@ -140,11 +142,13 @@ export const NewAppointmentModal = ({ open, onClose, onSuccess }: NewAppointment
               value={doctorSearch}
               onChange={(e) => setDoctorSearch(e.target.value)}
               placeholder={t("common.search")}
+              data-testid="appointment-doctor-search"
             />
             <select
               value={form.doctor_id}
               onChange={(e) => setForm({ ...form, doctor_id: e.target.value })}
               className="w-full h-10 px-3 rounded-md border bg-background text-sm"
+              data-testid="appointment-doctor-select"
             >
               <option value="">{t("appointments.selectDoctor")}</option>
               {doctors.map((d) => (
@@ -160,6 +164,7 @@ export const NewAppointmentModal = ({ open, onClose, onSuccess }: NewAppointment
               type="datetime-local"
               value={form.appointment_date}
               onChange={(e) => setForm({ ...form, appointment_date: e.target.value })}
+              data-testid="appointment-date"
             />
           </div>
           <div className="space-y-2">
@@ -183,7 +188,7 @@ export const NewAppointmentModal = ({ open, onClose, onSuccess }: NewAppointment
             <Button type="button" variant="outline" onClick={onClose}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading} data-testid="appointment-save">
               {loading ? t("common.loading") : t("common.save")}
             </Button>
           </div>
