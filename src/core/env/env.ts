@@ -9,14 +9,35 @@ const envSchema = z.object({
   VITE_APP_VERSION: z.string().min(1).optional().or(z.literal("")),
 });
 
-const parsed = envSchema.safeParse({
-  VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
-  VITE_SUPABASE_PUBLISHABLE_KEY: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-  VITE_SUPABASE_PROJECT_ID: import.meta.env.VITE_SUPABASE_PROJECT_ID,
-  VITE_CAPTCHA_SITE_KEY: import.meta.env.VITE_CAPTCHA_SITE_KEY,
-  VITE_SENTRY_DSN: import.meta.env.VITE_SENTRY_DSN,
-  VITE_APP_VERSION: import.meta.env.VITE_APP_VERSION,
+const isTest =
+  typeof process !== "undefined" &&
+  (process.env.VITEST || process.env.NODE_ENV === "test");
+
+const getEnv = (key: keyof z.infer<typeof envSchema>) => {
+  const metaEnv = typeof import.meta !== "undefined" ? (import.meta as any).env : undefined;
+  const processEnv = typeof process !== "undefined" ? process.env : undefined;
+  return metaEnv?.[key] ?? processEnv?.[key];
+};
+
+let parsed = envSchema.safeParse({
+  VITE_SUPABASE_URL: getEnv("VITE_SUPABASE_URL"),
+  VITE_SUPABASE_PUBLISHABLE_KEY: getEnv("VITE_SUPABASE_PUBLISHABLE_KEY"),
+  VITE_SUPABASE_PROJECT_ID: getEnv("VITE_SUPABASE_PROJECT_ID"),
+  VITE_CAPTCHA_SITE_KEY: getEnv("VITE_CAPTCHA_SITE_KEY"),
+  VITE_SENTRY_DSN: getEnv("VITE_SENTRY_DSN"),
+  VITE_APP_VERSION: getEnv("VITE_APP_VERSION"),
 });
+
+if (!parsed.success && isTest) {
+  parsed = envSchema.safeParse({
+    VITE_SUPABASE_URL: "http://localhost",
+    VITE_SUPABASE_PUBLISHABLE_KEY: "test-key",
+    VITE_SUPABASE_PROJECT_ID: "",
+    VITE_CAPTCHA_SITE_KEY: "",
+    VITE_SENTRY_DSN: "",
+    VITE_APP_VERSION: "",
+  });
+}
 
 if (!parsed.success) {
   const message =
