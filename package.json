@@ -15,7 +15,6 @@
     "test:db": "supabase test db",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "env:local": "node scripts/switch-env.mjs local",
     "env:remote": "node scripts/switch-env.mjs remote",
     "env:status": "node scripts/switch-env.mjs status",
     "health:outbound": "node scripts/outbound-health.mjs"

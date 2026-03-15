@@ -40,18 +40,7 @@ const status = () => {
 
 try {
   if (mode === "local") {
-    if (fileExists(envLocal)) {
-      console.log("Local env already active (.env.local exists).");
-    } else if (fileExists(envLocalDisabled)) {
-      const restored = renameSafe(envLocalDisabled, envLocal);
-      console.log(`Restored ${path.basename(restored)} -> .env.local`);
-    } else {
-      const created = copyIfMissing(envLocalExample, envLocal);
-      if (created) {
-        console.log("Created .env.local from .env.local.example.");
-      }
-    }
-    status();
+    throw new Error("Local Supabase is disabled for this project. Use remote env only.");
   } else if (mode === "remote") {
     const disabled = renameSafe(envLocal, envLocalDisabled);
     if (disabled) {
