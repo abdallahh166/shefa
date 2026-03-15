@@ -4,7 +4,8 @@ import { DataTable, Column } from "@/shared/components/DataTable";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { StatusFilter } from "@/shared/components/StatusFilter";
 import { StatCard } from "@/shared/components/StatCard";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
+import { PageContainer, SectionHeader } from "@/components/layout/AppLayout";
 import { Pill, Package, AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { useAuth } from "@/core/auth/authStore";
@@ -35,6 +36,10 @@ export const PharmacyPage = () => {
   const [deleting, setDeleting] = useState(false);
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
+  const [sort, setSort] = useState<{ column: string; direction: "asc" | "desc" }>({
+    column: "created_at",
+    direction: "desc",
+  });
   const pageSize = 25;
 
   useRealtimeSubscription(["medications"]);
@@ -46,13 +51,14 @@ export const PharmacyPage = () => {
       pageSize,
       search: searchTerm.trim() || undefined,
       filters: statusFilter ? { status: statusFilter } : undefined,
+      sort: { column: sort.column, ascending: sort.direction === "asc" },
     }),
     queryFn: async () => pharmacyService.listPaged({
       page,
       pageSize,
       search: searchTerm.trim() || undefined,
       filters: statusFilter ? { status: statusFilter } : undefined,
-      sort: { column: "created_at", ascending: false },
+      sort: { column: sort.column, ascending: sort.direction === "asc" },
     }),
     enabled: !!user?.tenantId,
   });
@@ -124,46 +130,68 @@ export const PharmacyPage = () => {
   };
 
   const columns: Column<MedicationRow>[] = [
-    { key: "name", header: t("pharmacy.medication"), searchable: true, render: (m) => <span className="font-medium">{m.name}</span> },
+    { key: "name", header: t("pharmacy.medication"), searchable: true, sortable: true, render: (m) => <span className="font-medium">{m.name}</span> },
     { key: "category", header: t("common.category"), searchable: true },
     {
       key: "stock",
       header: t("common.stock"),
+      sortable: true,
       render: (m) => (
         <div className="flex items-center gap-2">
           <span>{m.stock} {m.unit}</span>
           <div className="flex gap-1">
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
               onClick={() => handleUpdateStock(m.id, m.stock + 10)}
-              className="h-5 w-5 rounded bg-muted hover:bg-muted-foreground/20 text-xs font-medium"
-            >+</button>
-            <button
+              className="h-5 w-5 p-0 rounded bg-muted hover:bg-muted-foreground/20 text-xs font-medium"
+              aria-label={t("pharmacy.increaseStock")}
+            >
+              +
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
               onClick={() => handleUpdateStock(m.id, Math.max(0, m.stock - 10))}
-              className="h-5 w-5 rounded bg-muted hover:bg-muted-foreground/20 text-xs font-medium"
-            >-</button>
+              className="h-5 w-5 p-0 rounded bg-muted hover:bg-muted-foreground/20 text-xs font-medium"
+              aria-label={t("pharmacy.decreaseStock")}
+            >
+              -
+            </Button>
           </div>
         </div>
       ),
     },
-    { key: "price", header: t("common.price"), render: (m) => formatCurrency(m.price, locale) },
-    { key: "status", header: t("common.status"), render: (m) => <StatusBadge variant={statusVariant[m.status] ?? "default"}>{getMedStatusLabel(m.status)}</StatusBadge> },
+    { key: "price", header: t("common.price"), sortable: true, render: (m) => formatCurrency(m.price, locale) },
+    { key: "status", header: t("common.status"), sortable: true, render: (m) => <StatusBadge variant={statusVariant[m.status] ?? "default"}>{getMedStatusLabel(m.status)}</StatusBadge> },
     {
       key: "actions",
       header: t("common.actions"),
       render: (m) => (
-        <button onClick={() => setDeleteId(m.id)} className="p-1.5 rounded-md hover:bg-muted text-destructive">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => setDeleteId(m.id)}
+          className="text-destructive hover:text-destructive"
+          aria-label={t("common.remove")}
+          title={t("common.remove")}
+        >
           <Trash2 className="h-4 w-4" />
-        </button>
+        </Button>
       ),
     },
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="page-header">
-        <h1 className="page-title">{t("pharmacy.title")}</h1>
-        <Button onClick={() => setShowAddModal(true)}><Plus className="h-4 w-4" /> {t("pharmacy.addMedication")}</Button>
-      </div>
+    <PageContainer className="space-y-6">
+      <SectionHeader
+        title={t("pharmacy.title")}
+        actions={(
+          <Button onClick={() => setShowAddModal(true)}><Plus className="h-4 w-4" /> {t("pharmacy.addMedication")}</Button>
+        )}
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard title={t("pharmacy.totalMedications")} value={String(totalCount)} icon={Pill} />
@@ -180,6 +208,12 @@ export const PharmacyPage = () => {
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
         isLoading={isLoading}
+        sortColumn={sort.column}
+        sortDirection={sort.direction}
+        onSortChange={(column, direction) => {
+          setSort({ column, direction });
+          setPage(1);
+        }}
         page={page}
         pageSize={pageSize}
         total={total}
@@ -215,6 +249,6 @@ export const PharmacyPage = () => {
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
       />
-    </div>
+    </PageContainer>
   );
 };

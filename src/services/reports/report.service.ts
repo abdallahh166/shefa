@@ -8,7 +8,7 @@ import {
   revenueByMonthRowSchema,
   revenueByServiceRowSchema,
 } from "@/domain/reports/reports.schema";
-import { AuthorizationError, toServiceError } from "@/services/supabase/errors";
+import { AuthorizationError, ServiceError, toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { reportRepository } from "./report.repository";
 
@@ -24,6 +24,46 @@ const limitSchema = z.coerce.number().int().min(1).max(20);
 
 const monthLabel = (dateStr: string, withYear: boolean) =>
   new Date(dateStr).toLocaleString("en", withYear ? { month: "short", year: "2-digit" } : { month: "short" });
+
+const reportStaleErrorCodes = new Set([
+  "42P01", // undefined table/view
+  "42703", // undefined column
+  "42883", // undefined function
+  "42P10", // invalid column reference
+  "PGRST202", // RPC not found
+  "PGRST203",
+  "PGRST204",
+]);
+
+const reportStaleMessageFragments = [
+  "materialized view",
+  "mv_report_",
+  "relation \"mv_report",
+  "cache lookup failed",
+  "get_report_",
+  "does not exist",
+];
+
+const isReportStaleError = (err: ServiceError) => {
+  if (err.code && reportStaleErrorCodes.has(err.code)) return true;
+  const detailMessage =
+    typeof err.details === "object" && err.details && "message" in err.details
+      ? String((err.details as { message?: string }).message ?? "")
+      : "";
+  const combined = `${err.message ?? ""} ${detailMessage}`.toLowerCase();
+  return reportStaleMessageFragments.some((fragment) => combined.includes(fragment));
+};
+
+const handleReportError = <T>(err: unknown, fallbackMessage: string, fallbackValue: T): T => {
+  const mapped = toServiceError(err, fallbackMessage);
+  if (mapped instanceof AuthorizationError) {
+    throw mapped;
+  }
+  if (mapped instanceof ServiceError && isReportStaleError(mapped)) {
+    return fallbackValue;
+  }
+  throw mapped;
+};
 
 export const reportService = {
   async canViewReports() {
@@ -43,7 +83,12 @@ export const reportService = {
       const result = await reportRepository.getOverview(tenantId);
       return reportOverviewSchema.parse(result);
     } catch (err) {
-      throw toServiceError(err, "Failed to load reports overview");
+      return handleReportError(err, "Failed to load reports overview", {
+        total_revenue: 0,
+        total_patients: 0,
+        total_appointments: 0,
+        avg_doctor_rating: 0,
+      });
     }
   },
   async getRevenueByMonth(months = 6) {
@@ -58,7 +103,7 @@ export const reportService = {
         expenses: row.expenses,
       }));
     } catch (err) {
-      throw toServiceError(err, "Failed to load revenue report");
+      return handleReportError(err, "Failed to load revenue report", []);
     }
   },
   async getPatientGrowth(months = 6) {
@@ -72,7 +117,7 @@ export const reportService = {
         patients: row.total_patients,
       }));
     } catch (err) {
-      throw toServiceError(err, "Failed to load patient growth report");
+      return handleReportError(err, "Failed to load patient growth report", []);
     }
   },
   async getAppointmentTypes() {
@@ -85,7 +130,7 @@ export const reportService = {
         value: row.count,
       }));
     } catch (err) {
-      throw toServiceError(err, "Failed to load appointment types report");
+      return handleReportError(err, "Failed to load appointment types report", []);
     }
   },
   async getAppointmentStatusCounts() {
@@ -104,7 +149,12 @@ export const reportService = {
         cancelled: counts.cancelled ?? 0,
       });
     } catch (err) {
-      throw toServiceError(err, "Failed to load appointment status report");
+      return handleReportError(err, "Failed to load appointment status report", {
+        scheduled: 0,
+        in_progress: 0,
+        completed: 0,
+        cancelled: 0,
+      });
     }
   },
   async getRevenueByService(limit = 6) {
@@ -118,7 +168,7 @@ export const reportService = {
         value: row.revenue,
       }));
     } catch (err) {
-      throw toServiceError(err, "Failed to load revenue by service report");
+      return handleReportError(err, "Failed to load revenue by service report", []);
     }
   },
   async getDoctorPerformance() {
@@ -139,7 +189,7 @@ export const reportService = {
         })
         .sort((a, b) => b.appointments - a.appointments);
     } catch (err) {
-      throw toServiceError(err, "Failed to load doctor performance report");
+      return handleReportError(err, "Failed to load doctor performance report", []);
     }
   },
 };

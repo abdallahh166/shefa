@@ -54,6 +54,15 @@ export const reportRepository: ReportRepository = {
   async getPatientGrowth(_tenantId, months = 6) {
     const { data, error } = await supabase.rpc("get_report_patient_growth", { _months: months });
     if (error) {
+      const shouldRetry =
+        /_months|signature|function|get_report_patient_growth/i.test(error.message ?? "") ||
+        ["PGRST202", "PGRST203", "PGRST116", "PGRST301", "PGRST204"].includes(error.code ?? "");
+      if (shouldRetry) {
+        const fallback = await supabase.rpc("get_report_patient_growth");
+        if (!fallback.error) {
+          return (fallback.data ?? []) as PatientGrowthRow[];
+        }
+      }
       throw new ServiceError(error.message ?? "Failed to load patient growth report", {
         code: error.code,
         details: error,

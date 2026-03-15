@@ -2,10 +2,10 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { X } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/primitives/Button";
+import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/primitives/Inputs";
 import { toast } from "@/hooks/use-toast";
 import { labService } from "@/services/laboratory/lab.service";
 import { patientService } from "@/services/patients/patient.service";
@@ -114,15 +114,15 @@ export const NewLabOrderModal = ({ open, onClose, onSuccess }: NewLabOrderModalP
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 backdrop-blur-sm">
-      <div className="bg-card rounded-lg border shadow-lg w-full max-w-md mx-4">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="text-lg font-semibold">{t("laboratory.newLabOrder")}</h2>
-          <button onClick={onClose} className="p-1 rounded-md hover:bg-muted">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("laboratory.newLabOrder")}</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            {t("laboratory.newLabOrder")}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>{t("appointments.patient")} *</Label>
             <Input
@@ -130,18 +130,18 @@ export const NewLabOrderModal = ({ open, onClose, onSuccess }: NewLabOrderModalP
               onChange={(e) => setPatientSearch(e.target.value)}
               placeholder={t("common.search")}
             />
-            <select
-              value={form.patient_id}
-              onChange={(e) => setForm({ ...form, patient_id: e.target.value })}
-              className="w-full h-10 px-3 rounded-md border bg-background text-sm"
-            >
-              <option value="">{t("appointments.selectPatient")}</option>
-              {patients.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.full_name}
-                </option>
-              ))}
-            </select>
+            <Select value={form.patient_id} onValueChange={(value) => setForm({ ...form, patient_id: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("appointments.selectPatient")} />
+              </SelectTrigger>
+              <SelectContent>
+                {patients.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.full_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label>{t("laboratory.orderedBy")} *</Label>
@@ -150,43 +150,45 @@ export const NewLabOrderModal = ({ open, onClose, onSuccess }: NewLabOrderModalP
               onChange={(e) => setDoctorSearch(e.target.value)}
               placeholder={t("common.search")}
             />
-            <select
-              value={form.doctor_id}
-              onChange={(e) => setForm({ ...form, doctor_id: e.target.value })}
-              className="w-full h-10 px-3 rounded-md border bg-background text-sm"
-            >
-              <option value="">{t("appointments.selectDoctor")}</option>
-              {doctors.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.full_name}
-                </option>
-              ))}
-            </select>
+            <Select value={form.doctor_id} onValueChange={(value) => setForm({ ...form, doctor_id: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("appointments.selectDoctor")} />
+              </SelectTrigger>
+              <SelectContent>
+                {doctors.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.full_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label>{t("laboratory.test")} *</Label>
-            <select
-              value={form.test_name}
-              onChange={(e) => setForm({ ...form, test_name: e.target.value })}
-              className="w-full h-10 px-3 rounded-md border bg-background text-sm"
-            >
-              {TEST_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
+            <Select value={form.test_name} onValueChange={(value) => setForm({ ...form, test_name: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("laboratory.test")} />
+              </SelectTrigger>
+              <SelectContent>
+                {TEST_OPTIONS.map((opt) => (
+                  <SelectItem key={opt} value={opt}>
+                    {opt}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <div className="flex justify-end gap-3 pt-4">
+          <DialogFooter className="gap-2 sm:gap-2">
             <Button type="button" variant="outline" onClick={onClose}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? t("common.loading") : t("common.save")}
+            <Button type="submit" loading={loading}>
+              {t("common.save")}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
+

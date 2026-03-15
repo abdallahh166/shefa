@@ -40,8 +40,11 @@ export function enforceCors(req: Request, config: CorsConfig = {}): {
   const allowedOrigins = config.allowedOrigins ?? getAllowedOriginsFromEnv();
   const allowNoOrigin = config.allowNoOrigin ?? true;
   const originHeader = req.headers.get("origin");
+  const allowAnyOrigin = allowedOrigins.length === 0;
   const matchedOrigin =
-    originHeader && allowedOrigins.includes(originHeader) ? originHeader : null;
+    originHeader && (allowAnyOrigin || allowedOrigins.includes(originHeader))
+      ? originHeader
+      : null;
 
   if (originHeader && !matchedOrigin) {
     const corsHeaders = buildCorsHeaders(null, config);

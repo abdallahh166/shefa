@@ -1,5 +1,5 @@
-import { LucideIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+﻿import { LucideIcon } from "lucide-react";
+import { Button } from "@/components/primitives/Button";
 
 interface EmptyStateProps {
   icon: LucideIcon;
@@ -23,3 +23,4 @@ export const EmptyState = ({ icon: Icon, title, description, actionLabel, onActi
     </div>
   );
 };
+

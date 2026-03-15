@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
 import { Switch } from "@/components/ui/switch";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -102,3 +102,4 @@ export const NotificationsTab = () => {
     </div>
   );
 };
+

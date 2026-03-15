@@ -1,7 +1,8 @@
 import { ReactNode, useState, useMemo, useCallback } from "react";
-import { Search, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Download, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { useI18n } from "@/core/i18n/i18nStore";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
+import { Input } from "@/components/primitives/Inputs";
 import { TableSkeleton } from "./TableSkeleton";
 import { generatePDF } from "@/shared/utils/pdfGenerator";
 
@@ -10,12 +11,13 @@ export interface Column<T> {
   header: string;
   render?: (item: T) => ReactNode;
   searchable?: boolean;
+  sortable?: boolean;
 }
 
 interface BulkAction<T> {
   label: string;
   icon?: ReactNode;
-  variant?: "default" | "destructive" | "outline";
+  variant?: "default" | "danger" | "outline";
   action: (selectedIds: string[]) => Promise<void> | void;
 }
 
@@ -41,6 +43,9 @@ interface DataTableProps<T> {
   serverSearch?: boolean;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
+  sortColumn?: string;
+  sortDirection?: "asc" | "desc";
+  onSortChange?: (column: string, direction: "asc" | "desc") => void;
 }
 
 export function DataTable<T>({
@@ -62,6 +67,9 @@ export function DataTable<T>({
   serverSearch = false,
   searchValue,
   onSearchChange,
+  sortColumn,
+  sortDirection,
+  onSortChange,
 }: DataTableProps<T>) {
   const { t } = useI18n();
   const [localSearch, setLocalSearch] = useState("");
@@ -93,6 +101,13 @@ export function DataTable<T>({
       return;
     }
     setLocalSearch(value);
+  };
+
+  const handleSort = (col: Column<T>) => {
+    if (!col.sortable || !onSortChange) return;
+    const nextDirection: "asc" | "desc" =
+      sortColumn === col.key ? (sortDirection === "asc" ? "desc" : "asc") : "asc";
+    onSortChange(col.key, nextDirection);
   };
 
   const exportCsv = useCallback(() => {
@@ -174,14 +189,14 @@ export function DataTable<T>({
       {(searchable || filterSlot || hasBulkActions) && (
         <div className="flex flex-wrap items-center gap-2">
           {searchable && (
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-              <input
+            <div className="flex-1 min-w-[200px] max-w-sm">
+              <Input
+                size="sm"
                 type="text"
                 value={search}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder={searchPlaceholder ?? t("common.search")}
-                className="w-full h-9 pl-9 pr-3 bg-card rounded-lg border text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:border-transparent transition-shadow"
+                leadingIcon={<Search className="h-4 w-4" />}
               />
             </div>
           )}
@@ -189,7 +204,7 @@ export function DataTable<T>({
           <div className="flex items-center gap-1.5 ms-auto">
             {hasBulkActions && someSelected && (
               <>
-                <span className="text-xs text-muted-foreground mr-1">
+                <span className="text-xs text-muted-foreground me-1">
                   {selectedIds.size} {t("common.selected")}
                 </span>
                 {bulkActions!.map((action, i) => (
@@ -210,12 +225,12 @@ export function DataTable<T>({
             {data.length > 0 && (
               <>
                 <Button variant="ghost" size="sm" onClick={exportCsv} className="h-8 text-xs">
-                  <Download className="h-3.5 w-3.5 mr-1" />
+                  <Download className="h-3.5 w-3.5 me-1" />
                   CSV
                 </Button>
                 {pdfExport && (
                   <Button variant="ghost" size="sm" onClick={exportPdfHandler} className="h-8 text-xs">
-                    <Download className="h-3.5 w-3.5 mr-1" />
+                    <Download className="h-3.5 w-3.5 me-1" />
                     PDF
                   </Button>
                 )}
@@ -242,7 +257,37 @@ export function DataTable<T>({
                   </th>
                 )}
                 {columns.map((col) => (
-                  <th key={col.key}>{col.header}</th>
+                  <th
+                    key={col.key}
+                    aria-sort={
+                      col.sortable && sortColumn === col.key
+                        ? (sortDirection === "asc" ? "ascending" : "descending")
+                        : undefined
+                    }
+                  >
+                    {col.sortable && onSortChange ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto px-0 text-xs font-semibold"
+                        onClick={() => handleSort(col)}
+                      >
+                        <span>{col.header}</span>
+                        {sortColumn === col.key ? (
+                          sortDirection === "asc" ? (
+                            <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                          ) : (
+                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                          )
+                        ) : (
+                          <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                        )}
+                      </Button>
+                    ) : (
+                      col.header
+                    )}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -294,15 +339,15 @@ export function DataTable<T>({
         {isPaged && totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-2.5 text-xs text-muted-foreground border-t">
             <span>
-              {pageStart}–{pageEnd} of {total}
+              {pageStart}-{pageEnd} {t("common.of")} {total}
             </span>
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-7 w-7"
+                size="icon-sm"
                 onClick={() => onPageChange?.(Math.max(1, currentPage - 1))}
                 disabled={currentPage <= 1}
+                aria-label={t("common.previous")}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -311,10 +356,10 @@ export function DataTable<T>({
               </span>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-7 w-7"
+                size="icon-sm"
                 onClick={() => onPageChange?.(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage >= totalPages}
+                aria-label={t("common.next")}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>

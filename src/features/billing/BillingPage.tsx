@@ -4,8 +4,9 @@ import { StatCard } from "@/shared/components/StatCard";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { StatusFilter } from "@/shared/components/StatusFilter";
 import { DataTable, Column } from "@/shared/components/DataTable";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
 import { PermissionGuard } from "@/core/auth/PermissionGuard";
+import { PageContainer, SectionHeader } from "@/components/layout/AppLayout";
 import { DollarSign, CreditCard, FileText, TrendingUp, Plus, CheckCircle } from "lucide-react";
 import { NewInvoiceModal } from "./NewInvoiceModal";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
@@ -42,6 +43,10 @@ export const BillingPage = () => {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
+  const [sort, setSort] = useState<{ column: string; direction: "asc" | "desc" }>({
+    column: "invoice_date",
+    direction: "desc",
+  });
   const pageSize = 25;
 
   useRealtimeSubscription(["invoices"]);
@@ -53,13 +58,14 @@ export const BillingPage = () => {
       pageSize,
       search: searchTerm.trim() || undefined,
       filters: statusFilter ? { status: statusFilter } : undefined,
+      sort: { column: sort.column, ascending: sort.direction === "asc" },
     }),
     queryFn: async () => billingService.listPagedWithRelations({
       page,
       pageSize,
       search: searchTerm.trim() || undefined,
       filters: statusFilter ? { status: statusFilter } : undefined,
-      sort: { column: "created_at", ascending: false },
+      sort: { column: sort.column, ascending: sort.direction === "asc" },
     }),
     enabled: !!user?.tenantId,
   });
@@ -135,31 +141,36 @@ export const BillingPage = () => {
     { key: "patient_name", header: t("appointments.patient"), searchable: true },
     { key: "service", header: t("common.service"), searchable: true },
     { key: "amount", header: t("common.amount"), render: (inv) => <span className="font-semibold">{formatCurrency(inv.amount, locale)}</span> },
-    { key: "invoice_date", header: t("common.date"), render: (inv) => formatDate(inv.invoice_date, locale) },
-    { key: "status", header: t("common.status"), render: (inv) => <StatusBadge variant={(statusVariant as any)[inv.status] ?? "default"}>{getStatusLabel(inv.status)}</StatusBadge> },
+    { key: "invoice_date", header: t("common.date"), sortable: true, render: (inv) => formatDate(inv.invoice_date, locale) },
+    { key: "status", header: t("common.status"), sortable: true, render: (inv) => <StatusBadge variant={(statusVariant as any)[inv.status] ?? "default"}>{getStatusLabel(inv.status)}</StatusBadge> },
     {
       key: "actions",
       header: t("common.actions"),
       render: (inv) => inv.status !== "paid" ? (
-        <button
+        <Button
           onClick={() => handleMarkPaid(inv.id)}
-          className="p-1.5 rounded-md hover:bg-success/10 text-success"
+          variant="ghost"
+          size="icon-sm"
+          className="text-success hover:bg-success/10"
           title={t("billing.markAsPaid")}
+          aria-label={t("billing.markAsPaid")}
         >
           <CheckCircle className="h-4 w-4" />
-        </button>
+        </Button>
       ) : null,
     },
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="page-header">
-        <h1 className="page-title">{t("billing.title")}</h1>
-        <PermissionGuard permission="manage_billing">
-          <Button onClick={() => setShowModal(true)}><Plus className="h-4 w-4" /> {t("billing.newInvoice")}</Button>
-        </PermissionGuard>
-      </div>
+    <PageContainer className="space-y-6">
+      <SectionHeader
+        title={t("billing.title")}
+        actions={(
+          <PermissionGuard permission="manage_billing">
+            <Button onClick={() => setShowModal(true)}><Plus className="h-4 w-4" /> {t("billing.newInvoice")}</Button>
+          </PermissionGuard>
+        )}
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title={t("billing.totalRevenue")} value={formatCurrency(totalRevenue, locale)} icon={DollarSign} />
@@ -176,6 +187,12 @@ export const BillingPage = () => {
         serverSearch
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
+        sortColumn={sort.column}
+        sortDirection={sort.direction}
+        onSortChange={(column, direction) => {
+          setSort({ column, direction });
+          setPage(1);
+        }}
         isLoading={isLoading}
         exportFileName="invoices"
         pdfExport={{
@@ -205,6 +222,6 @@ export const BillingPage = () => {
           invalidateInvoices();
         }}
       />
-    </div>
+    </PageContainer>
   );
 };

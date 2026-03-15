@@ -17,6 +17,12 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "paths": {
+      "@/design-system/*": [
+        "./src/design-system/*"
+      ],
+      "@/components/*": [
+        "./src/components/*"
+      ],
       "@/*": [
         "./src/*"
       ]

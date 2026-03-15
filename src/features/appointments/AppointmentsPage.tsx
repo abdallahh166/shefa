@@ -3,8 +3,9 @@ import { useI18n } from "@/core/i18n/i18nStore";
 import { DataTable, Column } from "@/shared/components/DataTable";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { StatusFilter } from "@/shared/components/StatusFilter";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
 import { PermissionGuard } from "@/core/auth/PermissionGuard";
+import { PageContainer, SectionHeader } from "@/components/layout/AppLayout";
 import { CalendarPlus, CheckCircle, XCircle, Play, CalendarDays, List } from "lucide-react";
 import { formatDate } from "@/shared/utils/formatDate";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
@@ -68,6 +69,10 @@ export const AppointmentsPage = () => {
   });
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
+  const [sort, setSort] = useState<{ column: string; direction: "asc" | "desc" }>({
+    column: "appointment_date",
+    direction: "desc",
+  });
   const pageSize = 25;
 
   useRealtimeSubscription(["appointments"]);
@@ -79,12 +84,14 @@ export const AppointmentsPage = () => {
       pageSize,
       search: searchTerm.trim() || undefined,
       filters: statusFilter ? { status: statusFilter } : undefined,
+      sort: { column: sort.column, ascending: sort.direction === "asc" },
     }),
     queryFn: async () => appointmentService.listPagedWithRelations({
       page,
       pageSize,
       search: searchTerm.trim() || undefined,
       filters: statusFilter ? { status: statusFilter } : undefined,
+      sort: { column: sort.column, ascending: sort.direction === "asc" },
     }),
     enabled: viewMode === "list" && !!user?.tenantId,
   });
@@ -190,6 +197,7 @@ export const AppointmentsPage = () => {
     {
       key: "appointment_date",
       header: t("appointments.dateTime"),
+      sortable: true,
       render: (a) => <span className="text-muted-foreground tabular-nums text-sm">{formatDate(a.appointment_date, locale, "datetime", calendarType)}</span>,
     },
     {
@@ -200,6 +208,7 @@ export const AppointmentsPage = () => {
     {
       key: "status",
       header: t("common.status"),
+      sortable: true,
       render: (a) => (
         <StatusBadge variant={(statusVariant as any)[a.status] ?? "default"} dot>
           {statusLabel(a.status)}
@@ -212,29 +221,38 @@ export const AppointmentsPage = () => {
       render: (a) =>
         a.status === "scheduled" ? (
           <div className="flex gap-1">
-            <button
+            <Button
               onClick={() => handleUpdateStatus(a.id, "in_progress")}
-              className="p-1.5 rounded-md hover:bg-info/10 text-info transition-colors"
+              variant="ghost"
+              size="icon-sm"
+              className="text-info hover:bg-info/10"
               title={t("common.start")}
+              aria-label={t("common.start")}
             >
               <Play className="h-3.5 w-3.5" />
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => handleUpdateStatus(a.id, "cancelled")}
-              className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive transition-colors"
+              variant="ghost"
+              size="icon-sm"
+              className="text-destructive hover:bg-destructive/10"
               title={t("common.cancel")}
+              aria-label={t("common.cancel")}
             >
               <XCircle className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           </div>
         ) : a.status === "in_progress" ? (
-          <button
+          <Button
             onClick={() => handleUpdateStatus(a.id, "completed")}
-            className="p-1.5 rounded-md hover:bg-success/10 text-success transition-colors"
+            variant="ghost"
+            size="icon-sm"
+            className="text-success hover:bg-success/10"
             title={t("common.complete")}
+            aria-label={t("common.complete")}
           >
             <CheckCircle className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         ) : null,
     },
   ];
@@ -247,47 +265,58 @@ export const AppointmentsPage = () => {
   ];
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">{t("appointments.title")}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{totalAppointments} appointments</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-muted rounded-lg p-0.5">
-            <button
-              onClick={() => setViewMode("list")}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${viewMode === "list" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}
-            >
-              <List className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={() => setViewMode("calendar")}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${viewMode === "calendar" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}
-            >
-              <CalendarDays className="h-3.5 w-3.5" />
-            </button>
+    <PageContainer className="space-y-5">
+      <SectionHeader
+        title={t("appointments.title")}
+        subtitle={`${totalAppointments} appointments`}
+        actions={(
+          <div className="flex items-center gap-2">
+            <div className="flex items-center bg-muted rounded-lg p-0.5">
+              <Button
+                onClick={() => setViewMode("list")}
+                variant="ghost"
+                size="icon-sm"
+                className={`text-xs font-medium transition-colors ${viewMode === "list" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}
+                aria-label={t("common.list")}
+                aria-pressed={viewMode === "list"}
+              >
+                <List className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                onClick={() => setViewMode("calendar")}
+                variant="ghost"
+                size="icon-sm"
+                className={`text-xs font-medium transition-colors ${viewMode === "calendar" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}
+                aria-label={t("common.calendar")}
+                aria-pressed={viewMode === "calendar"}
+              >
+                <CalendarDays className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <PermissionGuard permission="manage_appointments">
+              <Button size="sm" onClick={() => setShowModal(true)} data-testid="appointments-add-button">
+                <CalendarPlus className="h-3.5 w-3.5 mr-1" />
+                {t("appointments.newAppointment")}
+              </Button>
+            </PermissionGuard>
           </div>
-          <PermissionGuard permission="manage_appointments">
-            <Button size="sm" onClick={() => setShowModal(true)} data-testid="appointments-add-button">
-              <CalendarPlus className="h-3.5 w-3.5 mr-1" />
-              {t("appointments.newAppointment")}
-            </Button>
-          </PermissionGuard>
-        </div>
-      </div>
+        )}
+      />
 
       {/* Status summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {statusCards.map(({ key, color }) => (
-          <button
+          <Button
             key={key}
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setStatusFilter(statusFilter === key ? null : key)}
-            className={`stat-card text-center cursor-pointer transition-all ${statusFilter === key ? "ring-2 ring-primary" : ""}`}
+            className={`stat-card w-full text-center cursor-pointer transition-all flex-col ${statusFilter === key ? "ring-2 ring-primary" : ""}`}
           >
             <p className="text-2xl font-semibold tabular-nums">{statusCounts[key] ?? 0}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{statusLabel(key)}</p>
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -300,6 +329,12 @@ export const AppointmentsPage = () => {
           serverSearch
           searchValue={searchTerm}
           onSearchChange={setSearchTerm}
+          sortColumn={sort.column}
+          sortDirection={sort.direction}
+          onSortChange={(column, direction) => {
+            setSort({ column, direction });
+            setPage(1);
+          }}
           isLoading={loadingList}
           exportFileName="appointments"
           page={page}
@@ -336,6 +371,6 @@ export const AppointmentsPage = () => {
         onClose={() => setShowModal(false)}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: queryKeys.appointments.root(user?.tenantId) })}
       />
-    </div>
+    </PageContainer>
   );
 };

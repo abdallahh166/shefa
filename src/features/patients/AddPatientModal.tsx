@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { X } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/primitives/Button";
+import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/primitives/Inputs";
 import { toast } from "@/hooks/use-toast";
 import { patientService } from "@/services/patients/patient.service";
 
@@ -57,13 +57,15 @@ export const AddPatientModal = ({ open, onClose, onSuccess }: AddPatientModalPro
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 backdrop-blur-sm">
-      <div className="bg-card rounded-lg border shadow-lg w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="text-lg font-semibold">{t("patients.addPatient")}</h2>
-          <button onClick={onClose} className="p-1 rounded-md hover:bg-muted"><X className="h-5 w-5" /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{t("patients.addPatient")}</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            {t("patients.addPatient")}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2 space-y-2">
               <Label>{t("patients.fullName")} *</Label>
@@ -79,10 +81,15 @@ export const AddPatientModal = ({ open, onClose, onSuccess }: AddPatientModalPro
             </div>
             <div className="space-y-2">
               <Label>{t("patients.gender")}</Label>
-              <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
-                <option value="male">{t("patients.male")}</option>
-                <option value="female">{t("patients.female")}</option>
-              </select>
+              <Select value={form.gender} onValueChange={(value) => setForm({ ...form, gender: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t("patients.gender")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">{t("patients.male")}</SelectItem>
+                  <SelectItem value="female">{t("patients.female")}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>{t("patients.bloodType")}</Label>
@@ -97,18 +104,19 @@ export const AddPatientModal = ({ open, onClose, onSuccess }: AddPatientModalPro
               <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label>Insurance</Label>
+              <Label>{t("patients.insuranceProvider")}</Label>
               <Input value={form.insurance_provider} onChange={(e) => setForm({ ...form, insurance_provider: e.target.value })} />
             </div>
           </div>
-          <div className="flex justify-end gap-3 pt-4">
+          <DialogFooter className="gap-2 sm:gap-2">
             <Button type="button" variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
-            <Button type="submit" disabled={loading} data-testid="patient-save">
-              {loading ? "..." : t("common.save")}
+            <Button type="submit" loading={loading} data-testid="patient-save">
+              {t("common.save")}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
+

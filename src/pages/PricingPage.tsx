@@ -1,9 +1,9 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSubscription, PlanType } from "@/core/subscription/SubscriptionContext";
 import { useAuth } from "@/core/auth/authStore";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
 import { Badge } from "@/components/ui/badge";
 import { Check, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -91,25 +91,33 @@ export const PricingPage = () => {
 
         {/* Billing toggle */}
         <div className="inline-flex items-center gap-3 bg-muted rounded-full p-1">
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setAnnual(false)}
+            aria-pressed={!annual}
             className={cn(
-              "px-5 py-2 rounded-full text-sm font-medium transition-colors",
+              "h-auto rounded-full px-5 py-2 text-sm font-medium transition-colors",
               !annual ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"
             )}
           >
             شهري
-          </button>
-          <button
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setAnnual(true)}
+            aria-pressed={annual}
             className={cn(
-              "px-5 py-2 rounded-full text-sm font-medium transition-colors",
+              "h-auto rounded-full px-5 py-2 text-sm font-medium transition-colors",
               annual ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"
             )}
           >
             سنوي
-            <Badge variant="secondary" className="mr-2 text-xs">شهرين مجاناً</Badge>
-          </button>
+            <Badge variant="secondary" className="me-2 text-xs">شهرين مجاناً</Badge>
+          </Button>
         </div>
       </div>
 
@@ -139,8 +147,8 @@ export const PricingPage = () => {
                 {price !== null ? (
                   <div className="mt-4">
                     <span className="text-4xl font-bold text-foreground">{price}</span>
-                    <span className="text-muted-foreground text-sm mr-1">
-                      جنيه/{annual ? "سنة" : "شهر"}
+                    <span className="text-muted-foreground text-sm me-1">
+                      جنيه/{annual ? "???" : "???"}
                     </span>
                   </div>
                 ) : (
@@ -169,7 +177,7 @@ export const PricingPage = () => {
                 ) : isEnterprise ? (
                   <Button variant="outline" className="w-full">
                     تواصل معنا
-                    <ArrowRight className="h-4 w-4 mr-2" />
+                    <ArrowRight className="h-4 w-4 me-2" />
                   </Button>
                 ) : (
                   <Button
@@ -211,3 +219,4 @@ export const PricingPage = () => {
     </div>
   );
 };
+

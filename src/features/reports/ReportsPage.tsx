@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
 import { cn } from "@/lib/utils";
 import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+  BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, AreaChart, Area,
 } from "recharts";
 import {
@@ -11,16 +11,14 @@ import {
   Activity, FileBarChart, Star, ArrowUpRight, ArrowDownRight,
 } from "lucide-react";
 import { StatCard } from "@/shared/components/StatCard";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
+import { PageContainer, SectionHeader } from "@/components/layout/AppLayout";
 import { generatePDF } from "@/shared/utils/pdfGenerator";
 import { useQuery } from "@tanstack/react-query";
 import { reportService } from "@/services/reports/report.service";
 import { queryKeys } from "@/services/queryKeys";
-
-const COLORS = [
-  "hsl(174, 62%, 34%)", "hsl(210, 80%, 52%)", "hsl(152, 60%, 40%)",
-  "hsl(38, 92%, 50%)", "hsl(0, 72%, 51%)",
-];
+import { useChartColors } from "@/shared/hooks/useChartColors";
+import { toast } from "@/hooks/use-toast";
 
 type Tab = "revenue" | "patients" | "doctors" | "appointments";
 
@@ -29,6 +27,23 @@ export const ReportsPage = () => {
   const { user, hasPermission } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("revenue");
   const canViewReports = hasPermission("view_reports") || hasPermission("super_admin");
+  const colors = useChartColors();
+  const chartPalette = [colors.primary, colors.info, colors.success, colors.warning, colors.violet, colors.destructive];
+  const reportErrorShownRef = useRef(false);
+
+  useEffect(() => {
+    reportErrorShownRef.current = false;
+  }, [user?.tenantId]);
+
+  const notifyReportError = useCallback(() => {
+    if (reportErrorShownRef.current) return;
+    reportErrorShownRef.current = true;
+    toast({
+      title: t("reports.loadError"),
+      description: t("reports.loadErrorDesc"),
+      variant: "destructive",
+    });
+  }, [t]);
 
   const { data: canViewReportsServer = true } = useQuery({
     queryKey: queryKeys.reports.access(user?.tenantId),
@@ -36,6 +51,7 @@ export const ReportsPage = () => {
     queryFn: () => reportService.canViewReports(),
     retry: false,
     staleTime: 1000 * 60 * 5,
+    onError: notifyReportError,
   });
 
   const canRenderReports = canViewReports && canViewReportsServer;
@@ -46,6 +62,7 @@ export const ReportsPage = () => {
     queryFn: () => reportService.getOverview(),
     staleTime: 1000 * 60 * 5,
     retry: false,
+    onError: notifyReportError,
   });
 
   const { data: revenueData = [] } = useQuery({
@@ -54,6 +71,7 @@ export const ReportsPage = () => {
     queryFn: () => reportService.getRevenueByMonth(6),
     staleTime: 1000 * 60 * 5,
     retry: false,
+    onError: notifyReportError,
   });
 
   const { data: patientGrowth = [] } = useQuery({
@@ -62,6 +80,7 @@ export const ReportsPage = () => {
     queryFn: () => reportService.getPatientGrowth(6),
     staleTime: 1000 * 60 * 5,
     retry: false,
+    onError: notifyReportError,
   });
 
   const { data: appointmentTypes = [] } = useQuery({
@@ -70,6 +89,7 @@ export const ReportsPage = () => {
     queryFn: () => reportService.getAppointmentTypes(),
     staleTime: 1000 * 60 * 5,
     retry: false,
+    onError: notifyReportError,
   });
 
   const { data: revenueByService = [] } = useQuery({
@@ -78,6 +98,7 @@ export const ReportsPage = () => {
     queryFn: () => reportService.getRevenueByService(6),
     staleTime: 1000 * 60 * 5,
     retry: false,
+    onError: notifyReportError,
   });
 
   const { data: doctorPerformance = [] } = useQuery({
@@ -86,6 +107,7 @@ export const ReportsPage = () => {
     queryFn: () => reportService.getDoctorPerformance(),
     staleTime: 1000 * 60 * 5,
     retry: false,
+    onError: notifyReportError,
   });
 
   const { data: appointmentStatusCounts = { scheduled: 0, in_progress: 0, completed: 0, cancelled: 0 } } = useQuery({
@@ -94,14 +116,19 @@ export const ReportsPage = () => {
     queryFn: () => reportService.getAppointmentStatusCounts(),
     staleTime: 1000 * 60 * 5,
     retry: false,
+    onError: notifyReportError,
   });
 
   if (!canRenderReports) {
     return (
-      <div className="space-y-4">
-        <h1 className="page-title">{t("reports.title")}</h1>
+      <PageContainer className="space-y-4">
+        <SectionHeader
+          title={t("reports.title")}
+          subtitle={t("reports.subtitle") || "Analytics and insights for your clinic"}
+          icon={FileBarChart}
+        />
         <p className="text-sm text-muted-foreground">{t("reports.noPermission")}</p>
-      </div>
+      </PageContainer>
     );
   }
 
@@ -186,24 +213,22 @@ export const ReportsPage = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title flex items-center gap-2">
-            <FileBarChart className="h-6 w-6 text-primary" />
-            {t("reports.title")}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">{t("reports.subtitle") || "Analytics and insights for your clinic"}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={exportReportCsv}>
-            <Download className="h-4 w-4" /> CSV
-          </Button>
-          <Button variant="outline" size="sm" onClick={exportReportPdf}>
-            <Printer className="h-4 w-4" /> PDF
-          </Button>
-        </div>
-      </div>
+    <PageContainer className="space-y-6">
+      <SectionHeader
+        title={t("reports.title")}
+        subtitle={t("reports.subtitle") || "Analytics and insights for your clinic"}
+        icon={FileBarChart}
+        actions={(
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={exportReportCsv}>
+              <Download className="h-4 w-4" /> CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportReportPdf}>
+              <Printer className="h-4 w-4" /> PDF
+            </Button>
+          </div>
+        )}
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title={t("billing.totalRevenue")} value={`$${totalRevenue.toLocaleString()}`} icon={DollarSign} accent="warning" />
@@ -214,15 +239,21 @@ export const ReportsPage = () => {
 
       <div className="border-b flex gap-1 overflow-x-auto">
         {tabItems.map((tab) => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+          <Button
+            key={tab.key}
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setActiveTab(tab.key)}
+            aria-pressed={activeTab === tab.key}
             className={cn(
-              "flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+              "h-auto rounded-none px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
               activeTab === tab.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >
             <tab.icon className="h-4 w-4" />
             {tab.label}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -237,13 +268,16 @@ export const ReportsPage = () => {
             </div>
             <ResponsiveContainer width="100%" height={340}>
               <BarChart data={revenueData} barGap={4}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 90%)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={colors.border} vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: any) => `$${Number(v).toLocaleString()}`} contentStyle={{ borderRadius: 8, border: "1px solid hsl(214, 20%, 90%)" }} />
+                <Tooltip
+                  formatter={(v: any) => `$${Number(v).toLocaleString()}`}
+                  contentStyle={{ borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.card, color: colors.fg }}
+                />
                 <Legend />
-                <Bar dataKey="revenue" fill="hsl(174, 62%, 34%)" radius={[6, 6, 0, 0]} name={t("reports.revenue")} />
-                <Bar dataKey="expenses" fill="hsl(210, 80%, 52%)" radius={[6, 6, 0, 0]} name={t("reports.pendingOverdue")} opacity={0.7} />
+                <Bar dataKey="revenue" fill={colors.primary} radius={[6, 6, 0, 0]} name={t("reports.revenue")} />
+                <Bar dataKey="expenses" fill={colors.warning} radius={[6, 6, 0, 0]} name={t("reports.pendingOverdue")} opacity={0.7} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -254,9 +288,9 @@ export const ReportsPage = () => {
                 <Pie data={revenueByService} cx="50%" cy="50%" innerRadius={60} outerRadius={95} dataKey="value" paddingAngle={3}
                   label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   labelLine={false}>
-                  {revenueByService.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  {revenueByService.map((_, i) => <Cell key={i} fill={chartPalette[i % chartPalette.length]} />)}
                 </Pie>
-                <Tooltip />
+                <Tooltip contentStyle={{ backgroundColor: colors.card, border: `1px solid ${colors.border}`, color: colors.fg }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -273,15 +307,15 @@ export const ReportsPage = () => {
             <AreaChart data={patientGrowth}>
               <defs>
                 <linearGradient id="patientGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(174, 62%, 34%)" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="hsl(174, 62%, 34%)" stopOpacity={0} />
+                  <stop offset="5%" stopColor={colors.success} stopOpacity={0.2} />
+                  <stop offset="95%" stopColor={colors.success} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 90%)" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.border} vertical={false} />
               <XAxis dataKey="month" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid hsl(214, 20%, 90%)" }} />
-              <Area type="monotone" dataKey="patients" stroke="hsl(174, 62%, 34%)" fill="url(#patientGrad)" strokeWidth={2.5} dot={{ fill: "hsl(174, 62%, 34%)", r: 5, strokeWidth: 2, stroke: "white" }} name={t("common.patients")} />
+              <Tooltip contentStyle={{ borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.card, color: colors.fg }} />
+              <Area type="monotone" dataKey="patients" stroke={colors.success} fill="url(#patientGrad)" strokeWidth={2.5} dot={{ fill: colors.success, r: 5, strokeWidth: 2, stroke: colors.card }} name={t("common.patients")} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -293,7 +327,7 @@ export const ReportsPage = () => {
             <h3 className="font-semibold mb-6">{t("reports.appointmentStatusDistribution")}</h3>
             {(() => {
               const statuses = ["scheduled", "in_progress", "completed", "cancelled"];
-              const statusColors = ["hsl(38, 92%, 50%)", "hsl(210, 80%, 52%)", "hsl(152, 60%, 40%)", "hsl(0, 72%, 51%)"];
+              const statusColors = [colors.warning, colors.info, colors.success, colors.destructive];
               const statusLabels: Record<string, string> = {
                 scheduled: t("appointments.scheduled"),
                 in_progress: t("appointments.inProgress"),
@@ -308,10 +342,10 @@ export const ReportsPage = () => {
               return (
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart data={data} layout="vertical" barSize={24}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 90%)" horizontal={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.border} horizontal={false} />
                     <XAxis type="number" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                     <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={95} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid hsl(214, 20%, 90%)" }} />
+                    <Tooltip contentStyle={{ borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.card, color: colors.fg }} />
                     <Bar dataKey="value" radius={[0, 6, 6, 0]} name={t("reports.count")}>
                       {data.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                     </Bar>
@@ -325,9 +359,9 @@ export const ReportsPage = () => {
             <ResponsiveContainer width="100%" height={320}>
               <PieChart>
                 <Pie data={appointmentTypes} cx="50%" cy="50%" innerRadius={55} outerRadius={90} dataKey="value" paddingAngle={3}>
-                  {appointmentTypes.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  {appointmentTypes.map((_, i) => <Cell key={i} fill={chartPalette[i % chartPalette.length]} />)}
                 </Pie>
-                <Tooltip />
+                <Tooltip contentStyle={{ backgroundColor: colors.card, border: `1px solid ${colors.border}`, color: colors.fg }} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
               </PieChart>
             </ResponsiveContainer>
@@ -395,6 +429,6 @@ export const ReportsPage = () => {
           </table>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 };

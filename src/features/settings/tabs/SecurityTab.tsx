@@ -1,8 +1,8 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/primitives/Button";
+import { Input } from "@/components/primitives/Inputs";
 import { Label } from "@/components/ui/label";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -52,13 +52,17 @@ export const SecurityTab = () => {
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder={t("common.mustBeAtLeast6")}
             />
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-sm"
               onClick={() => setShowPasswords(!showPasswords)}
               className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              aria-label={showPasswords ? t("common.hidePassword") : t("common.showPassword")}
+              title={showPasswords ? t("common.hidePassword") : t("common.showPassword")}
             >
               {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
+            </Button>
           </div>
         </div>
         <div className="space-y-2">
@@ -85,3 +89,5 @@ export const SecurityTab = () => {
     </div>
   );
 };
+
+

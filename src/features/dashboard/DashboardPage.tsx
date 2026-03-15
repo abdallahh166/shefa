@@ -3,12 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { StatCard } from "@/shared/components/StatCard";
 import { StatusBadge } from "@/shared/components/StatusBadge";
-import { ActivityFeed, ActivityItem } from "@/shared/components/ActivityFeed";
-import { Users, CalendarDays, Stethoscope, DollarSign, Activity, TrendingUp } from "lucide-react";
+import { Users, CalendarDays, Stethoscope, DollarSign, TrendingUp } from "lucide-react";
 import { useAuth } from "@/core/auth/authStore";
 import { formatCurrency } from "@/shared/utils/formatDate";
 import { reportService } from "@/services";
 import { queryKeys } from "@/services/queryKeys";
+import { useChartColors } from "@/shared/hooks/useChartColors";
+import { PageContainer, SectionHeader } from "@/components/layout/AppLayout";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -21,18 +22,12 @@ const statusVariant: Record<string, "success" | "info" | "default" | "destructiv
   cancelled: "destructive",
 };
 
-const CHART_COLORS = [
-  "hsl(221, 83%, 53%)",
-  "hsl(160, 84%, 39%)",
-  "hsl(38, 92%, 50%)",
-  "hsl(199, 89%, 48%)",
-  "hsl(0, 84%, 60%)",
-];
-
 export const DashboardPage = () => {
   const { t, locale } = useI18n();
   const { user } = useAuth();
   const tenantId = user?.tenantId;
+  const colors = useChartColors();
+  const chartPalette = [colors.primary, colors.success, colors.warning, colors.info, colors.violet];
 
   const { data: overview } = useQuery({
     queryKey: queryKeys.reports.overview(tenantId),
@@ -76,14 +71,11 @@ export const DashboardPage = () => {
   const totalStatusCount = statusRows.reduce((sum, r) => sum + r.count, 0);
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div>
-        <h1 className="page-title">{t("dashboard.title")}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {t("dashboard.welcomeBack") || "Welcome back"}, {user?.name?.split(" ")[0] ?? ""}
-        </p>
-      </div>
+    <PageContainer className="space-y-6">
+      <SectionHeader
+        title={t("dashboard.title")}
+        subtitle={`${t("dashboard.welcomeBack") || "Welcome back"}, ${user?.name?.split(" ")[0] ?? ""}`}
+      />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -110,24 +102,25 @@ export const DashboardPage = () => {
             <AreaChart data={revenueTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(221, 83%, 53%)" stopOpacity={0.15} />
-                  <stop offset="100%" stopColor="hsl(221, 83%, 53%)" stopOpacity={0} />
+                  <stop offset="0%" stopColor={colors.primary} stopOpacity={0.15} />
+                  <stop offset="100%" stopColor={colors.primary} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 91%)" vertical={false} />
-              <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(220, 9%, 46%)" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "hsl(220, 9%, 46%)" }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.border} vertical={false} />
+              <XAxis dataKey="month" tick={{ fontSize: 11, fill: colors.muted }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: colors.muted }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "hsl(0, 0%, 100%)",
-                  border: "1px solid hsl(220, 13%, 91%)",
+                  backgroundColor: colors.card,
+                  border: `1px solid ${colors.border}`,
                   borderRadius: "8px",
                   fontSize: "12px",
+                  color: colors.fg,
                   boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
                 }}
                 formatter={(v: any) => [`$${Number(v).toLocaleString()}`, "Revenue"]}
               />
-              <Area type="monotone" dataKey="revenue" stroke="hsl(221, 83%, 53%)" fill="url(#revGrad)" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "hsl(221, 83%, 53%)" }} />
+              <Area type="monotone" dataKey="revenue" stroke={colors.primary} fill="url(#revGrad)" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: colors.primary }} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -139,14 +132,15 @@ export const DashboardPage = () => {
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie data={apptTypes} cx="50%" cy="50%" innerRadius={50} outerRadius={75} dataKey="value" paddingAngle={2} strokeWidth={0}>
-                {apptTypes.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                {apptTypes.map((_, i) => <Cell key={i} fill={chartPalette[i % chartPalette.length]} />)}
               </Pie>
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "hsl(0, 0%, 100%)",
-                  border: "1px solid hsl(220, 13%, 91%)",
+                  backgroundColor: colors.card,
+                  border: `1px solid ${colors.border}`,
                   borderRadius: "8px",
                   fontSize: "12px",
+                  color: colors.fg,
                 }}
               />
             </PieChart>
@@ -154,7 +148,7 @@ export const DashboardPage = () => {
           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
             {apptTypes.map((item, i) => (
               <div key={i} className="flex items-center gap-1.5 text-xs">
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: chartPalette[i % chartPalette.length] }} />
                 <span className="text-muted-foreground">{item.name}</span>
               </div>
             ))}
@@ -179,10 +173,10 @@ export const DashboardPage = () => {
                   className="h-full rounded-full transition-all"
                   style={{
                     width: totalStatusCount > 0 ? `${(row.count / totalStatusCount) * 100}%` : "0%",
-                    backgroundColor: row.status === "completed" ? "hsl(160, 84%, 39%)"
-                      : row.status === "in_progress" ? "hsl(199, 89%, 48%)"
-                      : row.status === "cancelled" ? "hsl(0, 84%, 60%)"
-                      : "hsl(220, 13%, 91%)",
+                    backgroundColor: row.status === "completed" ? colors.success
+                      : row.status === "in_progress" ? colors.info
+                      : row.status === "cancelled" ? colors.destructive
+                      : colors.border,
                   }}
                 />
               </div>
@@ -194,6 +188,6 @@ export const DashboardPage = () => {
           )}
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 };

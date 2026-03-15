@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { StatusBadge } from "@/shared/components/StatusBadge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
+import { Input } from "@/components/primitives/Inputs";
 import { PermissionGuard } from "@/core/auth/PermissionGuard";
+import { PageContainer, SectionHeader } from "@/components/layout/AppLayout";
 import { UserPlus, Star, Search, MoreVertical, Pencil, Trash2, CalendarClock, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { useAuth } from "@/core/auth/authStore";
@@ -94,28 +96,27 @@ export const DoctorsPage = () => {
   };
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">{t("doctors.title")}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{total} doctors</p>
-        </div>
-        <PermissionGuard permission="manage_users">
-          <Button size="sm" onClick={() => setShowAddModal(true)}>
-            <UserPlus className="h-3.5 w-3.5 mr-1" />{t("doctors.addDoctor")}
-          </Button>
-        </PermissionGuard>
-      </div>
+    <PageContainer className="space-y-5">
+      <SectionHeader
+        title={t("doctors.title")}
+        subtitle={`${total} doctors`}
+        actions={(
+          <PermissionGuard permission="manage_users">
+            <Button size="sm" onClick={() => setShowAddModal(true)}>
+              <UserPlus className="h-3.5 w-3.5 mr-1" />{t("doctors.addDoctor")}
+            </Button>
+          </PermissionGuard>
+        )}
+      />
 
       {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <input
+      <div className="max-w-sm">
+        <Input
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder={t("common.search")}
-          className="w-full h-9 pl-9 pr-3 bg-card rounded-lg border text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:border-transparent transition-shadow"
+          leadingIcon={<Search className="h-4 w-4" />}
         />
       </div>
 
@@ -163,35 +164,48 @@ export const DoctorsPage = () => {
                     </StatusBadge>
                     <PermissionGuard permission="manage_users">
                       <div className="relative">
-                        <button
+                        <Button
                           onClick={() => setOpenMenu(openMenu === doc.id ? null : doc.id)}
-                          className="p-1 rounded-md hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label={t("common.actions")}
+                          title={t("common.actions")}
                         >
                           <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                        </button>
+                        </Button>
                         {openMenu === doc.id && (
                           <div className="absolute end-0 top-full mt-1 bg-card rounded-lg border shadow-lg py-1 z-10 min-w-[140px]">
-                            <button
-                              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-muted text-start"
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="w-full justify-start gap-2 px-3 py-1.5 text-xs"
                               onClick={() => handleStatusChange(doc.id, doc.status === "available" ? "busy" : "available")}
                             >
                               <Pencil className="h-3 w-3" />
                               {t("doctors.toggleStatus")}
-                            </button>
-                            <button
-                              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-muted text-start"
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="w-full justify-start gap-2 px-3 py-1.5 text-xs"
                               onClick={() => { setScheduleDoctor({ id: doc.id, name: doc.full_name }); setOpenMenu(null); }}
                             >
                               <CalendarClock className="h-3 w-3" />
                               {t("doctors.schedule")}
-                            </button>
-                            <button
-                              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-muted text-destructive text-start"
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="w-full justify-start gap-2 px-3 py-1.5 text-xs text-destructive hover:text-destructive"
                               onClick={() => { setDeleteId(doc.id); setOpenMenu(null); }}
                             >
                               <Trash2 className="h-3 w-3" />
                               {t("common.remove")}
-                            </button>
+                            </Button>
                           </div>
                         )}
                       </div>
@@ -215,13 +229,25 @@ export const DoctorsPage = () => {
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{pageStart}–{pageEnd} of {total}</span>
+              <span>{pageStart}â€“{pageEnd} of {total}</span>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPage(Math.max(1, page - 1))} disabled={page <= 1}>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setPage(Math.max(1, page - 1))}
+                  disabled={page <= 1}
+                  aria-label={t("common.previous")}
+                >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <span className="px-2 font-medium tabular-nums">{page} / {totalPages}</span>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page >= totalPages}>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setPage(Math.min(totalPages, page + 1))}
+                  disabled={page >= totalPages}
+                  aria-label={t("common.next")}
+                >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -255,6 +281,7 @@ export const DoctorsPage = () => {
           doctorName={scheduleDoctor.name}
         />
       )}
-    </div>
+    </PageContainer>
   );
 };
+

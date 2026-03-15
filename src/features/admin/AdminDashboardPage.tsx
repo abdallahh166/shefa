@@ -4,7 +4,7 @@ import { useAuth } from "@/core/auth/authStore";
 import { useNavigate } from "react-router-dom";
 import { StatCard } from "@/shared/components/StatCard";
 import { StatusBadge } from "@/shared/components/StatusBadge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
 import { DataTable, Column } from "@/shared/components/DataTable";
 import { StatusFilter } from "@/shared/components/StatusFilter";
 import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
@@ -17,7 +17,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/shared/utils/formatDate";
 import { toast } from "@/hooks/use-toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/primitives/Inputs";
 import { adminService } from "@/services/admin/admin.service";
 import { queryKeys } from "@/services/queryKeys";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
@@ -182,16 +182,18 @@ export const AdminDashboardPage = () => {
     },
     { key: "created_at", header: "Created", render: (c) => formatDate(c.created_at, locale, "date") },
     { key: "actions", header: "", render: (c) => (
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => {
-          setTenantOverride({ id: c.id, slug: c.slug, name: c.name });
-          navigate(`/tenant/${c.slug}/dashboard`);
-        }}
-      >
-        <Eye className="h-4 w-4" />
-      </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="View clinic"
+          title="View clinic"
+          onClick={() => {
+            setTenantOverride({ id: c.id, slug: c.slug, name: c.name });
+            navigate(`/tenant/${c.slug}/dashboard`);
+          }}
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
     )},
   ];
 
@@ -228,7 +230,7 @@ export const AdminDashboardPage = () => {
         value={s.plan}
         onValueChange={(val) => setConfirmAction({ id: s.id, field: "plan", value: val })}
       >
-        <SelectTrigger className="h-8 w-28">
+        <SelectTrigger size="sm" className="w-28">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -245,7 +247,7 @@ export const AdminDashboardPage = () => {
         value={s.status}
         onValueChange={(val) => setConfirmAction({ id: s.id, field: "status", value: val })}
       >
-        <SelectTrigger className="h-8 w-28">
+        <SelectTrigger size="sm" className="w-28">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -290,7 +292,7 @@ export const AdminDashboardPage = () => {
               </div>
               <span className="text-sm font-medium">{user?.name}</span>
             </div>
-            <Button variant="ghost" size="icon" onClick={handleLogout}>
+            <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Log out" title="Log out">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
@@ -301,15 +303,21 @@ export const AdminDashboardPage = () => {
         {/* Tabs */}
         <div className="border-b flex gap-1 overflow-x-auto">
           {tabs.map((tab) => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            <Button
+              key={tab.key}
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setActiveTab(tab.key)}
+              aria-pressed={activeTab === tab.key}
               className={cn(
-                "flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                "h-auto rounded-none flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
                 activeTab === tab.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
               <tab.icon className="h-4 w-4" />
               {tab.label}
-            </button>
+            </Button>
           ))}
         </div>
 

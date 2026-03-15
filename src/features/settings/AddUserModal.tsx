@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { X, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/primitives/Button";
+import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/primitives/Inputs";
 import { toast } from "@/hooks/use-toast";
 import { userInviteService } from "@/services/settings/userInvite.service";
 import type { InviteStaffInput } from "@/domain/settings/invite.types";
@@ -68,15 +68,15 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 backdrop-blur-sm">
-      <div className="bg-card rounded-lg border shadow-lg w-full max-w-md mx-4">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="text-lg font-semibold">{t("settings.addUser")}</h2>
-          <button onClick={onClose} className="p-1 rounded-md hover:bg-muted">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("settings.addUser")}</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            {t("settings.addUser")}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>{t("auth.fullName")} *</Label>
             <Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} placeholder="John Smith" />
@@ -87,29 +87,30 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
           </div>
           <div className="space-y-2">
             <Label>{t("settings.usersRoles")} *</Label>
-            <select
-              value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value })}
-              className="w-full h-10 px-3 rounded-md border bg-background text-sm"
-            >
-              {ROLES.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {t(r.labelKey)}
-                </option>
-              ))}
-            </select>
+            <Select value={form.role} onValueChange={(value) => setForm({ ...form, role: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("settings.usersRoles")} />
+              </SelectTrigger>
+              <SelectContent>
+                {ROLES.map((r) => (
+                  <SelectItem key={r.value} value={r.value}>
+                    {t(r.labelKey)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <div className="flex justify-end gap-3 pt-4">
+          <DialogFooter className="gap-2 sm:gap-2">
             <Button type="button" variant="outline" onClick={onClose}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {loading ? t("common.loading") : t("settings.addUser")}
+            <Button type="submit" loading={loading}>
+              {t("settings.addUser")}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
+

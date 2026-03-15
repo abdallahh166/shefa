@@ -1,5 +1,5 @@
 import { useI18n } from "@/core/i18n/i18nStore";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
 import { PermissionGuard } from "@/core/auth/PermissionGuard";
 import { UserPlus } from "lucide-react";
 import type { ProfileWithRoles } from "@/domain/settings/profile.types";

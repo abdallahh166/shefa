@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useAuth, type Permission } from "@/core/auth/authStore";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
@@ -10,12 +10,12 @@ import { useFeatureAccess, type Feature } from "@/core/subscription/useFeatureAc
 import {
   LayoutDashboard, Users, CalendarDays, Stethoscope,
   Receipt, Pill, FlaskConical, Shield, BarChart3,
-  Settings, LogOut, Menu, X, Heart,
+  Settings,
 } from "lucide-react";
-import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { AppLayout, type AppLayoutLabels, type NavItem, type AppUser } from "@/components/layout/AppLayout";
+import { Button } from "@/components/primitives/Button";
 
-interface NavItem {
+interface NavConfigItem {
   path: string;
   icon: typeof LayoutDashboard;
   labelKey: string;
@@ -23,7 +23,7 @@ interface NavItem {
   feature?: Feature;
 }
 
-const navItems: NavItem[] = [
+const navItems: NavConfigItem[] = [
   { path: "dashboard", icon: LayoutDashboard, labelKey: "common.dashboard", permission: "view_dashboard" },
   { path: "patients", icon: Users, labelKey: "common.patients", permission: "view_patients" },
   { path: "appointments", icon: CalendarDays, labelKey: "common.appointments", permission: "view_appointments", feature: "appointments" },
@@ -42,7 +42,6 @@ export const ClinicLayout = () => {
   const { hasFeature } = useFeatureAccess();
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -55,94 +54,59 @@ export const ClinicLayout = () => {
   };
 
   const visibleNav = navItems.filter((item) => hasPermission(item.permission) && (!item.feature || hasFeature(item.feature)));
+  const appNavItems: NavItem[] = visibleNav.map((item) => ({
+    path: item.path,
+    icon: item.icon,
+    label: t(item.labelKey),
+  }));
+
+  if (!user || !clinicSlug) return null;
+
+  const appUser: AppUser = {
+    id: user.id,
+    name: user.name ?? "User",
+    email: user.email ?? undefined,
+    role: user.role ?? undefined,
+  };
+
+  const labels: AppLayoutLabels = {
+    brandName: t("common.appName"),
+    logOut: t("common.logout"),
+    collapseSidebar: t("common.collapseSidebar"),
+    expandSidebar: t("common.expandSidebar"),
+    openMenu: t("common.openMenu"),
+    closeMenu: t("common.closeMenu"),
+    skipToContent: t("common.skipToContent"),
+  };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <>
       <PaywallModal />
-
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          "fixed inset-y-0 start-0 z-50 w-[240px] bg-sidebar border-e border-sidebar-border flex flex-col transition-transform duration-200 lg:relative lg:translate-x-0",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full rtl:translate-x-full rtl:lg:translate-x-0"
-        )}
-      >
-        {/* Logo */}
-        <div className="flex items-center gap-2.5 px-5 h-14 border-b border-sidebar-border">
-          <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
-            <Heart className="h-3.5 w-3.5 text-primary-foreground" />
-          </div>
-          <span className="font-semibold text-sm text-foreground">{t("common.appName")}</span>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
-          {visibleNav.map((item) => (
-            <NavLink
-              key={item.path}
-              to={`/tenant/${clinicSlug}/${item.path}`}
-              onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) => cn("sidebar-item", isActive && "active")}
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              <span>{t(item.labelKey)}</span>
-            </NavLink>
-          ))}
-        </nav>
-
-        {/* User footer */}
-        <div className="p-3 border-t border-sidebar-border">
-          <div className="flex items-center gap-2.5 px-2 py-1.5">
-            <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
-              {user?.name?.charAt(0) ?? "U"}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-foreground truncate">{user?.name}</p>
-              <p className="text-2xs text-muted-foreground capitalize">{user?.role?.replace("_", " ")}</p>
-            </div>
-            <button onClick={handleLogout} className="p-1 rounded-md hover:bg-muted text-muted-foreground" title={t("common.logout")}>
-              <LogOut className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* Overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
-
-      {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <UpgradeBanner />
-
-        {/* Topbar */}
-        <header className="h-14 border-b bg-card flex items-center justify-between px-4 lg:px-6">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden p-1.5 rounded-md hover:bg-muted">
-              {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
-            <GlobalSearch />
-          </div>
-          <div className="flex items-center gap-1.5">
-            {user?.role === "super_admin" && tenantOverride && (
-              <button
+      <AppLayout
+        navItems={appNavItems}
+        user={appUser}
+        onLogout={handleLogout}
+        clinicSlug={clinicSlug}
+        upgradeSlot={<UpgradeBanner />}
+        topbarStartSlot={<GlobalSearch />}
+        topbarEndSlot={(
+          <>
+            {user.role === "super_admin" && tenantOverride && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
                 onClick={handleExitImpersonation}
-                className="px-2.5 py-1.5 text-xs rounded-md border border-primary/30 text-primary hover:bg-primary/10"
-                title="Exit tenant view"
               >
                 Exit {tenantOverride.name}
-              </button>
+              </Button>
             )}
             <LanguageSwitcher />
             <NotificationCenter />
-          </div>
-        </header>
-
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-          <Outlet />
-        </main>
-      </div>
-    </div>
+          </>
+        )}
+        labels={labels}
+      />
+    </>
   );
 };

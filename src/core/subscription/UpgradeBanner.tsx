@@ -1,9 +1,9 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useSubscription } from "./SubscriptionContext";
 import { useAuth } from "@/core/auth/authStore";
 import { useNavigate } from "react-router-dom";
 import { X, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
 
 export const UpgradeBanner = () => {
   const { plan, isLoading } = useSubscription();
@@ -30,13 +30,19 @@ export const UpgradeBanner = () => {
         >
           ترقية
         </Button>
-        <button
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
           onClick={() => setDismissed(true)}
-          className="p-1 rounded hover:bg-muted text-muted-foreground"
+          className="text-muted-foreground hover:text-foreground"
+          aria-label="Dismiss upgrade banner"
+          title="Dismiss upgrade banner"
         >
           <X className="h-3.5 w-3.5" />
-        </button>
+        </Button>
       </div>
     </div>
   );
 };
+

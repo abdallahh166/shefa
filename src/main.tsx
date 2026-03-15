@@ -1,7 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
-import "./index.css";
+import "./design-system/styles/globals.css";
 import { useAuth } from "./core/auth/authStore";
 import { initTheme } from "./hooks/useDarkMode";
 import { initEventHandlers } from "./core/events";

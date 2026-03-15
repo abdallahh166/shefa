@@ -1,5 +1,5 @@
-import { Component, ReactNode } from "react";
-import { Button } from "@/components/ui/button";
+﻿import { Component, ReactNode } from "react";
+import { Button } from "@/components/primitives/Button";
 import { useAuth } from "@/core/auth/authStore";
 import { clientErrorLogService } from "@/services/observability/clientErrorLog.service";
 
@@ -73,3 +73,4 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return this.props.children;
   }
 }
+

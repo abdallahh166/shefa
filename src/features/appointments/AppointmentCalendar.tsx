@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
+﻿import { useMemo, useState } from "react";
+import { Button } from "@/components/primitives/Button";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useI18n } from "@/core/i18n/i18nStore";
@@ -135,7 +135,7 @@ export function AppointmentCalendar({ appointments, view, onViewChange, cursor, 
         calendar,
         month: "short",
         day: "numeric",
-      })} – ${end.toLocaleDateString(intlLocale, {
+      })} â€“ ${end.toLocaleDateString(intlLocale, {
         calendar,
         month: "short",
         day: "numeric",
@@ -286,7 +286,7 @@ export function AppointmentCalendar({ appointments, view, onViewChange, cursor, 
                           rescheduleEnabled && "cursor-grab active:cursor-grabbing",
                           statusChipClass[a.status] ?? "bg-muted text-foreground",
                         )}
-                        title={`${a.patient_name} • ${a.doctor_name} • ${statusLabel(a.status)}`}
+                        title={`${a.patient_name} â€¢ ${a.doctor_name} â€¢ ${statusLabel(a.status)}`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="truncate">{a.patient_name}</span>
@@ -311,3 +311,4 @@ export function AppointmentCalendar({ appointments, view, onViewChange, cursor, 
     </div>
   );
 }
+

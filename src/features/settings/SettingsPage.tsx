@@ -3,6 +3,8 @@ import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
 import { cn } from "@/lib/utils";
 import { Building, Users, Bell, Palette, Shield, ScrollText, User, CreditCard } from "lucide-react";
+import { Button } from "@/components/primitives/Button";
+import { PageContainer, SectionHeader } from "@/components/layout/AppLayout";
 import { AddUserModal } from "./AddUserModal";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { GeneralTab } from "./tabs/GeneralTab";
@@ -68,21 +70,25 @@ export const SettingsPage = () => {
   ];
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      <div>
-        <h1 className="page-title">{t("settings.title")}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Manage your clinic preferences</p>
-      </div>
+    <PageContainer className="space-y-5">
+      <SectionHeader
+        title={t("settings.title")}
+        subtitle={t("settings.subtitle") ?? "Manage your clinic preferences"}
+      />
 
       <div className="flex flex-col lg:flex-row gap-5">
         {/* Tab navigation */}
         <div className="lg:w-52 flex lg:flex-col gap-0.5 overflow-x-auto pb-1 lg:pb-0">
           {tabs.map((tab) => (
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
+              aria-pressed={activeTab === tab.key}
               className={cn(
-                "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors whitespace-nowrap",
+                "w-full justify-start gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors whitespace-nowrap",
                 activeTab === tab.key
                   ? "bg-primary/10 text-primary font-medium"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -90,7 +96,7 @@ export const SettingsPage = () => {
             >
               <tab.icon className="h-4 w-4 flex-shrink-0" />
               {tab.label}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -129,6 +135,6 @@ export const SettingsPage = () => {
           refetchProfiles();
         }}
       />
-    </div>
+    </PageContainer>
   );
 };

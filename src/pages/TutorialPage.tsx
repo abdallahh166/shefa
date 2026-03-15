@@ -1,6 +1,6 @@
-import { useNavigate } from "react-router-dom";
+﻿import { useNavigate } from "react-router-dom";
 import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
 import { useI18n } from "@/core/i18n/i18nStore";
 import {
   ArrowLeft,
@@ -130,13 +130,16 @@ export const TutorialPage = () => {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-md border-b">
         <div className="max-w-5xl mx-auto flex items-center justify-between px-4 h-14">
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => navigate("/login")}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
             {t("tutorial.backToLogin")}
-          </button>
+          </Button>
           <LanguageSwitcher />
         </div>
       </header>
@@ -289,7 +292,7 @@ export const TutorialPage = () => {
                           {has ? (
                             <CheckCircle2 className="h-4 w-4 text-primary mx-auto" />
                           ) : (
-                            <span className="text-muted-foreground/30">—</span>
+                            <span className="text-muted-foreground/30">â€”</span>
                           )}
                         </td>
                       ))}
@@ -317,3 +320,4 @@ export const TutorialPage = () => {
     </div>
   );
 };
+

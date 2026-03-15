@@ -11,7 +11,7 @@ export const queryKeys = {
   },
   patients: {
     root: (tenantId?: string) => tenantKey("patients", tenantId),
-    list: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string; filters?: Record<string, unknown> }) =>
+    list: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string; filters?: Record<string, unknown>; sort?: { column: string; ascending?: boolean } }) =>
       listKey("patients", args),
     detail: (id: string, tenantId?: string) => [...tenantKey("patients", tenantId), "detail", id] as const,
     documents: (patientId: string, tenantId?: string) => [...tenantKey("patients", tenantId), "documents", patientId] as const,
@@ -20,14 +20,14 @@ export const queryKeys = {
   },
   doctors: {
     root: (tenantId?: string) => tenantKey("doctors", tenantId),
-    list: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string }) =>
+    list: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string; sort?: { column: string; ascending?: boolean } }) =>
       listKey("doctors", args),
     detail: (id: string, tenantId?: string) => [...tenantKey("doctors", tenantId), "detail", id] as const,
     schedules: (doctorId: string, tenantId?: string) => [...tenantKey("doctors", tenantId), "schedules", doctorId] as const,
   },
   appointments: {
     root: (tenantId?: string) => tenantKey("appointments", tenantId),
-    list: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string; filters?: Record<string, unknown> }) =>
+    list: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string; filters?: Record<string, unknown>; sort?: { column: string; ascending?: boolean } }) =>
       listKey("appointments", args),
     calendar: (args?: { tenantId?: string; start?: string; end?: string }) =>
       [...tenantKey("appointments", args?.tenantId), "calendar", args] as const,
@@ -35,7 +35,7 @@ export const queryKeys = {
   },
   billing: {
     root: (tenantId?: string) => tenantKey("billing", tenantId),
-    list: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string; filters?: Record<string, unknown> }) =>
+    list: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string; filters?: Record<string, unknown>; sort?: { column: string; ascending?: boolean } }) =>
       listKey("billing", args),
     range: (args?: { tenantId?: string; start?: string; end?: string }) =>
       [...tenantKey("billing", args?.tenantId), "range", args] as const,
@@ -44,25 +44,25 @@ export const queryKeys = {
   },
   insurance: {
     root: (tenantId?: string) => tenantKey("insurance", tenantId),
-    list: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string; filters?: Record<string, unknown> }) =>
+    list: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string; filters?: Record<string, unknown>; sort?: { column: string; ascending?: boolean } }) =>
       listKey("insurance", args),
     summary: (tenantId?: string) => [...tenantKey("insurance", tenantId), "summary"] as const,
   },
   laboratory: {
     root: (tenantId?: string) => tenantKey("laboratory", tenantId),
-    list: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string; filters?: Record<string, unknown> }) =>
+    list: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string; filters?: Record<string, unknown>; sort?: { column: string; ascending?: boolean } }) =>
       listKey("laboratory", args),
     summary: (tenantId?: string) => [...tenantKey("laboratory", tenantId), "summary"] as const,
   },
   pharmacy: {
     root: (tenantId?: string) => tenantKey("pharmacy", tenantId),
-    list: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string; filters?: Record<string, unknown> }) =>
+    list: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string; filters?: Record<string, unknown>; sort?: { column: string; ascending?: boolean } }) =>
       listKey("pharmacy", args),
     summary: (tenantId?: string) => [...tenantKey("pharmacy", tenantId), "summary"] as const,
   },
   prescriptions: {
     root: (tenantId?: string) => tenantKey("prescriptions", tenantId),
-    list: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string; filters?: Record<string, unknown> }) =>
+    list: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string; filters?: Record<string, unknown>; sort?: { column: string; ascending?: boolean } }) =>
       listKey("prescriptions", args),
   },
   notifications: {

@@ -4,8 +4,9 @@ import { useI18n } from "@/core/i18n/i18nStore";
 import { DataTable, Column } from "@/shared/components/DataTable";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { StatusFilter } from "@/shared/components/StatusFilter";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
 import { PermissionGuard } from "@/core/auth/PermissionGuard";
+import { PageContainer, SectionHeader } from "@/components/layout/AppLayout";
 import { UserPlus, Eye, Trash2, Upload } from "lucide-react";
 import { AddPatientModal } from "./AddPatientModal";
 import { ImportPatientsModal } from "./ImportPatientsModal";
@@ -30,6 +31,10 @@ export const PatientsPage = () => {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
+  const [sort, setSort] = useState<{ column: string; direction: "asc" | "desc" }>({
+    column: "created_at",
+    direction: "desc",
+  });
   const pageSize = 25;
   const canManage = hasPermission("manage_patients");
   const canDelete = hasRole("clinic_admin");
@@ -43,6 +48,7 @@ export const PatientsPage = () => {
       pageSize,
       search: searchTerm || undefined,
       filters: statusFilter ? { status: statusFilter } : undefined,
+      sort: { column: sort.column, ascending: sort.direction === "asc" },
     }),
     queryFn: () =>
       patientService.listPaged({
@@ -50,7 +56,7 @@ export const PatientsPage = () => {
         pageSize,
         search: searchTerm || undefined,
         filters: statusFilter ? { status: statusFilter } : undefined,
-        sort: { column: "created_at", ascending: false },
+        sort: { column: sort.column, ascending: sort.direction === "asc" },
       }),
     enabled: !!user?.tenantId,
   });
@@ -75,9 +81,9 @@ export const PatientsPage = () => {
   };
 
   const columns: Column<PatientRow>[] = [
-    { key: "patient_code", header: t("patients.patientId"), searchable: true },
+    { key: "patient_code", header: t("patients.patientId"), searchable: true, sortable: true },
     {
-      key: "full_name", header: t("patients.fullName"), searchable: true,
+      key: "full_name", header: t("patients.fullName"), searchable: true, sortable: true,
       render: (p) => (
         <div className="flex items-center gap-2.5">
           <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">{p.full_name.charAt(0)}</div>
@@ -89,27 +95,32 @@ export const PatientsPage = () => {
     { key: "blood_type", header: t("patients.bloodType"), render: (p) => <span className="text-muted-foreground">{p.blood_type ?? "—"}</span> },
     { key: "phone", header: t("common.phone"), searchable: true, render: (p) => <span className="text-muted-foreground tabular-nums">{p.phone ?? "—"}</span> },
     {
-      key: "status", header: t("common.status"),
+      key: "status", header: t("common.status"), sortable: true,
       render: (p) => <StatusBadge variant={p.status === "active" ? "success" : "default"} dot>{t(`patients.${p.status}`)}</StatusBadge>,
     },
     {
       key: "actions", header: "", searchable: false,
       render: (p) => (
-        <button onClick={() => navigate(`/tenant/${clinicSlug}/patients/${p.id}`)} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+        <Button
+          onClick={() => navigate(`/tenant/${clinicSlug}/patients/${p.id}`)}
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground hover:text-foreground"
+          aria-label={t("common.view")}
+          title={t("common.view")}
+        >
           <Eye className="h-4 w-4" />
-        </button>
+        </Button>
       ),
     },
   ];
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">{t("patients.title")}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{total} total patients</p>
-        </div>
-        <div className="flex items-center gap-2">
+    <PageContainer>
+      <SectionHeader
+        title={t("patients.title")}
+        subtitle={`${total} total patients`}
+        actions={(
           <PermissionGuard permission="manage_patients">
             <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
               <Upload className="h-3.5 w-3.5 mr-1" /> {t("patients.importCSV")}
@@ -118,8 +129,8 @@ export const PatientsPage = () => {
               <UserPlus className="h-3.5 w-3.5 mr-1" />{t("patients.addPatient")}
             </Button>
           </PermissionGuard>
-        </div>
-      </div>
+        )}
+      />
 
       <DataTable
         columns={columns}
@@ -130,6 +141,12 @@ export const PatientsPage = () => {
         serverSearch
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
+        sortColumn={sort.column}
+        sortDirection={sort.direction}
+        onSortChange={(column, direction) => {
+          setSort({ column, direction });
+          setPage(1);
+        }}
         isLoading={isLoading}
         exportFileName="patients"
         pdfExport={{ title: "Patient List", subtitle: `Generated on ${new Date().toLocaleDateString()}` }}
@@ -141,7 +158,7 @@ export const PatientsPage = () => {
           {
             label: t("common.delete"),
             icon: <Trash2 className="h-3.5 w-3.5 me-1" />,
-            variant: "destructive",
+            variant: "danger",
             action: handleBulkDelete,
           },
         ] : undefined}
@@ -164,6 +181,6 @@ export const PatientsPage = () => {
         onClose={() => setShowImport(false)}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: queryKeys.patients.root(user?.tenantId) })}
       />
-    </div>
+    </PageContainer>
   );
 };

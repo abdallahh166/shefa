@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/core/auth/authStore";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/primitives/Button";
+import { Input } from "@/components/primitives/Inputs";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { ClinicNameField } from "@/features/auth/ClinicNameField";
@@ -215,39 +215,57 @@ export const LoginPage = () => {
           </form>
 
           <div className="mt-3 text-end">
-            <button
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
               onClick={() => navigate("/forgot-password")}
-              className="text-xs text-muted-foreground hover:text-primary hover:underline"
+              className="text-xs text-muted-foreground hover:text-primary"
             >
               {t("auth.forgotPassword")}
-            </button>
+            </Button>
           </div>
 
           <div className="mt-4 text-center text-sm">
             {mode === "login" ? (
               <p className="text-muted-foreground">
                 {t("auth.noAccount")}{" "}
-                <button onClick={() => setMode("signup")} className="text-primary font-medium hover:underline">
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  onClick={() => setMode("signup")}
+                  className="text-primary font-medium"
+                >
                   {t("auth.register")}
-                </button>
+                </Button>
               </p>
             ) : (
               <p className="text-muted-foreground">
                 {t("auth.alreadyHaveAccount")}{" "}
-                <button onClick={() => setMode("login")} className="text-primary font-medium hover:underline">
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  onClick={() => setMode("login")}
+                  className="text-primary font-medium"
+                >
                   {t("auth.login")}
-                </button>
+                </Button>
               </p>
             )}
           </div>
 
           <div className="mt-6 text-center">
-            <button
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
               onClick={() => navigate("/tutorial")}
-              className="inline-flex items-center gap-1.5 text-sm text-primary font-medium hover:underline"
+              className="gap-1.5 text-sm text-primary font-medium"
             >
-              📖 {t("auth.howToUse")}
-            </button>
+              ðŸ“– {t("auth.howToUse")}
+            </Button>
           </div>
 
         </div>
@@ -255,5 +273,7 @@ export const LoginPage = () => {
     </div>
   );
 };
+
+
 
 

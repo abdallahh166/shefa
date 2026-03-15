@@ -5,6 +5,7 @@ import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
 import { notificationService } from "@/services/notifications/notification.service";
 import { toast } from "@/hooks/use-toast";
+import { Button } from "@/components/primitives/Button";
 
 interface Notification {
   id: string;
@@ -128,23 +129,37 @@ export const NotificationCenter = () => {
 
   return (
     <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(!open)} className="p-1.5 rounded-md hover:bg-muted relative">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={() => setOpen(!open)}
+        className="relative"
+        aria-label={t("common.notifications")}
+        title={t("common.notifications")}
+      >
         <Bell className="h-4 w-4 text-muted-foreground" />
         {unreadCount > 0 && (
           <span className="absolute -top-0.5 -end-0.5 h-4 min-w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center px-1">
             {unreadCount}
           </span>
         )}
-      </button>
+      </Button>
 
       {open && (
         <div className="absolute end-0 top-full mt-2 w-80 bg-card rounded-xl border shadow-lg z-50 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b">
             <h3 className="text-sm font-semibold">{t("common.notifications")}</h3>
             {unreadCount > 0 && (
-              <button onClick={markAllRead} className="text-xs text-primary hover:underline">
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                onClick={markAllRead}
+                className="text-xs"
+              >
                 {t("common.markAllRead") ?? "Mark all read"}
-              </button>
+              </Button>
             )}
           </div>
 
@@ -175,9 +190,17 @@ export const NotificationCenter = () => {
                       {n.body && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</p>}
                       <p className="text-2xs text-muted-foreground mt-1">{timeAgo(n.created_at)}</p>
                     </div>
-                    <button onClick={() => dismiss(n.id)} className="shrink-0 p-1 rounded hover:bg-muted text-muted-foreground">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => dismiss(n.id)}
+                      className="shrink-0 text-muted-foreground hover:text-foreground"
+                      aria-label={t("common.dismiss")}
+                      title={t("common.dismiss")}
+                    >
                       <X className="h-3 w-3" />
-                    </button>
+                    </Button>
                   </div>
                 );
               })
@@ -186,13 +209,15 @@ export const NotificationCenter = () => {
 
           {canLoadMore && (
             <div className="border-t px-4 py-2">
-              <button
+              <Button
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="w-full text-xs text-primary hover:underline disabled:opacity-50"
+                variant="link"
+                size="sm"
+                className="w-full text-xs"
               >
                 {loadingMore ? t("common.loading") : t("common.loadMore") ?? "Load more"}
-              </button>
+              </Button>
             </div>
           )}
         </div>

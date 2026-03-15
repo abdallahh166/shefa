@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+﻿import { Button } from "@/components/primitives/Button";
 import { AlertTriangle, Loader2 } from "lucide-react";
 
 interface ConfirmDialogProps {
@@ -27,7 +27,7 @@ export const ConfirmDialog = ({
   if (!open) return null;
 
   const iconColor = variant === "danger" ? "text-destructive bg-destructive/10" : variant === "warning" ? "text-warning bg-warning/10" : "text-primary bg-primary/10";
-  const buttonVariant = variant === "danger" ? "destructive" : "default";
+  const buttonVariant = variant === "danger" ? "danger" : "default";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 backdrop-blur-sm">
@@ -52,3 +52,4 @@ export const ConfirmDialog = ({
     </div>
   );
 };
+

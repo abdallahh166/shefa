@@ -1,7 +1,7 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/primitives/Button";
+import { Input } from "@/components/primitives/Inputs";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
@@ -68,9 +68,15 @@ export const ForgotPasswordPage = () => {
                 </Button>
               </form>
               <div className="mt-4 text-center">
-                <button onClick={() => navigate("/login")} className="text-sm text-primary hover:underline">
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  onClick={() => navigate("/login")}
+                  className="text-sm"
+                >
                   {t("tutorial.backToLogin")}
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -79,3 +85,5 @@ export const ForgotPasswordPage = () => {
     </div>
   );
 };
+
+

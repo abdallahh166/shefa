@@ -5,7 +5,8 @@ import { StatusBadge } from "@/shared/components/StatusBadge";
 import { StatusFilter } from "@/shared/components/StatusFilter";
 import { DataTable, Column } from "@/shared/components/DataTable";
 import { Shield, Plus, CheckCircle, XCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
+import { PageContainer, SectionHeader } from "@/components/layout/AppLayout";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { useAuth } from "@/core/auth/authStore";
 import { NewClaimModal } from "./NewClaimModal";
@@ -38,6 +39,10 @@ export const InsurancePage = () => {
   const [showModal, setShowModal] = useState(false);
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
+  const [sort, setSort] = useState<{ column: string; direction: "asc" | "desc" }>({
+    column: "claim_date",
+    direction: "desc",
+  });
   const pageSize = 25;
 
   useRealtimeSubscription(["insurance_claims"]);
@@ -49,13 +54,14 @@ export const InsurancePage = () => {
       pageSize,
       search: searchTerm.trim() || undefined,
       filters: statusFilter ? { status: statusFilter } : undefined,
+      sort: { column: sort.column, ascending: sort.direction === "asc" },
     }),
     queryFn: async () => insuranceService.listPagedWithRelations({
       page,
       pageSize,
       search: searchTerm.trim() || undefined,
       filters: statusFilter ? { status: statusFilter } : undefined,
-      sort: { column: "claim_date", ascending: false },
+      sort: { column: sort.column, ascending: sort.direction === "asc" },
     }),
     enabled: !!user?.tenantId,
   });
@@ -117,38 +123,46 @@ export const InsurancePage = () => {
     { key: "provider", header: t("common.provider"), searchable: true },
     { key: "service", header: t("common.service"), searchable: true },
     { key: "amount", header: t("common.amount"), render: (c) => formatCurrency(c.amount, locale) },
-    { key: "claim_date", header: t("common.date"), render: (c) => formatDate(c.claim_date, locale, "date", calendarType) },
-    { key: "status", header: t("common.status"), render: (c) => <StatusBadge variant={statusVariant[c.status] ?? "default"}>{getClaimStatusLabel(c.status)}</StatusBadge> },
+    { key: "claim_date", header: t("common.date"), sortable: true, render: (c) => formatDate(c.claim_date, locale, "date", calendarType) },
+    { key: "status", header: t("common.status"), sortable: true, render: (c) => <StatusBadge variant={statusVariant[c.status] ?? "default"}>{getClaimStatusLabel(c.status)}</StatusBadge> },
     {
       key: "actions",
       header: t("common.actions"),
       render: (c) => c.status === "pending" ? (
         <div className="flex gap-1">
-          <button
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={() => handleUpdateStatus(c.id, "approved")}
-            className="p-1.5 rounded-md hover:bg-success/10 text-success"
+            className="text-success hover:text-success"
+            aria-label={t("common.approve")}
             title={t("common.approve")}
           >
             <CheckCircle className="h-4 w-4" />
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={() => handleUpdateStatus(c.id, "rejected")}
-            className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive"
+            className="text-destructive hover:text-destructive"
+            aria-label={t("common.reject")}
             title={t("common.reject")}
           >
             <XCircle className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       ) : null,
     },
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="page-header">
-        <h1 className="page-title">{t("insurance.title")}</h1>
-        <Button onClick={() => setShowModal(true)}><Plus className="h-4 w-4" /> {t("insurance.newClaim")}</Button>
-      </div>
+    <PageContainer className="space-y-6">
+      <SectionHeader
+        title={t("insurance.title")}
+        actions={(
+          <Button onClick={() => setShowModal(true)}><Plus className="h-4 w-4" /> {t("insurance.newClaim")}</Button>
+        )}
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard title={t("insurance.activeProviders")} value={String(providerCount)} icon={Shield} />
@@ -165,6 +179,12 @@ export const InsurancePage = () => {
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
         isLoading={isLoading}
+        sortColumn={sort.column}
+        sortDirection={sort.direction}
+        onSortChange={(column, direction) => {
+          setSort({ column, direction });
+          setPage(1);
+        }}
         page={page}
         pageSize={pageSize}
         total={total}
@@ -189,6 +209,6 @@ export const InsurancePage = () => {
           invalidateClaims();
         }}
       />
-    </div>
+    </PageContainer>
   );
 };

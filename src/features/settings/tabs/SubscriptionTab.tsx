@@ -1,6 +1,6 @@
-import { useSubscription } from "@/core/subscription/SubscriptionContext";
+﻿import { useSubscription } from "@/core/subscription/SubscriptionContext";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Crown, Calendar, CreditCard, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
@@ -106,7 +106,7 @@ export const SubscriptionTab = () => {
               <p className="text-sm text-muted-foreground mt-1">
                 يرجى تجديد اشتراكك للاستمرار في استخدام جميع الميزات.
               </p>
-              <Button onClick={() => navigate("/pricing")} variant="destructive" size="sm" className="mt-3">
+              <Button onClick={() => navigate("/pricing")} variant="danger" size="sm" className="mt-3">
                 تجديد الآن
               </Button>
             </div>
@@ -123,3 +123,4 @@ export const SubscriptionTab = () => {
     </div>
   );
 };
+

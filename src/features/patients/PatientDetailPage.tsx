@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
 import { StatusBadge } from "@/shared/components/StatusBadge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/primitives/Button";
+import { Input, Textarea, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/primitives/Inputs";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PageContainer } from "@/components/layout/AppLayout";
 import {
   ArrowLeft, FileText, Pill, Activity, Stethoscope,
   Calendar, Phone, Mail, Droplets, User, Loader2,
@@ -133,12 +133,12 @@ export const PatientDetailPage = () => {
 
   const recordTypeOptions = useMemo(
     () => [
-      { value: "progress_note", label: "Progress Note" },
-      { value: "lab_review", label: "Lab Review" },
-      { value: "acute_visit", label: "Acute Visit" },
-      { value: "annual_physical", label: "Annual Physical" },
+      { value: "progress_note", label: t("patients.recordTypes.progress_note") },
+      { value: "lab_review", label: t("patients.recordTypes.lab_review") },
+      { value: "acute_visit", label: t("patients.recordTypes.acute_visit") },
+      { value: "annual_physical", label: t("patients.recordTypes.annual_physical") },
     ],
-    [],
+    [t],
   );
   const editingRecord = useMemo(
     () => medicalRecords.find((record: any) => record.id === editingRecordId),
@@ -300,15 +300,23 @@ export const PatientDetailPage = () => {
   const totalPaid = invoices.filter((i: any) => i.status === "paid").reduce((s: number, i: any) => s + Number(i.amount), 0);
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <PageContainer className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <button onClick={() => navigate(`/tenant/${clinicSlug}/patients`)} className="p-2 rounded-md hover:bg-muted">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate(`/tenant/${clinicSlug}/patients`)}
+          className="hover:bg-muted"
+          aria-label={t("common.back")}
+          title={t("common.back")}
+        >
           <ArrowLeft className="h-5 w-5" />
-        </button>
+        </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="page-title">{patient.full_name}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">{patient.full_name}</h1>
             <StatusBadge variant={patient.status === "active" ? "success" : "default"}>
               {patient.status === "active" ? t("patients.active") : t("patients.inactive")}
             </StatusBadge>
@@ -334,10 +342,10 @@ export const PatientDetailPage = () => {
       {/* Patient Info Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { icon: Droplets, label: t("patients.bloodType"), value: patient.blood_type ?? "â€”" },
-          { icon: Phone, label: t("common.phone"), value: patient.phone ?? "â€”" },
-          { icon: Mail, label: t("common.email"), value: patient.email ?? "â€”" },
-          { icon: Stethoscope, label: t("patients.insuranceProvider"), value: patient.insurance_provider ?? "â€”" },
+          { icon: Droplets, label: t("patients.bloodType"), value: patient.blood_type ?? "—" },
+          { icon: Phone, label: t("common.phone"), value: patient.phone ?? "—" },
+          { icon: Mail, label: t("common.email"), value: patient.email ?? "—" },
+          { icon: Stethoscope, label: t("patients.insuranceProvider"), value: patient.insurance_provider ?? "—" },
         ].map((item, i) => (
           <div key={i} className="stat-card">
             <div className="flex items-center gap-2 mb-1">
@@ -352,17 +360,21 @@ export const PatientDetailPage = () => {
       {/* Tabs */}
       <div className="border-b flex gap-1 overflow-x-auto">
         {tabs.map((tab) => (
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
+            aria-pressed={activeTab === tab.key}
             className={cn(
-              "flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+              "h-auto rounded-none flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
               activeTab === tab.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >
             <tab.icon className="h-4 w-4" />
             {tab.label}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -381,7 +393,7 @@ export const PatientDetailPage = () => {
                         <div className="h-2 w-2 rounded-full bg-primary mt-2 shrink-0" />
                         <div>
                           <p className="text-sm font-medium">{h.diagnosis ?? t("patients.noDiagnosis")}</p>
-                          <p className="text-xs text-muted-foreground">{formatDate(h.record_date, locale, "date", calendarType)} Â· {h.doctors?.full_name ?? "â€”"}</p>
+                          <p className="text-xs text-muted-foreground">{formatDate(h.record_date, locale, "date", calendarType)} Â· {h.doctors?.full_name ?? "—"}</p>
                         </div>
                       </div>
                     ))}
@@ -449,14 +461,14 @@ export const PatientDetailPage = () => {
         const AppointmentRow = ({ a }: { a: any }) => (
           <tr className="hover:bg-muted/30 transition-colors">
             <td className="whitespace-nowrap text-muted-foreground">{formatDate(a.appointment_date, locale, "datetime", calendarType)}</td>
-            <td className="font-medium capitalize">{a.type?.replace("_", " ") ?? "â€”"}</td>
-            <td>{a.doctors?.full_name ?? "â€”"}</td>
+            <td className="font-medium capitalize">{a.type?.replace("_", " ") ?? "—"}</td>
+            <td>{a.doctors?.full_name ?? "—"}</td>
             <td>
               <StatusBadge variant={apptStatusVariant[a.status] ?? "default"}>
                 {getApptStatusLabel(a.status)}
               </StatusBadge>
             </td>
-            <td className="text-sm text-muted-foreground max-w-xs truncate">{a.notes ?? "â€”"}</td>
+            <td className="text-sm text-muted-foreground max-w-xs truncate">{a.notes ?? "—"}</td>
           </tr>
         );
 
@@ -542,13 +554,24 @@ export const PatientDetailPage = () => {
             )}
           </div>
           {medicalRecords.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">{t("patients.noMedicalHistoryFound")}</div>
+            <div className="text-center py-12 text-muted-foreground space-y-3">
+              <p>{t("patients.noMedicalHistoryFound")}</p>
+              {canManageRecords && (
+                <div className="flex flex-col items-center gap-2">
+                  <p className="text-xs text-muted-foreground">{t("patients.medicalHistoryEmptyCta")}</p>
+                  <Button variant="outline" size="sm" onClick={openCreateRecord} className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    {t("patients.addMedicalRecord")}
+                  </Button>
+                </div>
+              )}
+            </div>
           ) : (
             <table className="data-table">
               <thead><tr className="bg-muted/50">
                 <th>{t("common.date")}</th>
-                <th>{t("appointments.type")}</th>
-                <th>{t("common.result")}</th>
+                <th>{t("patients.recordType")}</th>
+                <th>{t("patients.diagnosis")}</th>
                 <th>{t("appointments.doctor")}</th>
                 <th>{t("appointments.notes")}</th>
                 {canManageRecords && <th className="text-right">{t("common.actions")}</th>}
@@ -566,22 +589,28 @@ export const PatientDetailPage = () => {
                     {canManageRecords && (
                       <td className="text-right">
                         <div className="inline-flex items-center gap-2">
-                          <button
+                          <Button
                             type="button"
-                            className="p-2 rounded-md hover:bg-muted"
+                            variant="ghost"
+                            size="icon-sm"
+                            className="hover:bg-muted"
                             onClick={() => openEditRecord(h)}
                             aria-label={t("common.edit")}
+                            title={t("common.edit")}
                           >
                             <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
-                            className="p-2 rounded-md hover:bg-muted text-destructive"
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-destructive hover:bg-destructive/10"
                             onClick={() => setDeleteRecordId(h.id)}
                             aria-label={t("common.delete")}
+                            title={t("common.delete")}
                           >
                             <Trash2 className="h-4 w-4" />
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     )}
@@ -627,7 +656,7 @@ export const PatientDetailPage = () => {
                   <tr key={rx.id} className="hover:bg-muted/30 transition-colors">
                     <td className="font-medium">{rx.medication}</td>
                     <td>{rx.dosage}</td>
-                    <td>{rx.doctors?.full_name ?? "â€”"}</td>
+                    <td>{rx.doctors?.full_name ?? "—"}</td>
                     <td className="text-muted-foreground">{formatDate(rx.prescribed_date, locale, "date", calendarType)}</td>
                     <td>
                       <StatusBadge variant={rx.status === "active" ? "success" : "default"}>
@@ -656,7 +685,18 @@ export const PatientDetailPage = () => {
             )}
           </div>
           {medicalRecords.length === 0 ? (
-            <div className="bg-card rounded-lg border p-8 text-center text-muted-foreground">{t("patients.noClinicalNotesFound")}</div>
+            <div className="bg-card rounded-lg border p-8 text-center text-muted-foreground space-y-3">
+              <p>{t("patients.noClinicalNotesFound")}</p>
+              {canManageRecords && (
+                <div className="flex flex-col items-center gap-2">
+                  <p className="text-xs text-muted-foreground">{t("patients.clinicalNotesEmptyCta")}</p>
+                  <Button variant="outline" size="sm" onClick={openCreateRecord} className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    {t("patients.addMedicalRecord")}
+                  </Button>
+                </div>
+              )}
+            </div>
           ) : (
             medicalRecords.map((note: any) => (
               <div key={note.id} className="bg-card rounded-lg border p-5">
@@ -669,22 +709,28 @@ export const PatientDetailPage = () => {
                     <span className="text-sm text-muted-foreground">{formatDate(note.record_date, locale, "date", calendarType)}</span>
                     {canManageRecords && (
                       <div className="inline-flex items-center gap-1">
-                        <button
+                        <Button
                           type="button"
-                          className="p-2 rounded-md hover:bg-muted"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="hover:bg-muted"
                           onClick={() => openEditRecord(note)}
                           aria-label={t("common.edit")}
+                          title={t("common.edit")}
                         >
                           <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
-                          className="p-2 rounded-md hover:bg-muted text-destructive"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-destructive hover:bg-destructive/10"
                           onClick={() => setDeleteRecordId(note.id)}
                           aria-label={t("common.delete")}
+                          title={t("common.delete")}
                         >
                           <Trash2 className="h-4 w-4" />
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -732,7 +778,7 @@ export const PatientDetailPage = () => {
                   {labOrders.map((l: any) => (
                     <tr key={l.id} className="hover:bg-muted/30 transition-colors">
                       <td className="font-medium">{l.test_name}</td>
-                      <td>{l.doctors?.full_name ?? "â€”"}</td>
+                      <td>{l.doctors?.full_name ?? "—"}</td>
                       <td className="text-muted-foreground whitespace-nowrap">{formatDate(l.order_date, locale, "date", calendarType)}</td>
                       <td>
                         <StatusBadge variant={labStatusVariant[l.status] ?? "default"}>
@@ -817,10 +863,11 @@ export const PatientDetailPage = () => {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {recordMode === "create"
-                ? `${t("common.add")} ${t("patients.medicalHistory")}`
-                : `${t("common.edit")} ${t("patients.medicalHistory")}`}
+              {recordMode === "create" ? t("patients.addMedicalRecord") : t("patients.editMedicalRecord")}
             </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              {recordMode === "create" ? t("patients.addMedicalRecord") : t("patients.editMedicalRecord")}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {recordMode === "create" ? (
@@ -831,18 +878,21 @@ export const PatientDetailPage = () => {
                   onChange={(e) => setDoctorSearch(e.target.value)}
                   placeholder={t("common.search")}
                 />
-                <select
+                <Select
                   value={recordForm.doctor_id}
-                  onChange={(e) => setRecordForm((prev) => ({ ...prev, doctor_id: e.target.value }))}
-                  className="w-full h-10 px-3 rounded-md border bg-background text-sm"
+                  onValueChange={(value) => setRecordForm((prev) => ({ ...prev, doctor_id: value }))}
                 >
-                  <option value="">{t("appointments.selectDoctor")}</option>
-                  {doctors.map((doctor: any) => (
-                    <option key={doctor.id} value={doctor.id}>
-                      {doctor.full_name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("appointments.selectDoctor")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {doctors.map((doctor: any) => (
+                      <SelectItem key={doctor.id} value={doctor.id}>
+                        {doctor.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             ) : (
               <div className="space-y-2">
@@ -860,22 +910,26 @@ export const PatientDetailPage = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{t("appointments.type")}</Label>
-                <select
+                <Label>{t("patients.recordType")}</Label>
+                <Select
                   value={recordForm.record_type}
-                  onChange={(e) => setRecordForm((prev) => ({ ...prev, record_type: e.target.value }))}
-                  className="w-full h-10 px-3 rounded-md border bg-background text-sm"
+                  onValueChange={(value) => setRecordForm((prev) => ({ ...prev, record_type: value }))}
                 >
-                  {recordTypeOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("patients.recordType")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {recordTypeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="space-y-2">
-              <Label>{t("common.result")}</Label>
+              <Label>{t("patients.diagnosis")}</Label>
               <Input
                 value={recordForm.diagnosis}
                 onChange={(e) => setRecordForm((prev) => ({ ...prev, diagnosis: e.target.value }))}
@@ -902,8 +956,8 @@ export const PatientDetailPage = () => {
       </Dialog>
       <ConfirmDialog
         open={!!deleteRecordId}
-        title={t("common.delete")}
-        message={t("common.confirm")}
+        title={t("patients.deleteMedicalRecordTitle")}
+        message={t("patients.deleteMedicalRecordMessage")}
         confirmLabel={t("common.delete")}
         cancelLabel={t("common.cancel")}
         variant="danger"
@@ -911,7 +965,10 @@ export const PatientDetailPage = () => {
         onConfirm={handleDeleteRecord}
         onCancel={() => setDeleteRecordId(null)}
       />
-    </div>
+    </PageContainer>
   );
 };
+
+
+
 

@@ -4,7 +4,8 @@ import { DataTable, Column } from "@/shared/components/DataTable";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { StatusFilter } from "@/shared/components/StatusFilter";
 import { StatCard } from "@/shared/components/StatCard";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
+import { PageContainer, SectionHeader } from "@/components/layout/AppLayout";
 import { FlaskConical, Clock, CheckCircle, Plus } from "lucide-react";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { useAuth } from "@/core/auth/authStore";
@@ -38,6 +39,10 @@ export const LaboratoryPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
+  const [sort, setSort] = useState<{ column: string; direction: "asc" | "desc" }>({
+    column: "order_date",
+    direction: "desc",
+  });
   const pageSize = 25;
 
   useRealtimeSubscription(["lab_orders"]);
@@ -49,13 +54,14 @@ export const LaboratoryPage = () => {
       pageSize,
       search: searchTerm.trim() || undefined,
       filters: statusFilter ? { status: statusFilter } : undefined,
+      sort: { column: sort.column, ascending: sort.direction === "asc" },
     }),
     queryFn: async () => labService.listPagedWithRelations({
       page,
       pageSize,
       search: searchTerm.trim() || undefined,
       filters: statusFilter ? { status: statusFilter } : undefined,
-      sort: { column: "order_date", ascending: false },
+      sort: { column: sort.column, ascending: sort.direction === "asc" },
     }),
     enabled: !!user?.tenantId,
   });
@@ -113,8 +119,8 @@ export const LaboratoryPage = () => {
     { key: "patient_name", header: t("appointments.patient"), searchable: true },
     { key: "test_name", header: t("laboratory.test"), searchable: true, render: (l) => <span className="font-medium">{l.test_name}</span> },
     { key: "doctor_name", header: t("laboratory.orderedBy"), searchable: true },
-    { key: "order_date", header: t("common.date"), render: (l) => formatDate(l.order_date, locale, "date", calendarType) },
-    { key: "status", header: t("common.status"), render: (l) => <StatusBadge variant={statusVariant[l.status] ?? "default"}>{getLabStatusLabel(l.status)}</StatusBadge> },
+    { key: "order_date", header: t("common.date"), sortable: true, render: (l) => formatDate(l.order_date, locale, "date", calendarType) },
+    { key: "status", header: t("common.status"), sortable: true, render: (l) => <StatusBadge variant={statusVariant[l.status] ?? "default"}>{getLabStatusLabel(l.status)}</StatusBadge> },
     { key: "result", header: t("common.result"), render: (l) => l.result ? <span className="font-medium">{l.result}</span> : <span className="text-muted-foreground">-</span> },
     {
       key: "actions",
@@ -122,20 +128,26 @@ export const LaboratoryPage = () => {
       render: (l) => (
         <div className="flex gap-1">
           {l.status === "pending" && (
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => handleUpdateStatus(l.id, "processing")}
-              className="px-2 py-1 text-xs rounded bg-warning/10 text-warning hover:bg-warning/20"
+              className="h-7 px-2 text-xs bg-warning/10 text-warning hover:bg-warning/20"
             >
               {t("common.start")}
-            </button>
+            </Button>
           )}
           {l.status === "processing" && (
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => handleUpdateStatus(l.id, "completed", "Normal")}
-              className="px-2 py-1 text-xs rounded bg-success/10 text-success hover:bg-success/20"
+              className="h-7 px-2 text-xs bg-success/10 text-success hover:bg-success/20"
             >
               {t("common.complete")}
-            </button>
+            </Button>
           )}
         </div>
       ),
@@ -143,11 +155,13 @@ export const LaboratoryPage = () => {
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="page-header">
-        <h1 className="page-title">{t("laboratory.title")}</h1>
-        <Button onClick={() => setShowModal(true)}><Plus className="h-4 w-4" /> {t("laboratory.newLabOrder")}</Button>
-      </div>
+    <PageContainer className="space-y-6">
+      <SectionHeader
+        title={t("laboratory.title")}
+        actions={(
+          <Button onClick={() => setShowModal(true)}><Plus className="h-4 w-4" /> {t("laboratory.newLabOrder")}</Button>
+        )}
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard title={t("laboratory.pendingOrders")} value={String(statusCounts.pending ?? 0)} icon={Clock} />
@@ -163,6 +177,12 @@ export const LaboratoryPage = () => {
         serverSearch
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
+        sortColumn={sort.column}
+        sortDirection={sort.direction}
+        onSortChange={(column, direction) => {
+          setSort({ column, direction });
+          setPage(1);
+        }}
         isLoading={isLoading}
         page={page}
         pageSize={pageSize}
@@ -188,6 +208,6 @@ export const LaboratoryPage = () => {
           invalidateLabs();
         }}
       />
-    </div>
+    </PageContainer>
   );
 };

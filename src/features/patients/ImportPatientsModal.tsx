@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/primitives/Button";
+import { FileUpload } from "@/components/primitives/FileUpload";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Upload, FileText, AlertTriangle, CheckCircle2, X, Download } from "lucide-react";
+import { Upload, FileText, AlertTriangle, CheckCircle2, Download } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { patientService } from "@/services/patients/patient.service";
 
@@ -179,6 +180,9 @@ export const ImportPatientsModal = ({ open, onClose, onSuccess }: Props) => {
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{t("patients.importPatients")}</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            {t("patients.importPatients")}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -193,24 +197,17 @@ export const ImportPatientsModal = ({ open, onClose, onSuccess }: Props) => {
             <Download className="h-4 w-4" /> {t("patients.downloadTemplate")}
           </Button>
 
-          <div className="border-2 border-dashed rounded-lg p-6 text-center">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleFileChange}
-              className="hidden"
-              id="csv-upload"
-            />
-            <label htmlFor="csv-upload" className="cursor-pointer">
-              <Upload className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
-              <p className="text-sm font-medium">
-                {file ? file.name : t("patients.selectCSVFile")}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {t("patients.clickToSelectFile")}
-              </p>
-            </label>
-          </div>
+          <FileUpload
+            variant="dropzone"
+            accept=".csv"
+            onChange={handleFileChange}
+            disabled={importing}
+            loading={importing}
+            fileName={file?.name}
+            title={t("patients.selectCSVFile")}
+            description={t("patients.clickToSelectFile")}
+            icon={<Upload className="h-10 w-10 text-muted-foreground" />}
+          />
 
           {result && (
             <Alert variant={result.errors.length > 0 ? "destructive" : "default"}>
@@ -250,3 +247,5 @@ export const ImportPatientsModal = ({ open, onClose, onSuccess }: Props) => {
     </Dialog>
   );
 };
+
+

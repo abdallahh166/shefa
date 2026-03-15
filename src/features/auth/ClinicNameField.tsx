@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Input } from "@/components/ui/input";
+﻿import { useState, useEffect, useRef, useCallback } from "react";
+import { Input } from "@/components/primitives/Inputs";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/primitives/Button";
 import { clinicSlugService } from "@/services/auth/clinicSlug.service";
 import { CheckCircle2, XCircle, Loader2, Pencil } from "lucide-react";
 
@@ -173,14 +174,16 @@ export const ClinicNameField = ({
                   <p className="text-xs text-muted-foreground">{t("auth.slugSuggestions")}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {suggestions.map((s) => (
-                      <button
+                      <Button
                         key={s}
                         type="button"
                         onClick={() => handleSuggestionClick(s)}
-                        className="inline-flex items-center px-2.5 py-1 rounded-md border border-primary/30 bg-primary/5 text-xs font-mono text-primary hover:bg-primary/10 transition-colors"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2.5 text-xs font-mono text-primary border-primary/30 bg-primary/5 hover:bg-primary/10"
                       >
                         {s}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -188,14 +191,16 @@ export const ClinicNameField = ({
 
               {/* Custom slug toggle */}
               {!showCustomSlug && (
-                <button
+                <Button
                   type="button"
+                  variant="link"
+                  size="sm"
                   onClick={() => setShowCustomSlug(true)}
-                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  className="h-auto p-0 text-xs text-primary"
                 >
                   <Pencil className="h-3 w-3" />
                   {t("auth.slugCustomize")}
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -231,3 +236,4 @@ export const ClinicNameField = ({
     </div>
   );
 };
+

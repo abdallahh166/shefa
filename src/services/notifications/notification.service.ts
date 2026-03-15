@@ -67,11 +67,13 @@ export const notificationService = {
   }) {
     try {
       const parsed = notificationCreateSchema.parse(input);
-      const { tenantId } = getTenantContext();
-      if (parsed.tenant_id !== tenantId) {
-        throw new Error("Tenant mismatch");
-      }
-      const result = await notificationRepository.create(parsed);
+      const { tenantId, userId } = getTenantContext();
+      const payload = {
+        ...parsed,
+        tenant_id: tenantId,
+        user_id: userId,
+      };
+      const result = await notificationRepository.create(payload);
       return notificationSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to create notification");

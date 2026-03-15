@@ -2,10 +2,10 @@ import { useState, useEffect } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
 import { toast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/primitives/Button";
+import { Input } from "@/components/primitives/Inputs";
 import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/services/queryKeys";
@@ -19,7 +19,7 @@ interface Props {
 }
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const DAYS_AR = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+const DAYS_AR = ["?????", "???????", "????????", "????????", "??????", "??????", "?????"];
 
 interface ScheduleRow {
   day_of_week: number;
@@ -118,6 +118,9 @@ export const DoctorScheduleModal = ({ open, onClose, doctorId, doctorName }: Pro
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{doctorName} - {t("doctors.schedule")}</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            {doctorName} - {t("doctors.schedule")}
+          </DialogDescription>
         </DialogHeader>
 
         {isLoading ? (
@@ -164,3 +167,6 @@ export const DoctorScheduleModal = ({ open, onClose, doctorId, doctorName }: Pro
     </Dialog>
   );
 };
+
+
+

@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { X } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/primitives/Button";
+import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/primitives/Inputs";
 import { toast } from "@/hooks/use-toast";
 import { pharmacyService } from "@/services/pharmacy/pharmacy.service";
 import type { MedicationCreateInput } from "@/domain/pharmacy/medication.types";
@@ -65,22 +65,29 @@ export const AddMedicationModal = ({ open, onClose, onSuccess }: AddMedicationMo
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 backdrop-blur-sm">
-      <div className="bg-card rounded-lg border shadow-lg w-full max-w-md mx-4">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="text-lg font-semibold">{t("pharmacy.addMedication")}</h2>
-          <button onClick={onClose} className="p-1 rounded-md hover:bg-muted"><X className="h-5 w-5" /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("pharmacy.addMedication")}</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            {t("pharmacy.addMedication")}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>{t("pharmacy.medication")} *</Label>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Lisinopril 10mg" />
           </div>
           <div className="space-y-2">
             <Label>{t("common.category")}</Label>
-            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
-              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <Select value={form.category} onValueChange={(value) => setForm({ ...form, category: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("common.category")} />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -88,26 +95,32 @@ export const AddMedicationModal = ({ open, onClose, onSuccess }: AddMedicationMo
               <Input type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} placeholder="100" />
             </div>
             <div className="space-y-2">
-              <Label>Unit</Label>
-              <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
-                <option value="tablets">Tablets</option>
-                <option value="capsules">Capsules</option>
-                <option value="ml">ML</option>
-                <option value="mg">MG</option>
-                <option value="units">Units</option>
-              </select>
+              <Label>{t("pharmacy.unit")}</Label>
+              <Select value={form.unit} onValueChange={(value) => setForm({ ...form, unit: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t("pharmacy.unit")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tablets">{t("pharmacy.units.tablets")}</SelectItem>
+                  <SelectItem value="capsules">{t("pharmacy.units.capsules")}</SelectItem>
+                  <SelectItem value="ml">{t("pharmacy.units.ml")}</SelectItem>
+                  <SelectItem value="mg">{t("pharmacy.units.mg")}</SelectItem>
+                  <SelectItem value="units">{t("pharmacy.units.units")}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="space-y-2">
             <Label>{t("common.price")} ($)</Label>
             <Input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="12.50" />
           </div>
-          <div className="flex justify-end gap-3 pt-4">
+          <DialogFooter className="gap-2 sm:gap-2">
             <Button type="button" variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
-            <Button type="submit" disabled={loading}>{loading ? "..." : t("common.save")}</Button>
-          </div>
+            <Button type="submit" loading={loading}>{t("common.save")}</Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
+

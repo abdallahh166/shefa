@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { X } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/primitives/Button";
+import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/primitives/Inputs";
 import { toast } from "@/hooks/use-toast";
 import { doctorService } from "@/services/doctors/doctor.service";
 
@@ -61,22 +61,29 @@ export const AddDoctorModal = ({ open, onClose, onSuccess }: AddDoctorModalProps
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 backdrop-blur-sm">
-      <div className="bg-card rounded-lg border shadow-lg w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="text-lg font-semibold">{t("doctors.addDoctor")}</h2>
-          <button onClick={onClose} className="p-1 rounded-md hover:bg-muted"><X className="h-5 w-5" /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{t("doctors.addDoctor")}</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            {t("doctors.addDoctor")}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>{t("patients.fullName")} *</Label>
             <Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} placeholder="Dr. John Smith" />
           </div>
           <div className="space-y-2">
             <Label>{t("doctors.specialty")} *</Label>
-            <select value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
-              {SPECIALTIES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <Select value={form.specialty} onValueChange={(value) => setForm({ ...form, specialty: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("doctors.specialty")} />
+              </SelectTrigger>
+              <SelectContent>
+                {SPECIALTIES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label>{t("common.email")}</Label>
@@ -88,18 +95,24 @@ export const AddDoctorModal = ({ open, onClose, onSuccess }: AddDoctorModalProps
           </div>
           <div className="space-y-2">
             <Label>{t("common.status")}</Label>
-            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="w-full h-10 px-3 rounded-md border bg-background text-sm">
-              <option value="available">{t("doctors.available")}</option>
-              <option value="busy">{t("doctors.busy")}</option>
-              <option value="on_leave">{t("doctors.onLeave")}</option>
-            </select>
+            <Select value={form.status} onValueChange={(value) => setForm({ ...form, status: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("common.status")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="available">{t("doctors.available")}</SelectItem>
+                <SelectItem value="busy">{t("doctors.busy")}</SelectItem>
+                <SelectItem value="on_leave">{t("doctors.onLeave")}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <div className="flex justify-end gap-3 pt-4">
+          <DialogFooter className="gap-2 sm:gap-2">
             <Button type="button" variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
-            <Button type="submit" disabled={loading}>{loading ? "..." : t("common.save")}</Button>
-          </div>
+            <Button type="submit" loading={loading}>{t("common.save")}</Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
+

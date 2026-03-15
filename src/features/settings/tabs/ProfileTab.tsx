@@ -1,9 +1,10 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
+import { FileUpload } from "@/components/primitives/FileUpload";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/primitives/Inputs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2, Camera, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -16,7 +17,6 @@ export const ProfileTab = () => {
   const [uploading, setUploading] = useState(false);
   const [fullName, setFullName] = useState(user?.name ?? "");
   const [saving, setSaving] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -99,15 +99,15 @@ export const ProfileTab = () => {
         </div>
         <div className="space-y-2">
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fileRef.current?.click()}
+            <FileUpload
+              variant="button"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleAvatarUpload}
               disabled={uploading}
-            >
-              <Camera className="h-4 w-4" />
-              {t("settings.uploadAvatar")}
-            </Button>
+              loading={uploading}
+              buttonLabel={t("settings.uploadAvatar")}
+              icon={<Camera className="h-4 w-4" />}
+            />
             {user?.avatar && (
               <Button
                 variant="outline"
@@ -121,13 +121,6 @@ export const ProfileTab = () => {
             )}
           </div>
           <p className="text-xs text-muted-foreground">{t("settings.avatarHint")}</p>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            onChange={handleAvatarUpload}
-          />
         </div>
       </div>
 
@@ -147,3 +140,8 @@ export const ProfileTab = () => {
     </div>
   );
 };
+
+
+
+
+

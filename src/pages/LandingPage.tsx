@@ -1,8 +1,8 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
 import { motion } from "framer-motion";
 import {
   CalendarCheck, Users, FlaskConical, Receipt, ShieldCheck, BarChart3,
@@ -83,7 +83,7 @@ export const LandingPage = () => {
 
   return (
     <div className={cn("min-h-screen bg-background text-foreground", isAr && "direction-rtl")} dir={isAr ? "rtl" : "ltr"}>
-      {/* ── NAVBAR ── */}
+      {/* â”€â”€ NAVBAR â”€â”€ */}
       <nav className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-lg">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
@@ -104,7 +104,7 @@ export const LandingPage = () => {
         </div>
       </nav>
 
-      {/* ── HERO ── */}
+      {/* â”€â”€ HERO â”€â”€ */}
       <section className="relative overflow-hidden py-24 md:py-36">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/10" />
         <div className="relative mx-auto max-w-7xl px-6 text-center">
@@ -136,7 +136,7 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* ── FEATURES ── */}
+      {/* â”€â”€ FEATURES â”€â”€ */}
       <section id="features" className="py-20 md:py-28 bg-muted/30">
         <div className="mx-auto max-w-7xl px-6">
           <div className="text-center mb-16">
@@ -161,7 +161,7 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* ── HOW IT WORKS ── */}
+      {/* â”€â”€ HOW IT WORKS â”€â”€ */}
       <section id="how-it-works" className="py-20 md:py-28">
         <div className="mx-auto max-w-7xl px-6">
           <div className="text-center mb-16">
@@ -185,7 +185,7 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* ── TESTIMONIALS ── */}
+      {/* â”€â”€ TESTIMONIALS â”€â”€ */}
       <section className="py-20 md:py-28 bg-muted/30">
         <div className="mx-auto max-w-7xl px-6">
           <div className="text-center mb-16">
@@ -215,7 +215,7 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* ── PRICING ── */}
+      {/* â”€â”€ PRICING â”€â”€ */}
       <section id="pricing" className="py-20 md:py-28">
         <div className="mx-auto max-w-7xl px-6">
           <div className="text-center mb-16">
@@ -265,7 +265,7 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* ── FAQ ── */}
+      {/* â”€â”€ FAQ â”€â”€ */}
       <section id="faq" className="py-20 md:py-28 bg-muted/30">
         <div className="mx-auto max-w-3xl px-6">
           <div className="text-center mb-16">
@@ -275,13 +275,16 @@ export const LandingPage = () => {
           <div className="space-y-4">
             {faqs.map((faq, i) => (
               <div key={i} className="rounded-xl border bg-card overflow-hidden">
-                <button
-                  className="flex w-full items-center justify-between p-5 text-left font-medium text-foreground hover:bg-muted/50 transition-colors"
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full h-auto justify-between p-5 text-left font-medium text-foreground hover:bg-muted/50"
                   onClick={() => setOpenFaq(openFaq === i ? null : i)}
                 >
                   <span>{faq.q}</span>
                   {openFaq === i ? <ChevronUp className="h-5 w-5 text-muted-foreground shrink-0" /> : <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" />}
-                </button>
+                </Button>
                 {openFaq === i && (
                   <div className="px-5 pb-5 text-sm text-muted-foreground leading-relaxed">
                     {faq.a}
@@ -293,7 +296,7 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* ── CTA ── */}
+      {/* â”€â”€ CTA â”€â”€ */}
       <section className="py-20 md:py-28">
         <div className="mx-auto max-w-4xl px-6 text-center">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={0}>
@@ -306,7 +309,7 @@ export const LandingPage = () => {
         </div>
       </section>
 
-      {/* ── FOOTER ── */}
+      {/* â”€â”€ FOOTER â”€â”€ */}
       <footer className="border-t bg-card py-12">
         <div className="mx-auto max-w-7xl px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -326,3 +329,4 @@ export const LandingPage = () => {
     </div>
   );
 };
+

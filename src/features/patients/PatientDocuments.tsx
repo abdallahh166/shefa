@@ -3,7 +3,8 @@ import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
 import { toast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
+import { FileUpload } from "@/components/primitives/FileUpload";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { FileText, Upload, Trash2, Download, Loader2, File, Image, FileSpreadsheet } from "lucide-react";
 import { formatDate } from "@/shared/utils/formatDate";
@@ -112,16 +113,16 @@ export const PatientDocuments = ({ patientId }: Props) => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">{t("patients.documents")} ({documents.length})</h3>
-        <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
-          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-          {t("patients.uploadDocument")}
-        </Button>
-        <input
-          ref={fileRef}
-          type="file"
-          className="hidden"
+        <FileUpload
+          variant="button"
+          inputRef={fileRef}
           accept=".pdf,.jpg,.jpeg,.png,.webp,.csv,.doc,.docx,.xls,.xlsx"
           onChange={handleUpload}
+          disabled={uploading}
+          loading={uploading}
+          buttonLabel={t("patients.uploadDocument")}
+          icon={<Upload className="h-4 w-4" />}
+          className="shrink-0"
         />
       </div>
 
@@ -165,20 +166,26 @@ export const PatientDocuments = ({ patientId }: Props) => {
                     <td className="text-muted-foreground">{formatSize(doc.file_size)}</td>
                     <td>
                       <div className="flex items-center gap-1">
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
                           onClick={() => handleDownload(doc)}
-                          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
-                          title="Download"
+                          className="text-muted-foreground hover:text-foreground"
+                          aria-label={t("common.download")}
+                          title={t("common.download")}
                         >
                           <Download className="h-4 w-4" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
                           onClick={() => setDeleteId(doc.id)}
-                          className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                          className="text-muted-foreground hover:text-destructive"
+                          aria-label={t("common.delete")}
                           title={t("common.delete")}
                         >
                           <Trash2 className="h-4 w-4" />
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -202,3 +209,8 @@ export const PatientDocuments = ({ patientId }: Props) => {
     </div>
   );
 };
+
+
+
+
+

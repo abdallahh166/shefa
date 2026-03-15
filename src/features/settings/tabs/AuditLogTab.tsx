@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
 import { formatDate } from "@/shared/utils/formatDate";
@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { auditLogService } from "@/services/settings/audit.service";
 import { queryKeys } from "@/services/queryKeys";
 import type { AuditLog } from "@/domain/settings/audit.types";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/primitives/Button";
 
 const ACTION_ICONS: Record<string, typeof ShieldCheck> = {
   clinic_created: Building,
@@ -80,7 +80,7 @@ export const AuditLogTab = () => {
           </div>
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-2 text-xs text-muted-foreground">
-              <span>{pageStart}–{pageEnd} of {total}</span>
+              <span>{pageStart}â€“{pageEnd} of {total}</span>
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
@@ -106,3 +106,4 @@ export const AuditLogTab = () => {
     </div>
   );
 };
+
