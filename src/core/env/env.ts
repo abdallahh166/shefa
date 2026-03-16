@@ -42,7 +42,6 @@ if (!parsed.success && isTest) {
 if (!parsed.success) {
   const message =
     "Invalid environment configuration. Check .env values for required VITE_ variables.";
-  // eslint-disable-next-line no-console
   console.error(message, parsed.error.flatten().fieldErrors);
   throw new Error(message);
 }

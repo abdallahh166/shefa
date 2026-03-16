@@ -121,7 +121,7 @@ export const PatientDetailPage = () => {
     enabled: recordModalOpen && !!user?.tenantId,
   });
 
-  const doctors = doctorPage?.data ?? [];
+  const doctors = useMemo(() => doctorPage?.data ?? [], [doctorPage?.data]);
 
   useEffect(() => {
     if (!recordModalOpen || recordMode !== "create") return;

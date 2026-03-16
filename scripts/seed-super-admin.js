@@ -174,7 +174,6 @@ async function seed() {
   if (roleRow?.role !== "super_admin") throw new Error("Role update verification failed.");
 
   // Do not print secrets.
-  // eslint-disable-next-line no-console
   console.log(
     JSON.stringify(
       {
@@ -193,7 +192,6 @@ async function seed() {
 }
 
 seed().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err instanceof Error ? err.message : String(err));
   process.exitCode = 1;
 });

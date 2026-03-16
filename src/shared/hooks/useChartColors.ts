@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 const getIsDark = () =>
   typeof document !== "undefined" && document.documentElement.classList.contains("dark");
@@ -14,19 +14,16 @@ export function useChartColors() {
     return () => observer.disconnect();
   }, []);
 
-  return useMemo(
-    () => ({
-      primary: "hsl(var(--chart-1))",
-      success: "hsl(var(--chart-2))",
-      warning: "hsl(var(--chart-3))",
-      info: "hsl(var(--chart-4))",
-      violet: "hsl(var(--chart-5))",
-      destructive: "hsl(var(--destructive))",
-      border: "hsl(var(--border))",
-      muted: "hsl(var(--muted-foreground))",
-      card: "hsl(var(--card))",
-      fg: "hsl(var(--foreground))",
-    }),
-    [isDark],
-  );
+  return {
+    primary: "hsl(var(--chart-1))",
+    success: "hsl(var(--chart-2))",
+    warning: "hsl(var(--chart-3))",
+    info: "hsl(var(--chart-4))",
+    violet: "hsl(var(--chart-5))",
+    destructive: "hsl(var(--destructive))",
+    border: "hsl(var(--border))",
+    muted: "hsl(var(--muted-foreground))",
+    card: "hsl(var(--card))",
+    fg: "hsl(var(--foreground))",
+  };
 }

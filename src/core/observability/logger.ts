@@ -21,13 +21,11 @@ const serializeError = (error: unknown) => ({
 
 export function logInfo(message: string, context?: LogContext) {
   const payload = { ...context };
-  // eslint-disable-next-line no-console
   console.info("[info]", message, payload ?? {});
 }
 
 export function logWarn(message: string, context?: LogContext) {
   const payload = { ...context };
-  // eslint-disable-next-line no-console
   console.warn("[warn]", message, payload ?? {});
 }
 
@@ -40,7 +38,6 @@ export async function reportError(error: unknown, context?: LogContext) {
   const actionType = context?.actionType ?? context?.action ?? null;
   const resourceType = context?.resourceType ?? context?.feature ?? null;
 
-  // eslint-disable-next-line no-console
   console.error("[error]", message, { stack, context });
   captureError(error, {
     request_id: requestId,

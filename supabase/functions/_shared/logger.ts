@@ -26,7 +26,6 @@ export function log(level: LogLevel, message: string, context?: LogContext) {
   if (level === "error") {
     captureException(new Error(message), payload);
   }
-  // eslint-disable-next-line no-console
   console.log(JSON.stringify(payload));
 }
 

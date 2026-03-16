@@ -34,7 +34,10 @@ export const GlobalSearch = () => {
     enabled: !!tenantId && debouncedQuery.trim().length >= 2,
   });
 
-  const effectiveResults = query.trim().length < 2 ? [] : results;
+  const effectiveResults = useMemo(
+    () => (query.trim().length < 2 ? [] : results),
+    [query, results],
+  );
 
   const grouped = useMemo(() => {
     return {

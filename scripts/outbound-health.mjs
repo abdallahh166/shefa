@@ -4,7 +4,6 @@ const urls = (process.env.OUTBOUND_HEALTHCHECK_URLS ?? "")
   .filter(Boolean);
 
 if (urls.length === 0) {
-  // eslint-disable-next-line no-console
   console.warn("OUTBOUND_HEALTHCHECK_URLS is not configured. Skipping outbound check.");
   process.exit(0);
 }
@@ -34,10 +33,8 @@ const results = await Promise.all(urls.map(checkUrl));
 const failures = results.filter((r) => !r.ok);
 
 if (failures.length > 0) {
-  // eslint-disable-next-line no-console
   console.error("Outbound health check failed:", failures);
   process.exit(1);
 }
 
-// eslint-disable-next-line no-console
 console.log("Outbound health check passed:", results);
