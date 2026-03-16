@@ -10,15 +10,30 @@ const paginationSchema = z.object({
   search: z.string().trim().min(1).optional(),
 });
 
+const sortSchema = z
+  .object({
+    column: z.enum(["full_name", "created_at"]),
+    direction: z.enum(["asc", "desc"]).optional(),
+  })
+  .optional();
+
 export const settingsUsersService = {
-  async listProfilesWithRolesPaged(input?: { page?: number; pageSize?: number; search?: string }) {
+  async listProfilesWithRolesPaged(input?: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    sort?: { column: "full_name" | "created_at"; direction?: "asc" | "desc" };
+  }) {
     try {
-      const parsed = paginationSchema.parse(input ?? {});
+      const parsed = paginationSchema.extend({ sort: sortSchema }).parse(input ?? {});
       const { tenantId } = getTenantContext();
       const { data, count } = await settingsUsersRepository.listProfilesWithRolesPaged(tenantId, {
         limit: parsed.pageSize,
         offset: (parsed.page - 1) * parsed.pageSize,
         search: parsed.search,
+        sort: parsed.sort
+          ? { column: parsed.sort.column, ascending: parsed.sort.direction === "asc" }
+          : undefined,
       });
       return { data: z.array(profileWithRolesSchema).parse(data), total: count };
     } catch (err) {

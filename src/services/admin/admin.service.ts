@@ -23,38 +23,83 @@ const paginationSchema = z.object({
   status: subscriptionStatusEnum.optional(),
 });
 
+const sortDirectionSchema = z.enum(["asc", "desc"]);
+const tenantSortSchema = z
+  .object({ column: z.enum(["name", "created_at"]), direction: sortDirectionSchema.optional() })
+  .optional();
+const profileSortSchema = z
+  .object({ column: z.enum(["full_name", "created_at"]), direction: sortDirectionSchema.optional() })
+  .optional();
+const subscriptionSortSchema = z
+  .object({
+    column: z.enum(["plan", "status", "amount", "expires_at", "created_at"]),
+    direction: sortDirectionSchema.optional(),
+  })
+  .optional();
+
 export const adminService = {
-  async listTenantsPaged(input?: { page?: number; pageSize?: number; search?: string; plan?: string }) {
+  async listTenantsPaged(input?: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    plan?: string;
+    sort?: { column: "name" | "created_at"; direction?: "asc" | "desc" };
+  }) {
     try {
-      const parsed = paginationSchema.pick({ page: true, pageSize: true, search: true, plan: true }).parse(input ?? {});
+      const parsed = paginationSchema
+        .pick({ page: true, pageSize: true, search: true, plan: true })
+        .extend({ sort: tenantSortSchema })
+        .parse(input ?? {});
       const { data, count } = await adminRepository.listTenantsPaged({
         limit: parsed.pageSize,
         offset: (parsed.page - 1) * parsed.pageSize,
         search: parsed.search,
         plan: parsed.plan,
+        sort: parsed.sort
+          ? { column: parsed.sort.column, ascending: parsed.sort.direction === "asc" }
+          : undefined,
       });
       return { data: z.array(adminTenantSchema).parse(data), total: count };
     } catch (err) {
       throw toServiceError(err, "Failed to load tenants");
     }
   },
-  async listProfilesWithRolesPaged(input?: { page?: number; pageSize?: number; search?: string }) {
+  async listProfilesWithRolesPaged(input?: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    sort?: { column: "full_name" | "created_at"; direction?: "asc" | "desc" };
+  }) {
     try {
-      const parsed = paginationSchema.pick({ page: true, pageSize: true, search: true }).parse(input ?? {});
+      const parsed = paginationSchema
+        .pick({ page: true, pageSize: true, search: true })
+        .extend({ sort: profileSortSchema })
+        .parse(input ?? {});
       const { data, count } = await adminRepository.listProfilesWithRolesPaged({
         limit: parsed.pageSize,
         offset: (parsed.page - 1) * parsed.pageSize,
         search: parsed.search,
+        sort: parsed.sort
+          ? { column: parsed.sort.column, ascending: parsed.sort.direction === "asc" }
+          : undefined,
       });
       return { data: z.array(profileWithRolesSchema).parse(data), total: count };
     } catch (err) {
       throw toServiceError(err, "Failed to load profiles");
     }
   },
-  async listSubscriptionsPaged(input?: { page?: number; pageSize?: number; search?: string; plan?: string; status?: string }) {
+  async listSubscriptionsPaged(input?: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    plan?: string;
+    status?: string;
+    sort?: { column: "plan" | "status" | "amount" | "expires_at" | "created_at"; direction?: "asc" | "desc" };
+  }) {
     try {
       const parsed = paginationSchema
         .pick({ page: true, pageSize: true, search: true, plan: true, status: true })
+        .extend({ sort: subscriptionSortSchema })
         .parse(input ?? {});
       const { data, count } = await adminRepository.listSubscriptionsPaged({
         limit: parsed.pageSize,
@@ -62,6 +107,9 @@ export const adminService = {
         search: parsed.search,
         plan: parsed.plan,
         status: parsed.status,
+        sort: parsed.sort
+          ? { column: parsed.sort.column, ascending: parsed.sort.direction === "asc" }
+          : undefined,
       });
       return { data: z.array(adminSubscriptionSchema).parse(data), total: count };
     } catch (err) {

@@ -16,6 +16,9 @@ interface UsersTabProps {
   onPageChange?: (page: number) => void;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
+  sortColumn?: "full_name" | "created_at";
+  sortDirection?: "asc" | "desc";
+  onSortChange?: (column: "full_name" | "created_at", direction: "asc" | "desc") => void;
 }
 
 export const UsersTab = ({
@@ -28,6 +31,9 @@ export const UsersTab = ({
   onPageChange,
   searchValue,
   onSearchChange,
+  sortColumn,
+  sortDirection,
+  onSortChange,
 }: UsersTabProps) => {
   const { t } = useI18n();
 
@@ -36,6 +42,7 @@ export const UsersTab = ({
       key: "full_name",
       header: t("auth.fullName"),
       searchable: true,
+      sortable: true,
       render: (p) => (
         <div className="flex items-center gap-3">
           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
@@ -96,6 +103,9 @@ export const UsersTab = ({
           pageSize={pageSize}
           total={total}
           onPageChange={onPageChange}
+          sortColumn={sortColumn}
+          sortDirection={sortDirection}
+          onSortChange={onSortChange ? (column, direction) => onSortChange(column as "full_name" | "created_at", direction) : undefined}
         />
       </PermissionGuard>
     </div>

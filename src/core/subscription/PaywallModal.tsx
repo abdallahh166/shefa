@@ -2,7 +2,7 @@ import { useSubscription } from "./SubscriptionContext";
 import { useAuth } from "@/core/auth/authStore";
 import { useNavigate } from "react-router-dom";
 import { ShieldAlert } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/primitives/Button";
 
 export const PaywallModal = () => {
@@ -24,13 +24,15 @@ export const PaywallModal = () => {
   return (
     <Dialog open onOpenChange={() => {}}>
       <DialogContent hideClose className="max-w-md p-8 text-center space-y-6">
-        <div className="mx-auto h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center">
-          <ShieldAlert className="h-8 w-8 text-destructive" />
-        </div>
-        <h2 className="text-2xl font-bold text-foreground">????? ?????? ???????</h2>
-        <p className="text-muted-foreground">
-          ???? ???????: <span className="font-semibold text-foreground capitalize">{plan}</span>
-        </p>
+        <DialogHeader className="text-center space-y-3">
+          <div className="mx-auto h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center">
+            <ShieldAlert className="h-8 w-8 text-destructive" />
+          </div>
+          <DialogTitle className="text-2xl font-bold text-foreground">????? ?????? ???????</DialogTitle>
+          <DialogDescription className="text-muted-foreground">
+            ???? ???????: <span className="font-semibold text-foreground capitalize">{plan}</span>
+          </DialogDescription>
+        </DialogHeader>
         {formattedDate && (
           <p className="text-sm text-muted-foreground">
             ????? ????????: {formattedDate}

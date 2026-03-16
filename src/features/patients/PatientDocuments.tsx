@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/primitives/Button";
 import { FileUpload } from "@/components/primitives/FileUpload";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
+import { DataTable, Column } from "@/shared/components/DataTable";
 import { FileText, Upload, Trash2, Download, Loader2, File, Image, FileSpreadsheet } from "lucide-react";
 import { formatDate } from "@/shared/utils/formatDate";
 import { patientDocumentsService } from "@/services/patients/patientDocuments.service";
@@ -109,6 +110,66 @@ export const PatientDocuments = ({ patientId }: Props) => {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const columns: Column<PatientDocument>[] = [
+    {
+      key: "file_name",
+      header: t("common.name"),
+      searchable: true,
+      render: (doc) => {
+        const Icon = FILE_ICONS[doc.file_type] || File;
+        return (
+          <div className="flex items-center gap-2">
+            <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="font-medium truncate max-w-[200px]">{doc.file_name}</span>
+          </div>
+        );
+      },
+    },
+    {
+      key: "created_at",
+      header: t("common.date"),
+      render: (doc) => (
+        <span className="text-muted-foreground whitespace-nowrap">
+          {formatDate(doc.created_at, locale, "datetime", calendarType)}
+        </span>
+      ),
+    },
+    {
+      key: "file_size",
+      header: t("common.size") || "Size",
+      render: (doc) => <span className="text-muted-foreground">{formatSize(doc.file_size)}</span>,
+    },
+    {
+      key: "actions",
+      header: t("common.actions"),
+      searchable: false,
+      render: (doc) => (
+        <div className="flex items-center gap-1 justify-end">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => handleDownload(doc)}
+            className="text-muted-foreground hover:text-foreground"
+            aria-label={t("common.download")}
+            title={t("common.download")}
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setDeleteId(doc.id)}
+            className="text-muted-foreground hover:text-destructive"
+            aria-label={t("common.delete")}
+            title={t("common.delete")}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -139,61 +200,15 @@ export const PatientDocuments = ({ patientId }: Props) => {
           </Button>
         </div>
       ) : (
-        <div className="bg-card rounded-lg border overflow-hidden">
-          <table className="data-table">
-            <thead>
-              <tr className="bg-muted/50">
-                <th>{t("common.name")}</th>
-                <th>{t("common.date")}</th>
-                <th>Size</th>
-                <th>{t("common.actions")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {documents.map((doc: PatientDocument) => {
-                const Icon = FILE_ICONS[doc.file_type] || File;
-                return (
-                  <tr key={doc.id} className="hover:bg-muted/30 transition-colors">
-                    <td>
-                      <div className="flex items-center gap-2">
-                        <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span className="font-medium truncate max-w-[200px]">{doc.file_name}</span>
-                      </div>
-                    </td>
-                    <td className="text-muted-foreground whitespace-nowrap">
-                      {formatDate(doc.created_at, locale, "datetime", calendarType)}
-                    </td>
-                    <td className="text-muted-foreground">{formatSize(doc.file_size)}</td>
-                    <td>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => handleDownload(doc)}
-                          className="text-muted-foreground hover:text-foreground"
-                          aria-label={t("common.download")}
-                          title={t("common.download")}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => setDeleteId(doc.id)}
-                          className="text-muted-foreground hover:text-destructive"
-                          aria-label={t("common.delete")}
-                          title={t("common.delete")}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={columns}
+          data={documents}
+          keyExtractor={(doc) => doc.id}
+          searchable
+          searchPlaceholder={t("common.search")}
+          exportFileName="patient-documents"
+          tableLabel={t("patients.documents")}
+        />
       )}
 
       <ConfirmDialog

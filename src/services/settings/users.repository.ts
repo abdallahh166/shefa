@@ -4,22 +4,26 @@ import { ServiceError } from "@/services/supabase/errors";
 
 const PROFILE_COLUMNS = "id, user_id, tenant_id, full_name, avatar_url, created_at, updated_at";
 
+type ProfileSort = { column: "full_name" | "created_at"; ascending?: boolean };
+
 export interface SettingsUsersRepository {
-  listProfilesWithRolesPaged(tenantId: string, params: { limit: number; offset: number; search?: string }): Promise<{
-    data: ProfileWithRoles[];
-    count: number;
-  }>;
+  listProfilesWithRolesPaged(
+    tenantId: string,
+    params: { limit: number; offset: number; search?: string; sort?: ProfileSort }
+  ): Promise<{ data: ProfileWithRoles[]; count: number }>;
 }
 
 export const settingsUsersRepository: SettingsUsersRepository = {
   async listProfilesWithRolesPaged(tenantId, params) {
     const to = Math.max(0, params.offset + params.limit - 1);
+    const sortColumn = params.sort?.column ?? "created_at";
+    const ascending = params.sort?.ascending ?? false;
     let profilesQuery = supabase
       .from("profiles")
       .select(PROFILE_COLUMNS, { count: "exact" })
       .eq("tenant_id", tenantId)
-      .order("created_at", { ascending: false })
       .range(params.offset, to);
+    profilesQuery = profilesQuery.order(sortColumn, { ascending });
 
     if (params.search && params.search.trim().length > 0) {
       const q = `%${params.search.trim()}%`;

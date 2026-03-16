@@ -179,6 +179,7 @@ export const en = {
     noClinicalNotesFound: "No clinical notes found",
     noLabOrders: "No lab orders for this patient",
     noInvoices: "No invoices for this patient",
+    invoices: "Invoices",
     labOrdersCount: "Lab Orders",
     totalBilled: "Total Billed",
     totalPaid: "Total Paid",

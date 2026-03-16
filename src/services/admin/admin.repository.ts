@@ -8,17 +8,23 @@ const SUBSCRIPTION_COLUMNS =
   "id, tenant_id, plan, status, amount, currency, billing_cycle, expires_at, created_at, tenants(name, slug)";
 const PROFILE_COLUMNS = "id, user_id, tenant_id, full_name, avatar_url, created_at, updated_at, tenants(name, slug)";
 
+type TenantSort = { column: "name" | "created_at"; ascending?: boolean };
+type ProfileSort = { column: "full_name" | "created_at"; ascending?: boolean };
+type SubscriptionSort = { column: "plan" | "status" | "amount" | "expires_at" | "created_at"; ascending?: boolean };
+
 export interface AdminRepository {
   listTenantsPaged(params: {
     limit: number;
     offset: number;
     search?: string;
     plan?: AdminSubscription["plan"];
+    sort?: TenantSort;
   }): Promise<{ data: AdminTenant[]; count: number }>;
   listProfilesWithRolesPaged(params: {
     limit: number;
     offset: number;
     search?: string;
+    sort?: ProfileSort;
   }): Promise<{ data: ProfileWithRoles[]; count: number }>;
   listSubscriptionsPaged(params: {
     limit: number;
@@ -26,27 +32,34 @@ export interface AdminRepository {
     search?: string;
     plan?: AdminSubscription["plan"];
     status?: AdminSubscription["status"];
+    sort?: SubscriptionSort;
   }): Promise<{ data: AdminSubscription[]; count: number }>;
   updateSubscription(id: string, input: Partial<Pick<AdminSubscription, "plan" | "status">>): Promise<AdminSubscription>;
   getSubscriptionStats(): Promise<AdminSubscriptionStats>;
 }
 
 export const adminRepository: AdminRepository = {
-  async listTenantsPaged({ limit, offset, search, plan }) {
+  async listTenantsPaged({ limit, offset, search, plan, sort }) {
     const to = Math.max(0, offset + limit - 1);
+    const sortColumn = sort?.column ?? "created_at";
+    const ascending = sort?.ascending ?? false;
 
     if (plan) {
       let planQuery = supabase
         .from("subscriptions")
         .select("plan, status, tenants(id, name, slug, email, phone, created_at)", { count: "exact" })
         .eq("plan", plan)
-        .order("created_at", { ascending: false })
         .range(offset, to);
 
       if (search && search.trim().length > 0) {
         const q = `%${search.trim()}%`;
         planQuery = planQuery.or(`tenants.name.ilike.${q},tenants.slug.ilike.${q},tenants.email.ilike.${q}`);
       }
+
+      planQuery = planQuery.order(sortColumn === "name" ? "name" : "created_at", {
+        ascending,
+        foreignTable: "tenants",
+      });
 
       const { data, error, count } = await planQuery;
       if (error) {
@@ -73,13 +86,14 @@ export const adminRepository: AdminRepository = {
     let query = supabase
       .from("tenants")
       .select(TENANT_COLUMNS, { count: "exact" })
-      .order("created_at", { ascending: false })
       .range(offset, to);
 
     if (search && search.trim().length > 0) {
       const q = `%${search.trim()}%`;
       query = query.or(`name.ilike.${q},slug.ilike.${q},email.ilike.${q}`);
     }
+
+    query = query.order(sortColumn === "name" ? "name" : "created_at", { ascending });
 
     const { data, error, count } = await query;
 
@@ -101,13 +115,15 @@ export const adminRepository: AdminRepository = {
 
     return { data: mapped, count: count ?? 0 };
   },
-  async listProfilesWithRolesPaged({ limit, offset, search }) {
+  async listProfilesWithRolesPaged({ limit, offset, search, sort }) {
     const to = Math.max(0, offset + limit - 1);
+    const sortColumn = sort?.column ?? "created_at";
+    const ascending = sort?.ascending ?? false;
     let profilesQuery = supabase
       .from("profiles")
       .select(PROFILE_COLUMNS, { count: "exact" })
-      .order("created_at", { ascending: false })
       .range(offset, to);
+    profilesQuery = profilesQuery.order(sortColumn, { ascending });
 
     if (search && search.trim().length > 0) {
       const q = `%${search.trim()}%`;
@@ -153,12 +169,13 @@ export const adminRepository: AdminRepository = {
 
     return { data, count: count ?? 0 };
   },
-  async listSubscriptionsPaged({ limit, offset, search, plan, status }) {
+  async listSubscriptionsPaged({ limit, offset, search, plan, status, sort }) {
     const to = Math.max(0, offset + limit - 1);
+    const sortColumn = sort?.column ?? "created_at";
+    const ascending = sort?.ascending ?? false;
     let query = supabase
       .from("subscriptions")
       .select(SUBSCRIPTION_COLUMNS, { count: "exact" })
-      .order("created_at", { ascending: false })
       .range(offset, to);
 
     if (plan) {
@@ -173,6 +190,8 @@ export const adminRepository: AdminRepository = {
       const q = `%${search.trim()}%`;
       query = query.or(`tenants.name.ilike.${q},tenants.slug.ilike.${q}`);
     }
+
+    query = query.order(sortColumn, { ascending });
 
     const { data, error, count } = await query;
 

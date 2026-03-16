@@ -41,6 +41,21 @@ export const AdminDashboardPage = () => {
   const [clinicSearch, setClinicSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
   const [subSearch, setSubSearch] = useState("");
+  const [clinicSort, setClinicSort] = useState<{ column: "name" | "created_at"; direction: "asc" | "desc" }>({
+    column: "created_at",
+    direction: "desc",
+  });
+  const [userSort, setUserSort] = useState<{ column: "full_name" | "created_at"; direction: "asc" | "desc" }>({
+    column: "created_at",
+    direction: "desc",
+  });
+  const [subSort, setSubSort] = useState<{
+    column: "plan" | "status" | "amount" | "expires_at" | "created_at";
+    direction: "asc" | "desc";
+  }>({
+    column: "created_at",
+    direction: "desc",
+  });
   const debouncedClinicSearch = useDebouncedValue(clinicSearch, 300);
   const debouncedUserSearch = useDebouncedValue(userSearch, 300);
   const debouncedSubSearch = useDebouncedValue(subSearch, 300);
@@ -50,15 +65,15 @@ export const AdminDashboardPage = () => {
 
   useEffect(() => {
     setClinicPage(1);
-  }, [debouncedClinicSearch, clinicFilter]);
+  }, [debouncedClinicSearch, clinicFilter, clinicSort]);
 
   useEffect(() => {
     setUserPage(1);
-  }, [debouncedUserSearch]);
+  }, [debouncedUserSearch, userSort]);
 
   useEffect(() => {
     setSubPage(1);
-  }, [debouncedSubSearch, subFilter]);
+  }, [debouncedSubSearch, subFilter, subSort]);
 
   const { data: tenantsResponse, isLoading: loadingTenants } = useQuery({
     queryKey: queryKeys.admin.tenants({
@@ -66,6 +81,7 @@ export const AdminDashboardPage = () => {
       pageSize,
       search: debouncedClinicSearch.trim() || undefined,
       plan: clinicFilter ?? undefined,
+      sort: clinicSort,
     }),
     queryFn: () =>
       adminService.listTenantsPaged({
@@ -73,6 +89,7 @@ export const AdminDashboardPage = () => {
         pageSize,
         search: debouncedClinicSearch.trim() || undefined,
         plan: clinicFilter ?? undefined,
+        sort: clinicSort,
       }),
   });
 
@@ -81,12 +98,14 @@ export const AdminDashboardPage = () => {
       page: userPage,
       pageSize,
       search: debouncedUserSearch.trim() || undefined,
+      sort: userSort,
     }),
     queryFn: () =>
       adminService.listProfilesWithRolesPaged({
         page: userPage,
         pageSize,
         search: debouncedUserSearch.trim() || undefined,
+        sort: userSort,
       }),
   });
 
@@ -96,6 +115,7 @@ export const AdminDashboardPage = () => {
       pageSize,
       search: debouncedSubSearch.trim() || undefined,
       plan: subFilter ?? undefined,
+      sort: subSort,
     }),
     queryFn: () =>
       adminService.listSubscriptionsPaged({
@@ -103,6 +123,7 @@ export const AdminDashboardPage = () => {
         pageSize,
         search: debouncedSubSearch.trim() || undefined,
         plan: subFilter ?? undefined,
+        sort: subSort,
       }),
   });
 
@@ -160,7 +181,7 @@ export const AdminDashboardPage = () => {
   ];
 
   const clinicColumns: Column<any>[] = [
-    { key: "name", header: "Clinic Name", searchable: true, render: (c) => (
+    { key: "name", header: "Clinic Name", searchable: true, sortable: true, render: (c) => (
       <div className="flex items-center gap-3">
         <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">{c.name?.charAt(0)}</div>
         <div>
@@ -169,8 +190,8 @@ export const AdminDashboardPage = () => {
         </div>
       </div>
     )},
-    { key: "email", header: "Email", searchable: true, render: (c) => c.email || "—" },
-    { key: "phone", header: "Phone", render: (c) => c.phone || "—" },
+    { key: "email", header: "Email", searchable: true, render: (c) => c.email || "-" },
+    { key: "phone", header: "Phone", render: (c) => c.phone || "-" },
     {
       key: "plan",
       header: "Plan",
@@ -180,7 +201,7 @@ export const AdminDashboardPage = () => {
         return <StatusBadge variant={variant as any}>{plan}</StatusBadge>;
       },
     },
-    { key: "created_at", header: "Created", render: (c) => formatDate(c.created_at, locale, "date") },
+    { key: "created_at", header: "Created", sortable: true, render: (c) => formatDate(c.created_at, locale, "date") },
     { key: "actions", header: "", render: (c) => (
         <Button
           variant="ghost"
@@ -197,8 +218,38 @@ export const AdminDashboardPage = () => {
     )},
   ];
 
+  const recentClinicColumns: Column<any>[] = [
+    {
+      key: "name",
+      header: "Clinic",
+      render: (t) => (
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">{t.name?.charAt(0)}</div>
+          <div>
+            <p className="font-medium">{t.name}</p>
+            <p className="text-xs text-muted-foreground">{t.slug}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "plan",
+      header: "Plan",
+      render: (t) => {
+        const plan = t.plan ?? "free";
+        const variant = plan === "pro" ? "success" : plan === "enterprise" ? "info" : "default";
+        return <StatusBadge variant={variant as any}>{plan}</StatusBadge>;
+      },
+    },
+    {
+      key: "created_at",
+      header: "Created",
+      render: (t) => <span className="text-muted-foreground">{formatDate(t.created_at, locale, "date")}</span>,
+    },
+  ];
+
   const userColumns: Column<any>[] = [
-    { key: "full_name", header: "Name", searchable: true, render: (p) => (
+    { key: "full_name", header: "Name", searchable: true, sortable: true, render: (p) => (
       <div className="flex items-center gap-3">
         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs">
           {p.full_name?.charAt(0) || "U"}
@@ -207,12 +258,12 @@ export const AdminDashboardPage = () => {
       </div>
     )},
     { key: "role", header: "Role", render: (p) => {
-      const role = (p.user_roles as any)?.[0]?.role || "—";
+      const role = (p.user_roles as any)?.[0]?.role || "-";
       const variant = role === "clinic_admin" ? "info" : role === "super_admin" ? "destructive" : "default";
       return <StatusBadge variant={variant as any}>{role.replace("_", " ")}</StatusBadge>;
     }},
-    { key: "tenant_id", header: "Clinic", render: (p) => p.tenants?.name || "—" },
-    { key: "created_at", header: "Joined", render: (p) => formatDate(p.created_at, locale, "date") },
+    { key: "tenant_id", header: "Clinic", render: (p) => p.tenants?.name || "-" },
+    { key: "created_at", header: "Joined", sortable: true, render: (p) => formatDate(p.created_at, locale, "date") },
   ];
 
   const subColumns: Column<any>[] = [
@@ -220,12 +271,12 @@ export const AdminDashboardPage = () => {
       <div className="flex items-center gap-3">
         <Building2 className="h-4 w-4 text-muted-foreground" />
         <div>
-          <p className="font-medium">{(s.tenants as any)?.name || "—"}</p>
+          <p className="font-medium">{(s.tenants as any)?.name || "-"}</p>
           <p className="text-xs text-muted-foreground">{(s.tenants as any)?.slug || ""}</p>
         </div>
       </div>
     )},
-    { key: "plan", header: "Plan", render: (s) => (
+    { key: "plan", header: "Plan", sortable: true, render: (s) => (
       <Select
         value={s.plan}
         onValueChange={(val) => setConfirmAction({ id: s.id, field: "plan", value: val })}
@@ -240,9 +291,9 @@ export const AdminDashboardPage = () => {
         </SelectContent>
       </Select>
     )},
-    { key: "amount", header: "Amount", render: (s) => s.amount > 0 ? `${s.currency} ${Number(s.amount).toLocaleString()}` : "Free" },
+    { key: "amount", header: "Amount", sortable: true, render: (s) => s.amount > 0 ? `${s.currency} ${Number(s.amount).toLocaleString()}` : "Free" },
     { key: "billing_cycle", header: "Cycle", render: (s) => s.billing_cycle },
-    { key: "status", header: "Status", render: (s) => (
+    { key: "status", header: "Status", sortable: true, render: (s) => (
       <Select
         value={s.status}
         onValueChange={(val) => setConfirmAction({ id: s.id, field: "status", value: val })}
@@ -257,7 +308,7 @@ export const AdminDashboardPage = () => {
         </SelectContent>
       </Select>
     )},
-    { key: "expires_at", header: "Expires", render: (s) => s.expires_at ? formatDate(s.expires_at, locale, "date") : "—" },
+    { key: "expires_at", header: "Expires", sortable: true, render: (s) => s.expires_at ? formatDate(s.expires_at, locale, "date") : "-" },
   ];
 
   const planCounts = subscriptionStats?.plan_counts ?? {};
@@ -332,48 +383,24 @@ export const AdminDashboardPage = () => {
             </div>
 
             {/* Recent clinics */}
-            <div className="bg-card rounded-xl border">
-              <div className="px-5 py-4 border-b flex items-center justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
                 <h3 className="font-semibold">Recent Clinics</h3>
                 <Button variant="ghost" size="sm" onClick={() => setActiveTab("clinics")}>
                   View All <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="overflow-x-auto">
-                <table className="data-table">
-                  <thead><tr className="bg-muted/30">
-                    <th>Clinic</th><th>Plan</th><th>Created</th>
-                  </tr></thead>
-                  <tbody>
-                    {recentTenants.map((t: any) => {
-                      const plan = t.plan ?? "free";
-                      const variant = plan === "pro" ? "success" : plan === "enterprise" ? "info" : "default";
-                      return (
-                        <tr
-                          key={t.id}
-                          className="hover:bg-muted/20 transition-colors cursor-pointer"
-                          onClick={() => {
-                            setTenantOverride({ id: t.id, slug: t.slug, name: t.name });
-                            navigate(`/tenant/${t.slug}/dashboard`);
-                          }}
-                        >
-                          <td>
-                            <div className="flex items-center gap-3">
-                              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">{t.name?.charAt(0)}</div>
-                              <div>
-                                <p className="font-medium">{t.name}</p>
-                                <p className="text-xs text-muted-foreground">{t.slug}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td><StatusBadge variant={variant as any}>{plan}</StatusBadge></td>
-                          <td className="text-muted-foreground">{formatDate(t.created_at, locale, "date")}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                columns={recentClinicColumns}
+                data={recentTenants}
+                keyExtractor={(t) => t.id}
+                emptyMessage="No clinics yet"
+                tableLabel="Recent clinics"
+                onRowClick={(t) => {
+                  setTenantOverride({ id: t.id, slug: t.slug, name: t.name });
+                  navigate(`/tenant/${t.slug}/dashboard`);
+                }}
+              />
             </div>
 
             {/* Subscription breakdown - all 4 plans */}
@@ -411,6 +438,9 @@ export const AdminDashboardPage = () => {
               pageSize={pageSize}
               total={tenantsResponse?.total}
               onPageChange={setClinicPage}
+              sortColumn={clinicSort.column}
+              sortDirection={clinicSort.direction}
+              onSortChange={(column, direction) => setClinicSort({ column: column as "name" | "created_at", direction })}
               filterSlot={
                 <StatusFilter
                   options={PLAN_OPTIONS.map((p) => ({ value: p, label: p.charAt(0).toUpperCase() + p.slice(1) }))}
@@ -439,6 +469,9 @@ export const AdminDashboardPage = () => {
               pageSize={pageSize}
               total={profilesResponse?.total}
               onPageChange={setUserPage}
+              sortColumn={userSort.column}
+              sortDirection={userSort.direction}
+              onSortChange={(column, direction) => setUserSort({ column: column as "full_name" | "created_at", direction })}
             />
           </div>
         )}
@@ -460,6 +493,9 @@ export const AdminDashboardPage = () => {
               pageSize={pageSize}
               total={subscriptionsResponse?.total}
               onPageChange={setSubPage}
+              sortColumn={subSort.column}
+              sortDirection={subSort.direction}
+              onSortChange={(column, direction) => setSubSort({ column: column as typeof subSort.column, direction })}
               filterSlot={
                 <StatusFilter
                   options={PLAN_OPTIONS.map((p) => ({ value: p, label: p.charAt(0).toUpperCase() + p.slice(1) }))}
@@ -487,4 +523,5 @@ export const AdminDashboardPage = () => {
     </div>
   );
 };
+
 

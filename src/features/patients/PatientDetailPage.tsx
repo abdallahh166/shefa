@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
 import { StatusBadge } from "@/shared/components/StatusBadge";
+import { DataTable, Column } from "@/shared/components/DataTable";
 import { Button } from "@/components/primitives/Button";
 import { Input, Textarea, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/primitives/Inputs";
 import { Label } from "@/components/ui/label";
@@ -342,10 +343,10 @@ export const PatientDetailPage = () => {
       {/* Patient Info Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { icon: Droplets, label: t("patients.bloodType"), value: patient.blood_type ?? "�" },
-          { icon: Phone, label: t("common.phone"), value: patient.phone ?? "�" },
-          { icon: Mail, label: t("common.email"), value: patient.email ?? "�" },
-          { icon: Stethoscope, label: t("patients.insuranceProvider"), value: patient.insurance_provider ?? "�" },
+          { icon: Droplets, label: t("patients.bloodType"), value: patient.blood_type ?? "-" },
+          { icon: Phone, label: t("common.phone"), value: patient.phone ?? "-" },
+          { icon: Mail, label: t("common.email"), value: patient.email ?? "-" },
+          { icon: Stethoscope, label: t("patients.insuranceProvider"), value: patient.insurance_provider ?? "-" },
         ].map((item, i) => (
           <div key={i} className="stat-card">
             <div className="flex items-center gap-2 mb-1">
@@ -393,7 +394,7 @@ export const PatientDetailPage = () => {
                         <div className="h-2 w-2 rounded-full bg-primary mt-2 shrink-0" />
                         <div>
                           <p className="text-sm font-medium">{h.diagnosis ?? t("patients.noDiagnosis")}</p>
-                          <p className="text-xs text-muted-foreground">{formatDate(h.record_date, locale, "date", calendarType)} · {h.doctors?.full_name ?? "�"}</p>
+                          <p className="text-xs text-muted-foreground">{formatDate(h.record_date, locale, "date", calendarType)} · {h.doctors?.full_name ?? "-"}</p>
                         </div>
                       </div>
                     ))}
@@ -458,19 +459,41 @@ export const PatientDetailPage = () => {
           s === "completed" ? t("appointments.completed") :
           s === "cancelled" ? t("appointments.cancelled") : s;
 
-        const AppointmentRow = ({ a }: { a: any }) => (
-          <tr className="hover:bg-muted/30 transition-colors">
-            <td className="whitespace-nowrap text-muted-foreground">{formatDate(a.appointment_date, locale, "datetime", calendarType)}</td>
-            <td className="font-medium capitalize">{a.type?.replace("_", " ") ?? "�"}</td>
-            <td>{a.doctors?.full_name ?? "�"}</td>
-            <td>
+        const appointmentColumns: Column<any>[] = [
+          {
+            key: "appointment_date",
+            header: t("common.date"),
+            render: (a) => (
+              <span className="whitespace-nowrap text-muted-foreground">
+                {formatDate(a.appointment_date, locale, "datetime", calendarType)}
+              </span>
+            ),
+          },
+          {
+            key: "type",
+            header: t("appointments.type"),
+            render: (a) => <span className="font-medium capitalize">{a.type?.replace("_", " ") ?? "-"}</span>,
+          },
+          {
+            key: "doctor",
+            header: t("appointments.doctor"),
+            render: (a) => a.doctors?.full_name ?? "-",
+          },
+          {
+            key: "status",
+            header: t("common.status"),
+            render: (a) => (
               <StatusBadge variant={apptStatusVariant[a.status] ?? "default"}>
                 {getApptStatusLabel(a.status)}
               </StatusBadge>
-            </td>
-            <td className="text-sm text-muted-foreground max-w-xs truncate">{a.notes ?? "�"}</td>
-          </tr>
-        );
+            ),
+          },
+          {
+            key: "notes",
+            header: t("appointments.notes"),
+            render: (a) => <span className="text-sm text-muted-foreground max-w-xs truncate">{a.notes ?? "-"}</span>,
+          },
+        ];
 
         return (
           <div className="space-y-6">
@@ -496,22 +519,13 @@ export const PatientDetailPage = () => {
                 <Clock className="h-4 w-4 text-yellow-500" />
                 {t("appointments.upcomingAppointments")} ({upcoming.length})
               </h3>
-              <div className="bg-card rounded-lg border overflow-hidden">
-                {upcoming.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground text-sm">{t("appointments.noUpcomingAppointments")}</div>
-                ) : (
-                  <table className="data-table">
-                    <thead><tr className="bg-muted/50">
-                      <th>{t("common.date")}</th>
-                      <th>{t("appointments.type")}</th>
-                      <th>{t("appointments.doctor")}</th>
-                      <th>{t("common.status")}</th>
-                      <th>{t("appointments.notes")}</th>
-                    </tr></thead>
-                    <tbody>{upcoming.map((a: any) => <AppointmentRow key={a.id} a={a} />)}</tbody>
-                  </table>
-                )}
-              </div>
+              <DataTable
+                columns={appointmentColumns}
+                data={upcoming}
+                keyExtractor={(a) => a.id}
+                emptyMessage={t("appointments.noUpcomingAppointments")}
+                tableLabel={t("appointments.upcomingAppointments")}
+              />
             </div>
 
             {/* Past */}
@@ -520,157 +534,152 @@ export const PatientDetailPage = () => {
                 <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
                 {t("appointments.pastAppointments")} ({past.length})
               </h3>
-              <div className="bg-card rounded-lg border overflow-hidden">
-                {past.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground text-sm">{t("appointments.noPastAppointments")}</div>
-                ) : (
-                  <table className="data-table">
-                    <thead><tr className="bg-muted/50">
-                      <th>{t("common.date")}</th>
-                      <th>{t("appointments.type")}</th>
-                      <th>{t("appointments.doctor")}</th>
-                      <th>{t("common.status")}</th>
-                      <th>{t("appointments.notes")}</th>
-                    </tr></thead>
-                    <tbody>{past.map((a: any) => <AppointmentRow key={a.id} a={a} />)}</tbody>
-                  </table>
-                )}
-              </div>
+              <DataTable
+                columns={appointmentColumns}
+                data={past}
+                keyExtractor={(a) => a.id}
+                emptyMessage={t("appointments.noPastAppointments")}
+                tableLabel={t("appointments.pastAppointments")}
+              />
             </div>
           </div>
         );
       })()}
 
       {/* ── MEDICAL HISTORY ── */}
-      {activeTab === "history" && (
-        <div className="bg-card rounded-lg border overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b bg-muted/20">
-            <h3 className="font-semibold">{t("patients.medicalHistory")}</h3>
-            {canManageRecords && (
-              <Button size="sm" onClick={openCreateRecord} className="gap-2">
-                <Plus className="h-4 w-4" />
-                {t("common.add")}
-              </Button>
-            )}
-          </div>
-          {medicalRecords.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground space-y-3">
-              <p>{t("patients.noMedicalHistoryFound")}</p>
+      {activeTab === "history" && (() => {
+        const historyColumns: Column<any>[] = [
+          {
+            key: "record_date",
+            header: t("common.date"),
+            render: (h) => (
+              <span className="text-muted-foreground whitespace-nowrap">
+                {formatDate(h.record_date, locale, "date", calendarType)}
+              </span>
+            ),
+          },
+          { key: "record_type", header: t("patients.recordType"), render: (h) => <span className="text-sm font-medium">{getRecordTypeLabel(h.record_type)}</span> },
+          { key: "diagnosis", header: t("patients.diagnosis"), render: (h) => <span className="font-medium">{h.diagnosis ?? "-"}</span> },
+          { key: "doctor", header: t("appointments.doctor"), render: (h) => h.doctors?.full_name ?? "-" },
+          { key: "notes", header: t("appointments.notes"), render: (h) => <span className="text-sm text-muted-foreground max-w-xs truncate">{h.notes ?? "-"}</span> },
+        ];
+
+        if (canManageRecords) {
+          historyColumns.push({
+            key: "actions",
+            header: t("common.actions"),
+            render: (h) => (
+              <div className="inline-flex items-center gap-2 justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="hover:bg-muted"
+                  onClick={() => openEditRecord(h)}
+                  aria-label={t("common.edit")}
+                  title={t("common.edit")}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-destructive hover:bg-destructive/10"
+                  onClick={() => setDeleteRecordId(h.id)}
+                  aria-label={t("common.delete")}
+                  title={t("common.delete")}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ),
+          });
+        }
+
+        return (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">{t("patients.medicalHistory")}</h3>
               {canManageRecords && (
-                <div className="flex flex-col items-center gap-2">
-                  <p className="text-xs text-muted-foreground">{t("patients.medicalHistoryEmptyCta")}</p>
-                  <Button variant="outline" size="sm" onClick={openCreateRecord} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    {t("patients.addMedicalRecord")}
-                  </Button>
-                </div>
+                <Button size="sm" onClick={openCreateRecord} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  {t("common.add")}
+                </Button>
               )}
             </div>
-          ) : (
-            <table className="data-table">
-              <thead><tr className="bg-muted/50">
-                <th>{t("common.date")}</th>
-                <th>{t("patients.recordType")}</th>
-                <th>{t("patients.diagnosis")}</th>
-                <th>{t("appointments.doctor")}</th>
-                <th>{t("appointments.notes")}</th>
-                {canManageRecords && <th className="text-right">{t("common.actions")}</th>}
-              </tr></thead>
-              <tbody>
-                {medicalRecords.map((h: any) => (
-                  <tr key={h.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="text-muted-foreground whitespace-nowrap">
-                      {formatDate(h.record_date, locale, "date", calendarType)}
-                    </td>
-                    <td className="text-sm font-medium">{getRecordTypeLabel(h.record_type)}</td>
-                    <td className="font-medium">{h.diagnosis ?? "-"}</td>
-                    <td>{h.doctors?.full_name ?? "-"}</td>
-                    <td className="text-sm text-muted-foreground max-w-xs truncate">{h.notes ?? "-"}</td>
-                    {canManageRecords && (
-                      <td className="text-right">
-                        <div className="inline-flex items-center gap-2">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            className="hover:bg-muted"
-                            onClick={() => openEditRecord(h)}
-                            aria-label={t("common.edit")}
-                            title={t("common.edit")}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-destructive hover:bg-destructive/10"
-                            onClick={() => setDeleteRecordId(h.id)}
-                            aria-label={t("common.delete")}
-                            title={t("common.delete")}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
+            {medicalRecords.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground space-y-3">
+                <p>{t("patients.noMedicalHistoryFound")}</p>
+                {canManageRecords && (
+                  <div className="flex flex-col items-center gap-2">
+                    <p className="text-xs text-muted-foreground">{t("patients.medicalHistoryEmptyCta")}</p>
+                    <Button variant="outline" size="sm" onClick={openCreateRecord} className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      {t("patients.addMedicalRecord")}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <DataTable
+                columns={historyColumns}
+                data={medicalRecords}
+                keyExtractor={(h) => h.id}
+                tableLabel={t("patients.medicalHistory")}
+              />
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── PRESCRIPTIONS ── */}
-      {activeTab === "prescriptions" && (
-        <div className="space-y-4">
-          {prescriptions.length > 0 && (
-            <div className="flex justify-end">
-              <Button variant="outline" size="sm" onClick={() => {
-                generatePrescriptionsListPDF(
-                  prescriptions as any,
-                  { full_name: patient.full_name },
-                  locale === "ar" ? "ar" : "en",
-                );
-              }}>
-                <Printer className="h-4 w-4" />
-                {t("common.print")}
-              </Button>
-            </div>
-          )}
-          <div className="bg-card rounded-lg border overflow-hidden">
-          {prescriptions.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">{t("patients.noPrescriptionsFound")}</div>
-          ) : (
-            <table className="data-table">
-              <thead><tr className="bg-muted/50">
-                <th>{t("pharmacy.medication")}</th>
-                <th>{t("laboratory.test")}</th>
-                <th>{t("appointments.doctor")}</th>
-                <th>{t("common.date")}</th>
-                <th>{t("common.status")}</th>
-              </tr></thead>
-              <tbody>
-                {prescriptions.map((rx: any) => (
-                  <tr key={rx.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="font-medium">{rx.medication}</td>
-                    <td>{rx.dosage}</td>
-                    <td>{rx.doctors?.full_name ?? "�"}</td>
-                    <td className="text-muted-foreground">{formatDate(rx.prescribed_date, locale, "date", calendarType)}</td>
-                    <td>
-                      <StatusBadge variant={rx.status === "active" ? "success" : "default"}>
-                        {rx.status === "active" ? t("patients.active") : t("patients.inactive")}
-                      </StatusBadge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+      {activeTab === "prescriptions" && (() => {
+        const prescriptionColumns: Column<any>[] = [
+          { key: "medication", header: t("pharmacy.medication"), render: (rx) => <span className="font-medium">{rx.medication}</span> },
+          { key: "dosage", header: t("laboratory.test"), render: (rx) => rx.dosage },
+          { key: "doctor", header: t("appointments.doctor"), render: (rx) => rx.doctors?.full_name ?? "-" },
+          { key: "prescribed_date", header: t("common.date"), render: (rx) => <span className="text-muted-foreground">{formatDate(rx.prescribed_date, locale, "date", calendarType)}</span> },
+          {
+            key: "status",
+            header: t("common.status"),
+            render: (rx) => (
+              <StatusBadge variant={rx.status === "active" ? "success" : "default"}>
+                {rx.status === "active" ? t("patients.active") : t("patients.inactive")}
+              </StatusBadge>
+            ),
+          },
+        ];
+
+        return (
+          <div className="space-y-4">
+            {prescriptions.length > 0 && (
+              <div className="flex justify-end">
+                <Button variant="outline" size="sm" onClick={() => {
+                  generatePrescriptionsListPDF(
+                    prescriptions as any,
+                    { full_name: patient.full_name },
+                    locale === "ar" ? "ar" : "en",
+                  );
+                }}>
+                  <Printer className="h-4 w-4" />
+                  {t("common.print")}
+                </Button>
+              </div>
+            )}
+            {prescriptions.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">{t("patients.noPrescriptionsFound")}</div>
+            ) : (
+              <DataTable
+                columns={prescriptionColumns}
+                data={prescriptions}
+                keyExtractor={(rx) => rx.id}
+                tableLabel={t("patients.prescriptions")}
+              />
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── CLINICAL NOTES ── */}
       {activeTab === "notes" && (
@@ -743,117 +752,116 @@ export const PatientDetailPage = () => {
       )}
 
       {/* ── LAB ORDERS ── */}
-      {activeTab === "lab_orders" && (
-        <div className="space-y-4">
-          {/* summary strip */}
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: t("laboratory.pendingOrders"), count: labOrders.filter((l: any) => l.status === "pending").length, variant: "default" },
-              { label: t("laboratory.processing"), count: labOrders.filter((l: any) => l.status === "processing").length, variant: "warning" },
-              { label: t("appointments.completed"), count: labOrders.filter((l: any) => l.status === "completed").length, variant: "success" },
-            ].map((s, i) => (
-              <div key={i} className="stat-card text-center">
-                <p className="text-2xl font-bold">{s.count}</p>
-                <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
-              </div>
-            ))}
-          </div>
+      {activeTab === "lab_orders" && (() => {
+        const labColumns: Column<any>[] = [
+          { key: "test_name", header: t("laboratory.test"), render: (l) => <span className="font-medium">{l.test_name}</span> },
+          { key: "doctor", header: t("laboratory.orderedBy"), render: (l) => l.doctors?.full_name ?? "-" },
+          { key: "order_date", header: t("common.date"), render: (l) => <span className="text-muted-foreground whitespace-nowrap">{formatDate(l.order_date, locale, "date", calendarType)}</span> },
+          {
+            key: "status",
+            header: t("common.status"),
+            render: (l) => (
+              <StatusBadge variant={labStatusVariant[l.status] ?? "default"}>
+                {getLabStatusLabel(l.status)}
+              </StatusBadge>
+            ),
+          },
+          {
+            key: "result",
+            header: t("common.result"),
+            render: (l) => (
+              l.result
+                ? <span className="text-sm">{l.result}</span>
+                : <span className="text-muted-foreground">-</span>
+            ),
+          },
+        ];
 
-          <div className="bg-card rounded-lg border overflow-hidden">
+        return (
+          <div className="space-y-4">
+            {/* summary strip */}
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: t("laboratory.pendingOrders"), count: labOrders.filter((l: any) => l.status === "pending").length, variant: "default" },
+                { label: t("laboratory.processing"), count: labOrders.filter((l: any) => l.status === "processing").length, variant: "warning" },
+                { label: t("appointments.completed"), count: labOrders.filter((l: any) => l.status === "completed").length, variant: "success" },
+              ].map((s, i) => (
+                <div key={i} className="stat-card text-center">
+                  <p className="text-2xl font-bold">{s.count}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
             {labOrders.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground flex flex-col items-center gap-3">
                 <FlaskConical className="h-10 w-10 opacity-30" />
                 {t("patients.noLabOrders")}
               </div>
             ) : (
-              <table className="data-table">
-                <thead><tr className="bg-muted/50">
-                  <th>{t("laboratory.test")}</th>
-                  <th>{t("laboratory.orderedBy")}</th>
-                  <th>{t("common.date")}</th>
-                  <th>{t("common.status")}</th>
-                  <th>{t("common.result")}</th>
-                </tr></thead>
-                <tbody>
-                  {labOrders.map((l: any) => (
-                    <tr key={l.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="font-medium">{l.test_name}</td>
-                      <td>{l.doctors?.full_name ?? "�"}</td>
-                      <td className="text-muted-foreground whitespace-nowrap">{formatDate(l.order_date, locale, "date", calendarType)}</td>
-                      <td>
-                        <StatusBadge variant={labStatusVariant[l.status] ?? "default"}>
-                          {getLabStatusLabel(l.status)}
-                        </StatusBadge>
-                      </td>
-                      <td className="text-sm max-w-xs">
-                        {l.result
-                          ? <span>{l.result}</span>
-                          : <span className="text-muted-foreground">—</span>
-                        }
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                columns={labColumns}
+                data={labOrders}
+                keyExtractor={(l) => l.id}
+                tableLabel={t("patients.labOrdersCount")}
+              />
             )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── INVOICES ── */}
-      {activeTab === "invoices" && (
-        <div className="space-y-4">
-          {/* billing summary strip */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="stat-card text-center">
-              <p className="text-2xl font-bold">{invoices.length}</p>
-              <p className="text-xs text-muted-foreground mt-1">{t("billing.invoicesThisMonth")}</p>
-            </div>
-            <div className="stat-card text-center">
-              <p className="text-2xl font-bold">{formatCurrency(totalBilled, locale)}</p>
-              <p className="text-xs text-muted-foreground mt-1">{t("patients.totalBilled")}</p>
-            </div>
-            <div className="stat-card text-center">
-              <p className="text-2xl font-bold text-success">{formatCurrency(totalPaid, locale)}</p>
-              <p className="text-xs text-muted-foreground mt-1">{t("billing.paid")}</p>
-            </div>
-          </div>
+      {activeTab === "invoices" && (() => {
+        const invoiceColumns: Column<any>[] = [
+          { key: "invoice_code", header: t("billing.invoiceNumber"), render: (inv) => <span className="font-medium">{inv.invoice_code}</span> },
+          { key: "service", header: t("common.service"), render: (inv) => inv.service },
+          { key: "amount", header: t("common.amount"), render: (inv) => <span className="font-semibold">{formatCurrency(Number(inv.amount), locale)}</span> },
+          { key: "invoice_date", header: t("common.date"), render: (inv) => <span className="text-muted-foreground whitespace-nowrap">{formatDate(inv.invoice_date, locale, "date", calendarType)}</span> },
+          {
+            key: "status",
+            header: t("common.status"),
+            render: (inv) => (
+              <StatusBadge variant={invoiceStatusVariant[inv.status] ?? "default"}>
+                {getInvoiceStatusLabel(inv.status)}
+              </StatusBadge>
+            ),
+          },
+        ];
 
-          <div className="bg-card rounded-lg border overflow-hidden">
+        return (
+          <div className="space-y-4">
+            {/* billing summary strip */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="stat-card text-center">
+                <p className="text-2xl font-bold">{invoices.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t("billing.invoicesThisMonth")}</p>
+              </div>
+              <div className="stat-card text-center">
+                <p className="text-2xl font-bold">{formatCurrency(totalBilled, locale)}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t("patients.totalBilled")}</p>
+              </div>
+              <div className="stat-card text-center">
+                <p className="text-2xl font-bold text-success">{formatCurrency(totalPaid, locale)}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t("billing.paid")}</p>
+              </div>
+            </div>
+
             {invoices.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground flex flex-col items-center gap-3">
                 <Receipt className="h-10 w-10 opacity-30" />
                 {t("patients.noInvoices")}
               </div>
             ) : (
-              <table className="data-table">
-                <thead><tr className="bg-muted/50">
-                  <th>{t("billing.invoiceNumber")}</th>
-                  <th>{t("common.service")}</th>
-                  <th>{t("common.amount")}</th>
-                  <th>{t("common.date")}</th>
-                  <th>{t("common.status")}</th>
-                </tr></thead>
-                <tbody>
-                  {invoices.map((inv: any) => (
-                    <tr key={inv.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="font-medium">{inv.invoice_code}</td>
-                      <td>{inv.service}</td>
-                      <td className="font-semibold">{formatCurrency(Number(inv.amount), locale)}</td>
-                      <td className="text-muted-foreground whitespace-nowrap">{formatDate(inv.invoice_date, locale, "date", calendarType)}</td>
-                      <td>
-                        <StatusBadge variant={invoiceStatusVariant[inv.status] ?? "default"}>
-                          {getInvoiceStatusLabel(inv.status)}
-                        </StatusBadge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                columns={invoiceColumns}
+                data={invoices}
+                keyExtractor={(inv) => inv.id}
+                tableLabel={t("patients.invoices")}
+              />
             )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── DOCUMENTS ── */}
       {activeTab === "documents" && (

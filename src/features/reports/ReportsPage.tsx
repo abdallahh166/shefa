@@ -11,6 +11,7 @@ import {
   Activity, FileBarChart, Star, ArrowUpRight, ArrowDownRight,
 } from "lucide-react";
 import { StatCard } from "@/shared/components/StatCard";
+import { DataTable, Column } from "@/shared/components/DataTable";
 import { Button } from "@/components/primitives/Button";
 import { PageContainer, SectionHeader } from "@/components/layout/AppLayout";
 import { generatePDF } from "@/shared/utils/pdfGenerator";
@@ -212,6 +213,59 @@ export const ReportsPage = () => {
     }
   };
 
+  const doctorColumns: Column<any>[] = [
+    {
+      key: "name",
+      header: t("reports.doctor"),
+      render: (doc) => (
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs">
+            {doc.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
+          </div>
+          <span className="font-medium">{doc.name}</span>
+        </div>
+      ),
+    },
+    {
+      key: "appointments",
+      header: t("reports.appointments"),
+      render: (doc) => <span className="font-semibold">{doc.appointments}</span>,
+    },
+    {
+      key: "completedRate",
+      header: t("reports.completionRate"),
+      render: (doc) => (
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-2 bg-muted rounded-full max-w-[100px]">
+            <div
+              className="h-2 bg-success rounded-full transition-all"
+              style={{ width: doc.completedRate === "-" ? "0%" : doc.completedRate }}
+            />
+          </div>
+          <span className="text-sm font-medium">{doc.completedRate}</span>
+        </div>
+      ),
+    },
+    {
+      key: "rating",
+      header: t("reports.rating"),
+      render: (doc) => (
+        <span className="inline-flex items-center gap-1 text-warning">
+          <Star className="h-3.5 w-3.5 fill-warning" /> {doc.rating}
+        </span>
+      ),
+    },
+    {
+      key: "trend",
+      header: t("reports.trend") || "Trend",
+      render: (doc) => (
+        doc.trend
+          ? <span className="inline-flex items-center gap-1 text-xs text-success"><ArrowUpRight className="h-3.5 w-3.5" /> Up</span>
+          : <span className="inline-flex items-center gap-1 text-xs text-destructive"><ArrowDownRight className="h-3.5 w-3.5" /> Down</span>
+      ),
+    },
+  ];
+
   return (
     <PageContainer className="space-y-6">
       <SectionHeader
@@ -370,63 +424,15 @@ export const ReportsPage = () => {
       )}
 
       {activeTab === "doctors" && (
-        <div className="bg-card rounded-xl border overflow-hidden">
-          <div className="px-6 py-4 border-b bg-muted/20">
-            <h3 className="font-semibold">{t("reports.doctorPerformance")}</h3>
-          </div>
-          <table className="data-table">
-            <thead>
-              <tr className="bg-muted/30">
-                <th>{t("reports.doctor")}</th>
-                <th>{t("reports.appointments")}</th>
-                <th>{t("reports.completionRate")}</th>
-                <th>{t("reports.rating")}</th>
-                <th>{t("reports.trend") || "Trend"}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {doctorPerformance.map((doc, i) => (
-                <tr key={i} className="hover:bg-muted/20 transition-colors">
-                  <td>
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs">
-                        {doc.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-                      </div>
-                      <span className="font-medium">{doc.name}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <span className="font-semibold">{doc.appointments}</span>
-                  </td>
-                  <td>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-2 bg-muted rounded-full max-w-[100px]">
-                        <div
-                          className="h-2 bg-success rounded-full transition-all"
-                          style={{ width: doc.completedRate === "-" ? "0%" : doc.completedRate }}
-                        />
-                      </div>
-                      <span className="text-sm font-medium">{doc.completedRate}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <span className="inline-flex items-center gap-1 text-warning">
-                      <Star className="h-3.5 w-3.5 fill-warning" /> {doc.rating}
-                    </span>
-                  </td>
-                  <td>
-                    {doc.trend
-                      ? <span className="inline-flex items-center gap-1 text-xs text-success"><ArrowUpRight className="h-3.5 w-3.5" /> Up</span>
-                      : <span className="inline-flex items-center gap-1 text-xs text-destructive"><ArrowDownRight className="h-3.5 w-3.5" /> Down</span>
-                    }
-                  </td>
-                </tr>
-              ))}
-              {doctorPerformance.length === 0 && (
-                <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">{t("common.noData")}</td></tr>
-              )}
-            </tbody>
-          </table>
+        <div className="space-y-3">
+          <h3 className="font-semibold">{t("reports.doctorPerformance")}</h3>
+          <DataTable
+            columns={doctorColumns}
+            data={doctorPerformance}
+            keyExtractor={(doc) => doc.name}
+            emptyMessage={t("common.noData")}
+            tableLabel={t("reports.doctorPerformance")}
+          />
         </div>
       )}
     </PageContainer>

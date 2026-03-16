@@ -1,6 +1,7 @@
 ﻿import { useNavigate } from "react-router-dom";
 import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
 import { Button } from "@/components/primitives/Button";
+import { DataTable, Column } from "@/shared/components/DataTable";
 import { useI18n } from "@/core/i18n/i18nStore";
 import {
   ArrowLeft,
@@ -114,6 +115,30 @@ export const TutorialPage = () => {
     { page: t("common.insurance"), perms: [true, false, false, false, true] },
     { page: t("common.reports"), perms: [true, false, false, false, true] },
     { page: t("common.settings"), perms: [true, false, false, false, false] },
+  ];
+
+  const permissionColumns: Column<(typeof permissionsTable)[number]>[] = [
+    {
+      key: "page",
+      header: t("tutorial.page"),
+      searchable: true,
+      render: (row) => <span className="font-medium text-foreground">{row.page}</span>,
+    },
+    ...[
+      { key: "admin", label: t("tutorial.admin"), index: 0 },
+      { key: "doctor", label: t("tutorial.doctor"), index: 1 },
+      { key: "receptionist", label: t("tutorial.receptionist"), index: 2 },
+      { key: "nurse", label: t("tutorial.nurse"), index: 3 },
+      { key: "accountant", label: t("tutorial.accountant"), index: 4 },
+    ].map((role) => ({
+      key: role.key,
+      header: role.label,
+      render: (row: (typeof permissionsTable)[number]) => (
+        row.perms[role.index]
+          ? <CheckCircle2 className="h-4 w-4 text-primary mx-auto" />
+          : <span className="text-muted-foreground/30">-</span>
+      ),
+    })),
   ];
 
   const roleColors: Record<string, string> = {
@@ -270,38 +295,12 @@ export const TutorialPage = () => {
             <span className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary text-sm font-bold">4</span>
             {t("tutorial.rolePermissions")}
           </h2>
-          <div className="bg-card rounded-xl border overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-muted/50 border-b">
-                    <th className="text-start px-4 py-3 font-semibold text-foreground">{t("tutorial.page")}</th>
-                    <th className="text-center px-3 py-3 font-semibold text-foreground">{t("tutorial.admin")}</th>
-                    <th className="text-center px-3 py-3 font-semibold text-foreground">{t("tutorial.doctor")}</th>
-                    <th className="text-center px-3 py-3 font-semibold text-foreground">{t("tutorial.receptionist")}</th>
-                    <th className="text-center px-3 py-3 font-semibold text-foreground">{t("tutorial.nurse")}</th>
-                    <th className="text-center px-3 py-3 font-semibold text-foreground">{t("tutorial.accountant")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {permissionsTable.map((row) => (
-                    <tr key={row.page} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-2.5 font-medium text-foreground">{row.page}</td>
-                      {row.perms.map((has, i) => (
-                        <td key={i} className="text-center px-3 py-2.5">
-                          {has ? (
-                            <CheckCircle2 className="h-4 w-4 text-primary mx-auto" />
-                          ) : (
-                            <span className="text-muted-foreground/30">â€”</span>
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <DataTable
+            columns={permissionColumns}
+            data={permissionsTable}
+            keyExtractor={(row) => row.page}
+            tableLabel={t("tutorial.rolePermissions")}
+          />
         </section>
 
         {/* CTA */}

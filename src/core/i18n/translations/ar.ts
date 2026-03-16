@@ -154,6 +154,7 @@
     noClinicalNotesFound: "لا توجد ملاحظات سريرية",
     noLabOrders: "لا توجد طلبات مختبر لهذا المريض",
     noInvoices: "لا توجد فواتير لهذا المريض",
+    invoices: "الفواتير",
     labOrdersCount: "طلبات المختبر",
     totalBilled: "إجمالي المُفوتر",
     totalPaid: "إجمالي المدفوع",
@@ -562,6 +563,5 @@
     footerCopy: "© 2026 MedFlow. جميع الحقوق محفوظة.",
   },
 };
-
 
 

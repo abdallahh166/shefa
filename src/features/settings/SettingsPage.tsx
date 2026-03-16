@@ -29,19 +29,24 @@ export const SettingsPage = () => {
   const [showAddUser, setShowAddUser] = useState(false);
   const [userPage, setUserPage] = useState(1);
   const [userSearch, setUserSearch] = useState("");
+  const [userSort, setUserSort] = useState<{ column: "full_name" | "created_at"; direction: "asc" | "desc" }>({
+    column: "created_at",
+    direction: "desc",
+  });
   const debouncedUserSearch = useDebouncedValue(userSearch, 300);
   const pageSize = 20;
   const canManageUsers = hasPermission("manage_users");
 
   useEffect(() => {
     setUserPage(1);
-  }, [debouncedUserSearch]);
+  }, [debouncedUserSearch, userSort]);
 
   const profilesQueryKey = queryKeys.settings.profiles({
     tenantId: user?.tenantId,
     page: userPage,
     pageSize,
     search: debouncedUserSearch.trim() || undefined,
+    sort: userSort,
   });
 
   const { data: profilesResponse, refetch: refetchProfiles, isLoading: loadingProfiles } = useQuery({
@@ -52,6 +57,7 @@ export const SettingsPage = () => {
         page: userPage,
         pageSize,
         search: debouncedUserSearch.trim() || undefined,
+        sort: userSort,
       }),
   });
 
@@ -115,6 +121,9 @@ export const SettingsPage = () => {
               onPageChange={setUserPage}
               searchValue={userSearch}
               onSearchChange={setUserSearch}
+              sortColumn={userSort.column}
+              sortDirection={userSort.direction}
+              onSortChange={(column, direction) => setUserSort({ column, direction })}
             />
           )}
           {activeTab === "security" && <SecurityTab />}

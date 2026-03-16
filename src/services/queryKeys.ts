@@ -72,11 +72,29 @@ export const queryKeys = {
     byUser: (userId: string) => ["profiles", "byUser", userId] as const,
   },
   admin: {
-    tenants: (args?: { page?: number; pageSize?: number; search?: string; plan?: string }) =>
+    tenants: (args?: {
+      page?: number;
+      pageSize?: number;
+      search?: string;
+      plan?: string;
+      sort?: { column: string; direction?: "asc" | "desc" };
+    }) =>
       ["admin", "tenants", args] as const,
-    profiles: (args?: { page?: number; pageSize?: number; search?: string }) =>
+    profiles: (args?: {
+      page?: number;
+      pageSize?: number;
+      search?: string;
+      sort?: { column: string; direction?: "asc" | "desc" };
+    }) =>
       ["admin", "profiles", args] as const,
-    subscriptions: (args?: { page?: number; pageSize?: number; search?: string; plan?: string; status?: string }) =>
+    subscriptions: (args?: {
+      page?: number;
+      pageSize?: number;
+      search?: string;
+      plan?: string;
+      status?: string;
+      sort?: { column: string; direction?: "asc" | "desc" };
+    }) =>
       ["admin", "subscriptions", args] as const,
     subscriptionStats: () => ["admin", "subscriptionStats"] as const,
   },
@@ -99,7 +117,13 @@ export const queryKeys = {
   },
   settings: {
     tenant: (tenantId?: string) => [...tenantKey("settings", tenantId), "tenant"] as const,
-    profiles: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string }) =>
+    profiles: (args?: {
+      tenantId?: string;
+      page?: number;
+      pageSize?: number;
+      search?: string;
+      sort?: { column: string; direction?: "asc" | "desc" };
+    }) =>
       [...tenantKey("settings", args?.tenantId), "profiles", args] as const,
     notifications: (userId: string, tenantId?: string) => [...tenantKey("settings", tenantId), "notifications", userId] as const,
     audit: (args?: { tenantId?: string; page?: number; pageSize?: number }) =>

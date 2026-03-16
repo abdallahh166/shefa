@@ -5,6 +5,7 @@ import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Inputs";
 import { TableSkeleton } from "./TableSkeleton";
 import { generatePDF } from "@/shared/utils/pdfGenerator";
+import { cn } from "@/lib/utils";
 
 export interface Column<T> {
   key: string;
@@ -46,6 +47,8 @@ interface DataTableProps<T> {
   sortColumn?: string;
   sortDirection?: "asc" | "desc";
   onSortChange?: (column: string, direction: "asc" | "desc") => void;
+  onRowClick?: (item: T) => void;
+  tableLabel?: string;
 }
 
 export function DataTable<T>({
@@ -70,6 +73,8 @@ export function DataTable<T>({
   sortColumn,
   sortDirection,
   onSortChange,
+  onRowClick,
+  tableLabel,
 }: DataTableProps<T>) {
   const { t } = useI18n();
   const [localSearch, setLocalSearch] = useState("");
@@ -182,6 +187,8 @@ export function DataTable<T>({
   const hasBulkActions = !!bulkActions?.length;
   const allSelected = filtered.length > 0 && selectedIds.size === filtered.length;
   const someSelected = selectedIds.size > 0;
+  const rowClickable = typeof onRowClick === "function";
+  const resolvedTableLabel = tableLabel ?? "Data table";
 
   return (
     <div className="space-y-3">
@@ -196,6 +203,7 @@ export function DataTable<T>({
                 value={search}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder={searchPlaceholder ?? t("common.search")}
+                aria-label={searchPlaceholder ?? t("common.search")}
                 leadingIcon={<Search className="h-4 w-4" />}
               />
             </div>
@@ -243,7 +251,7 @@ export function DataTable<T>({
       {/* Table */}
       <div className="bg-card rounded-xl border overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="data-table">
+          <table className="data-table" aria-label={resolvedTableLabel}>
             <thead>
               <tr>
                 {hasBulkActions && (
@@ -252,6 +260,7 @@ export function DataTable<T>({
                       type="checkbox"
                       checked={allSelected}
                       onChange={toggleSelectAll}
+                      onClick={(e) => e.stopPropagation()}
                       className="rounded border-border accent-primary cursor-pointer"
                     />
                   </th>
@@ -310,7 +319,23 @@ export function DataTable<T>({
                   return (
                     <tr
                       key={id}
-                      className={selectedIds.has(id) ? "bg-primary/[0.03]" : ""}
+                      className={cn(
+                        selectedIds.has(id) && "bg-primary/[0.03]",
+                        rowClickable && "cursor-pointer hover:bg-muted/30",
+                      )}
+                      onClick={rowClickable ? (event) => {
+                        const target = event.target as HTMLElement;
+                        if (target.closest("button,a,input,select,textarea,label")) return;
+                        onRowClick?.(item);
+                      } : undefined}
+                      onKeyDown={rowClickable ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onRowClick?.(item);
+                        }
+                      } : undefined}
+                      role={rowClickable ? "button" : undefined}
+                      tabIndex={rowClickable ? 0 : undefined}
                     >
                       {hasBulkActions && (
                         <td className="w-10 px-4">
@@ -318,6 +343,7 @@ export function DataTable<T>({
                             type="checkbox"
                             checked={selectedIds.has(id)}
                             onChange={() => toggleSelect(id)}
+                            onClick={(e) => e.stopPropagation()}
                             className="rounded border-border accent-primary cursor-pointer"
                           />
                         </td>
