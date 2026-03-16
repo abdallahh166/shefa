@@ -45,7 +45,8 @@ export function FileUpload({
 }: FileUploadProps) {
   const internalRef = React.useRef<HTMLInputElement>(null);
   const resolvedRef = inputRef ?? internalRef;
-  const inputId = id ?? React.useId();
+  const generatedId = React.useId();
+  const inputId = id ?? generatedId;
 
   const handleOpen = () => {
     if (disabled) return;

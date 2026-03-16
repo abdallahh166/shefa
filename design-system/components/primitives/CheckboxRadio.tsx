@@ -72,7 +72,8 @@ const Checkbox = React.forwardRef<
   required,
   ...props
 }, ref) => {
-  const uid = id ?? React.useId();
+  const generatedId = React.useId();
+  const uid = id ?? generatedId;
   const descId = description ? `${uid}-desc` : undefined;
   const errId  = error       ? `${uid}-err`  : undefined;
   const ariaDescBy = [descId, errId].filter(Boolean).join(" ") || undefined;
@@ -219,7 +220,8 @@ const RadioGroup = React.forwardRef<
   React.ElementRef<typeof RadioGroupPrimitive.Root>,
   RadioGroupProps
 >(({ label, description, error, horizontal = false, className, children, required, ...props }, ref) => {
-  const errId = error ? React.useId() : undefined;
+  const errorId = React.useId();
+  const errId = error ? errorId : undefined;
 
   return (
     <fieldset className="space-y-3 border-0 p-0 m-0">
@@ -274,7 +276,8 @@ const RadioItem = React.forwardRef<
   React.ElementRef<typeof RadioGroupPrimitive.Item>,
   RadioItemProps
 >(({ className, label, description, size = "default", value, id, disabled, ...props }, ref) => {
-  const uid = id ?? React.useId();
+  const generatedId = React.useId();
+  const uid = id ?? generatedId;
 
   return (
     <div className="flex items-start gap-3">
@@ -363,7 +366,8 @@ const RadioCard = React.forwardRef<
   React.ElementRef<typeof RadioGroupPrimitive.Item>,
   RadioCardProps
 >(({ className, label, description, badge, icon: Icon, value, id, disabled, ...props }, ref) => {
-  const uid = id ?? React.useId();
+  const generatedId = React.useId();
+  const uid = id ?? generatedId;
 
   return (
     <RadioGroupPrimitive.Item

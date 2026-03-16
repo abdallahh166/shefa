@@ -114,7 +114,8 @@ function FormField({
   children,
   ...props
 }: FormFieldProps) {
-  const id = name ?? React.useId();
+  const generatedId = React.useId();
+  const id = name ?? generatedId;
 
   // Clone children to inject id and aria-describedby
   const ariaDescribedBy = [
@@ -179,7 +180,7 @@ function FormLabel({ className, required, children, ...props }: FormLabelProps) 
 
 // ─── FormHint ─────────────────────────────────────────────────────────────────
 
-interface FormHintProps extends React.HTMLAttributes<HTMLParagraphElement> {}
+type FormHintProps = React.HTMLAttributes<HTMLParagraphElement>;
 
 function FormHint({ className, children, ...props }: FormHintProps) {
   return (
@@ -192,7 +193,7 @@ function FormHint({ className, children, ...props }: FormHintProps) {
 
 // ─── FormError ────────────────────────────────────────────────────────────────
 
-interface FormErrorProps extends React.HTMLAttributes<HTMLParagraphElement> {}
+type FormErrorProps = React.HTMLAttributes<HTMLParagraphElement>;
 
 function FormError({ className, children, ...props }: FormErrorProps) {
   if (!children) return null;
