@@ -46,7 +46,7 @@ export const ReportsPage = () => {
     });
   }, [t]);
 
-  const { data: canViewReportsServer = true } = useQuery({
+  const { data: canViewReportsServer = false } = useQuery({
     queryKey: queryKeys.reports.access(user?.tenantId),
     enabled: !!user?.tenantId && canViewReports,
     queryFn: () => reportService.canViewReports(),
