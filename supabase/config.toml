@@ -18,7 +18,13 @@ verify_jwt = false
 [functions.appointment-reminders]
 verify_jwt = false
 
+[functions.job-worker]
+verify_jwt = false
+
 [functions.send-appointment-notifications]
+verify_jwt = true
+
+[functions.agora-token]
 verify_jwt = true
 
 [functions.generate-monthly-reports]
@@ -32,3 +38,9 @@ verify_jwt = true
 
 [functions.send-invoice-emails]
 verify_jwt = true
+
+[functions.lab-webhook-inbound]
+verify_jwt = false
+
+[functions.integration-api]
+verify_jwt = false

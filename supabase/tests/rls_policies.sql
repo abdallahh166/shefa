@@ -99,8 +99,8 @@ values
 
 insert into public.insurance_claims (tenant_id, patient_id, provider, service, amount, status)
 values
-  ('00000000-0000-0000-0000-000000000001', (select id from public.patients where tenant_id = '00000000-0000-0000-0000-000000000001' limit 1), 'InsureCo', 'Visit', 150, 'pending'),
-  ('00000000-0000-0000-0000-000000000002', (select id from public.patients where tenant_id = '00000000-0000-0000-0000-000000000002' limit 1), 'InsureCo', 'Visit', 150, 'pending');
+  ('00000000-0000-0000-0000-000000000001', (select id from public.patients where tenant_id = '00000000-0000-0000-0000-000000000001' limit 1), 'InsureCo', 'Visit', 150, 'submitted'),
+  ('00000000-0000-0000-0000-000000000002', (select id from public.patients where tenant_id = '00000000-0000-0000-0000-000000000002' limit 1), 'InsureCo', 'Visit', 150, 'submitted');
 
 insert into public.patient_documents (tenant_id, patient_id, file_name, file_path, file_size, file_type, uploaded_by)
 values

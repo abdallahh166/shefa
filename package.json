@@ -13,8 +13,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:db": "supabase test db",
+    "test:db:remote": "node scripts/test-remote-db.mjs",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:load": "node scripts/load-test.mjs",
     "env:remote": "node scripts/switch-env.mjs remote",
     "env:status": "node scripts/switch-env.mjs status",
     "health:outbound": "node scripts/outbound-health.mjs"
@@ -61,6 +63,7 @@
     "jspdf": "2.5.1",
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.462.0",
+    "agora-rtc-sdk-ng": "^4.21.0",
     "next-themes": "^0.3.0",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",

@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+﻿import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enforceCors, getAllowedOriginsFromEnv } from "../_shared/cors.ts";
 import { initSentry } from "../_shared/sentry.ts";
 import { logError, logInfo } from "../_shared/logger.ts";
@@ -10,14 +10,48 @@ interface AppointmentRow {
   id: string;
   appointment_date: string;
   tenant_id: string;
+  patient_id: string;
   patients:
-    | { full_name: string | null; email: string | null }
-    | Array<{ full_name: string | null; email: string | null }>
+    | { full_name: string | null; email: string | null; phone: string | null }
+    | Array<{ full_name: string | null; email: string | null; phone: string | null }>
     | null;
   doctors:
     | { full_name: string | null; user_id: string | null }
     | Array<{ full_name: string | null; user_id: string | null }>
     | null;
+}
+
+type ContactPrefs = {
+  email: string | null;
+  phone_e164: string | null;
+  whatsapp_opt_in: boolean;
+};
+
+const WINDOW_DAYS = 7;
+const MAX_BATCH = 100;
+const MAX_ATTEMPTS = 3;
+
+async function sendWhatsAppMessage(
+  phoneNumberId: string,
+  accessToken: string,
+  to: string,
+  body: string,
+) {
+  const url = `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "text",
+      text: { body },
+    }),
+  });
+  return res.ok;
 }
 
 Deno.serve(async (req) => {
@@ -70,137 +104,253 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const now = new Date();
-    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const windowEnd = new Date(now.getTime() + WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
     const { data: upcomingAppointments, error } = await supabase
       .from("appointments")
-      .select("id, appointment_date, tenant_id, patients(full_name, email), doctors(full_name, user_id)")
+      .select("id, appointment_date, tenant_id, patient_id, patients(full_name, email, phone), doctors(full_name, user_id)")
       .eq("status", "scheduled")
       .gte("appointment_date", now.toISOString())
-      .lte("appointment_date", tomorrow.toISOString());
+      .lte("appointment_date", windowEnd.toISOString());
 
     if (error) {
       throw error;
     }
 
+    const appointments = (upcomingAppointments ?? []) as AppointmentRow[];
     const preferenceCache = new Map<string, boolean>();
+    const contactCache = new Map<string, ContactPrefs>();
+    const configCache = new Map<string, { offsets: number[]; email_enabled: boolean; whatsapp_enabled: boolean }>();
+
+    // Schedule reminders into the queue
+    for (const appt of appointments) {
+      const config = configCache.get(appt.tenant_id) ??
+        (await (async () => {
+          const { data } = await supabase
+            .from("appointment_reminder_config")
+            .select("offsets, email_enabled, whatsapp_enabled")
+            .eq("tenant_id", appt.tenant_id)
+            .maybeSingle();
+          const normalized = {
+            offsets: (data?.offsets ?? [1440, 120]) as number[],
+            email_enabled: data?.email_enabled ?? true,
+            whatsapp_enabled: data?.whatsapp_enabled ?? false,
+          };
+          configCache.set(appt.tenant_id, normalized);
+          return normalized;
+        })());
+
+      const offsets = Array.isArray(config.offsets) ? config.offsets : [1440];
+      const appointmentDate = new Date(appt.appointment_date);
+
+      for (const offsetMinutes of offsets) {
+        const sendAt = new Date(appointmentDate.getTime() - offsetMinutes * 60 * 1000);
+        if (sendAt <= now) continue;
+
+        const queuePayloads: Array<{ channel: string; send_at: string }> = [];
+        if (config.email_enabled) queuePayloads.push({ channel: "email", send_at: sendAt.toISOString() });
+        if (config.whatsapp_enabled) queuePayloads.push({ channel: "whatsapp", send_at: sendAt.toISOString() });
+        queuePayloads.push({ channel: "in_app", send_at: sendAt.toISOString() });
+
+        for (const payload of queuePayloads) {
+          await supabase
+            .from("reminder_queue")
+            .upsert({
+              tenant_id: appt.tenant_id,
+              appointment_id: appt.id,
+              patient_id: appt.patient_id,
+              channel: payload.channel,
+              send_at: payload.send_at,
+            }, { onConflict: "appointment_id,channel,send_at" });
+        }
+      }
+    }
+
+    // Process due reminders
+    const { data: dueReminders, error: dueError } = await supabase
+      .from("reminder_queue")
+      .select("id, tenant_id, appointment_id, patient_id, channel, send_at, attempts")
+      .eq("status", "pending")
+      .lte("send_at", now.toISOString())
+      .or("next_attempt_at.is.null,next_attempt_at.lte." + now.toISOString())
+      .limit(MAX_BATCH);
+
+    if (dueError) {
+      throw dueError;
+    }
+
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
+    const whatsappToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
+    const whatsappPhoneNumberId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
+
     let notificationsCreated = 0;
     let emailsSent = 0;
+    let whatsappSent = 0;
 
-    const appointments = (upcomingAppointments ?? []) as AppointmentRow[];
+    for (const reminder of dueReminders ?? []) {
+      const { data: appointment } = await supabase
+        .from("appointments")
+        .select("id, appointment_date, tenant_id, patients(full_name, email, phone), doctors(full_name, user_id)")
+        .eq("id", reminder.appointment_id)
+        .maybeSingle();
 
-    for (const appt of appointments) {
+      if (!appointment) {
+        await supabase.from("reminder_queue").update({ status: "failed", error_message: "Appointment not found" }).eq("id", reminder.id);
+        continue;
+      }
+
+      const appt = appointment as AppointmentRow;
       const patient = Array.isArray(appt.patients) ? appt.patients[0] : appt.patients;
       const doctor = Array.isArray(appt.doctors) ? appt.doctors[0] : appt.doctors;
+
+      let prefs = contactCache.get(appt.patient_id);
+      if (!prefs) {
+        const { data: prefData } = await supabase
+          .from("patient_contact_preferences")
+          .select("email, phone_e164, whatsapp_opt_in")
+          .eq("patient_id", appt.patient_id)
+          .maybeSingle();
+        prefs = {
+          email: prefData?.email ?? patient?.email ?? null,
+          phone_e164: prefData?.phone_e164 ?? null,
+          whatsapp_opt_in: prefData?.whatsapp_opt_in ?? false,
+        };
+        contactCache.set(appt.patient_id, prefs);
+      }
 
       const appointmentTime = new Date(appt.appointment_date).toLocaleString("en-US", {
         dateStyle: "medium",
         timeStyle: "short",
       });
-      const bodyText = `You have an appointment with ${doctor?.full_name ?? "your patient"} scheduled for ${appointmentTime}. Appointment ID: ${appt.id}`;
+      const bodyText = `You have an appointment scheduled for ${appointmentTime}. Appointment ID: ${appt.id}`;
 
-      const doctorUserId = doctor?.user_id ?? null;
-      if (doctorUserId) {
-        let allowInApp = preferenceCache.get(doctorUserId);
-        if (allowInApp === undefined) {
-          const { data: prefData } = await supabase
-            .from("notification_preferences")
-            .select("appointment_reminders")
-            .eq("user_id", doctorUserId)
-            .maybeSingle();
-          allowInApp = prefData?.appointment_reminders ?? true;
-          preferenceCache.set(doctorUserId, allowInApp);
-        }
+      try {
+        if (reminder.channel === "email") {
+          const normalizedEmail = prefs.email?.trim().toLowerCase() ?? null;
+          if (!normalizedEmail || !resendApiKey) {
+            throw new Error("Email not available or RESEND_API_KEY missing");
+          }
 
-        if (allowInApp) {
-          const { data: existingInAppLog } = await supabase
+          const { data: existingEmailLog } = await supabase
             .from("appointment_reminder_log")
             .select("id")
             .eq("appointment_id", appt.id)
-            .eq("channel", "in_app")
-            .eq("notified_user_id", doctorUserId)
+            .eq("channel", "email")
+            .eq("patient_email", normalizedEmail)
             .maybeSingle();
 
-          if (!existingInAppLog) {
-            const { error: notifError } = await supabase.from("notifications").insert({
-              tenant_id: appt.tenant_id,
-              user_id: doctorUserId,
-              title: "Upcoming Appointment Reminder",
-              body: bodyText,
-              type: "appointment_reminder",
-              read: false,
+          if (!existingEmailLog) {
+            const res = await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${resendApiKey}`,
+              },
+              body: JSON.stringify({
+                from: "Clinic Notifications <onboarding@resend.dev>",
+                to: [normalizedEmail],
+                subject: "Upcoming Appointment Reminder",
+                html: `<p>${bodyText}</p>`,
+              }),
             });
 
-            if (!notifError) {
-              await supabase.from("appointment_reminder_log").insert({
-                appointment_id: appt.id,
-                tenant_id: appt.tenant_id,
-                notified_user_id: doctorUserId,
-                channel: "in_app",
-              });
-              notificationsCreated++;
+            if (!res.ok) {
+              throw new Error(await res.text());
+            }
+
+            await supabase.from("appointment_reminder_log").insert({
+              appointment_id: appt.id,
+              tenant_id: appt.tenant_id,
+              patient_email: normalizedEmail,
+              channel: "email",
+            });
+            emailsSent++;
+          }
+        }
+
+        if (reminder.channel === "whatsapp") {
+          if (!prefs.phone_e164 || !prefs.whatsapp_opt_in || !whatsappToken || !whatsappPhoneNumberId) {
+            throw new Error("WhatsApp not configured or patient not opted in");
+          }
+
+          const sent = await sendWhatsAppMessage(whatsappPhoneNumberId, whatsappToken, prefs.phone_e164, bodyText);
+          if (!sent) {
+            throw new Error("WhatsApp send failed");
+          }
+
+          await supabase.from("appointment_reminder_log").insert({
+            appointment_id: appt.id,
+            tenant_id: appt.tenant_id,
+            patient_phone: prefs.phone_e164,
+            channel: "whatsapp",
+          });
+          whatsappSent++;
+        }
+
+        if (reminder.channel === "in_app") {
+          const doctorUserId = doctor?.user_id ?? null;
+          if (doctorUserId) {
+            let allowInApp = preferenceCache.get(doctorUserId);
+            if (allowInApp === undefined) {
+              const { data: prefData } = await supabase
+                .from("notification_preferences")
+                .select("appointment_reminders")
+                .eq("user_id", doctorUserId)
+                .maybeSingle();
+              allowInApp = prefData?.appointment_reminders ?? true;
+              preferenceCache.set(doctorUserId, allowInApp);
+            }
+
+            if (allowInApp) {
+              const { data: existingInAppLog } = await supabase
+                .from("appointment_reminder_log")
+                .select("id")
+                .eq("appointment_id", appt.id)
+                .eq("channel", "in_app")
+                .eq("notified_user_id", doctorUserId)
+                .maybeSingle();
+
+              if (!existingInAppLog) {
+                const { error: notifError } = await supabase.from("notifications").insert({
+                  tenant_id: appt.tenant_id,
+                  user_id: doctorUserId,
+                  title: "Upcoming Appointment Reminder",
+                  body: bodyText,
+                  type: "appointment_reminder",
+                  read: false,
+                });
+
+                if (!notifError) {
+                  await supabase.from("appointment_reminder_log").insert({
+                    appointment_id: appt.id,
+                    tenant_id: appt.tenant_id,
+                    notified_user_id: doctorUserId,
+                    channel: "in_app",
+                  });
+                  notificationsCreated++;
+                }
+              }
             }
           }
         }
-      }
 
-      const normalizedEmail = patient?.email?.trim().toLowerCase() ?? null;
-      if (!normalizedEmail || !resendApiKey) {
-        continue;
-      }
-
-      const { data: existingEmailLog } = await supabase
-        .from("appointment_reminder_log")
-        .select("id")
-        .eq("appointment_id", appt.id)
-        .eq("channel", "email")
-        .eq("patient_email", normalizedEmail)
-        .maybeSingle();
-
-      if (existingEmailLog) {
-        continue;
-      }
-
-      try {
-        const res = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${resendApiKey}`,
-          },
-          body: JSON.stringify({
-            from: "Clinic Notifications <onboarding@resend.dev>",
-            to: [normalizedEmail],
-            subject: "Upcoming Appointment Reminder",
-            html: `<p>${bodyText}</p>`,
-          }),
-        });
-
-        if (!res.ok) {
-          logError("appointment_reminder_email_failed", {
-            request_id: requestId,
-            action_type: "appointment_reminders",
-            resource_type: "appointment",
-            metadata: { error: await res.text() },
-          });
-          continue;
-        }
-
-        await supabase.from("appointment_reminder_log").insert({
-          appointment_id: appt.id,
-          tenant_id: appt.tenant_id,
-          patient_email: normalizedEmail,
-          channel: "email",
-        });
-        emailsSent++;
+        await supabase
+          .from("reminder_queue")
+          .update({ status: "sent", error_message: null, next_attempt_at: null })
+          .eq("id", reminder.id);
       } catch (err) {
-        logError("appointment_reminder_email_exception", {
-          request_id: requestId,
-          action_type: "appointment_reminders",
-          resource_type: "appointment",
-          metadata: { error: err instanceof Error ? err.message : String(err) },
-        });
+        const attempts = (reminder.attempts ?? 0) + 1;
+        const nextAttemptAt = new Date(Date.now() + attempts * 5 * 60 * 1000).toISOString();
+        const isDead = attempts >= MAX_ATTEMPTS;
+        await supabase
+          .from("reminder_queue")
+          .update({
+            attempts,
+            status: isDead ? "failed" : "pending",
+            error_message: err instanceof Error ? err.message : String(err),
+            next_attempt_at: isDead ? null : nextAttemptAt,
+          })
+          .eq("id", reminder.id);
       }
     }
 
@@ -210,6 +360,7 @@ Deno.serve(async (req) => {
         checked: appointments.length,
         notificationsCreated,
         emailsSent,
+        whatsappSent,
       }),
       {
         status: 200,

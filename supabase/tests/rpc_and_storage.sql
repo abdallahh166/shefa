@@ -38,7 +38,7 @@ values
 
 insert into public.insurance_claims (tenant_id, patient_id, provider, service, amount, status)
 values
-  ('00000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000001111', 'InsureCo', 'Visit', 150, 'pending'),
+  ('00000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000001111', 'InsureCo', 'Visit', 150, 'submitted'),
   ('00000000-0000-0000-0000-000000000022', '00000000-0000-0000-0000-000000002222', 'OtherInsure', 'Visit', 200, 'approved');
 
 insert into storage.objects (bucket_id, name, owner)

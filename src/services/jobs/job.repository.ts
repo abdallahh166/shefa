@@ -1,18 +1,48 @@
 import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
+import { getTenantContext } from "@/services/supabase/tenant";
 
 export interface JobRepository {
+  enqueue(functionName: string, payload: Record<string, unknown>): Promise<void>;
   invoke(functionName: string, payload: Record<string, unknown>): Promise<void>;
 }
 
-export const jobRepository: JobRepository = {
-  async invoke(functionName, payload) {
-    const { error } = await supabase.functions.invoke(functionName, {
-      body: payload,
-    });
+async function enqueueJob(functionName: string, payload: Record<string, unknown>) {
+    const { tenantId } = getTenantContext();
+    const resolvedTenantId =
+      (payload as { tenant_id?: string; tenantId?: string })?.tenant_id ??
+      (payload as { tenantId?: string })?.tenantId ??
+      tenantId;
+
+    const { data, error } = await supabase
+      .from("jobs")
+      .insert({
+        tenant_id: resolvedTenantId,
+        type: functionName,
+        payload,
+      })
+      .select("id")
+      .single();
 
     if (error) {
-      throw new ServiceError(error.message ?? "Failed to invoke job", { code: error.code, details: error });
+      throw new ServiceError(error.message ?? "Failed to enqueue job", { code: error.code, details: error });
     }
-  },
+
+    if (data?.id) {
+      const { error: invokeError } = await supabase.functions.invoke("job-worker", {
+        body: { job_id: data.id },
+      });
+      if (invokeError) {
+        // Keep the job in the queue; worker can pick it up later.
+        throw new ServiceError(invokeError.message ?? "Failed to trigger job worker", {
+          code: invokeError.code,
+          details: invokeError,
+        });
+      }
+    }
+}
+
+export const jobRepository: JobRepository = {
+  enqueue: enqueueJob,
+  invoke: enqueueJob,
 };

@@ -13,6 +13,15 @@ import { toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { insuranceRepository } from "./insurance.repository";
 
+const ALLOWED_STATUS_TRANSITIONS: Record<string, string[]> = {
+  draft: ["submitted"],
+  submitted: ["processing"],
+  processing: ["approved", "denied"],
+  approved: ["reimbursed"],
+  denied: [],
+  reimbursed: [],
+};
+
 export const insuranceService = {
   async listPaged(params: InsuranceClaimListParams) {
     try {
@@ -62,7 +71,29 @@ export const insuranceService = {
       const parsedId = uuidSchema.parse(id);
       const parsed = insuranceClaimUpdateSchema.parse(input);
       const { tenantId } = getTenantContext();
-      const result = await insuranceRepository.update(parsedId, parsed, tenantId);
+      const updates: InsuranceClaimUpdateInput = { ...parsed };
+      if (updates.status) {
+        const current = await insuranceRepository.getById(parsedId, tenantId);
+        if (current.status !== updates.status) {
+          const allowed = ALLOWED_STATUS_TRANSITIONS[current.status] ?? [];
+          if (!allowed.includes(updates.status)) {
+            throw new Error(`Invalid insurance claim status transition: ${current.status} -> ${updates.status}`);
+          }
+        }
+
+        const now = new Date().toISOString();
+        if (updates.status === "submitted" && !updates.submitted_at) {
+          updates.submitted_at = now;
+        }
+        if (updates.status === "approved" && !updates.approved_at) {
+          updates.approved_at = now;
+        }
+        if (updates.status === "reimbursed" && !updates.reimbursed_at) {
+          updates.reimbursed_at = now;
+        }
+      }
+
+      const result = await insuranceRepository.update(parsedId, updates, tenantId);
       return insuranceClaimSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to update insurance claim");

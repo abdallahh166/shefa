@@ -111,6 +111,13 @@ Pull remote schema (read-only check)
    `supabase db pull`
 2. This generates a schema dump from remote for comparison.
 
+Run DB tests (remote)
+1. Install the PostgreSQL client tools so `psql` is available.
+2. Set the remote connection string in your environment:
+   `SUPABASE_DB_URL="postgresql://..."`
+3. Run:
+   `npm run test:db:remote`
+
 Remote Studio
 - Use the Supabase web dashboard for the remote project.
 - Use it to monitor data, logs, and manage settings.

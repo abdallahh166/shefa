@@ -12,7 +12,7 @@ import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
 
 const CLAIM_COLUMNS =
-  "id, tenant_id, patient_id, provider, service, amount, claim_date, status, deleted_at, deleted_by, created_at, updated_at";
+  "id, tenant_id, patient_id, provider, service, amount, claim_date, status, submitted_at, approved_at, reimbursed_at, payer_reference, deleted_at, deleted_by, created_at, updated_at";
 const CLAIM_WITH_PATIENT_COLUMNS = `${CLAIM_COLUMNS}, patients(full_name)`;
 
 const SEARCH_COLUMNS = ["provider", "service", "status"];
@@ -32,6 +32,7 @@ export interface InsuranceRepository {
   listPaged(params: InsuranceClaimListParams, tenantId: string): Promise<PagedResult<InsuranceClaim>>;
   listPagedWithRelations(params: InsuranceClaimListParams, tenantId: string): Promise<PagedResult<InsuranceClaimWithPatient>>;
   getSummary(tenantId: string): Promise<InsuranceSummary>;
+  getById(id: string, tenantId: string): Promise<InsuranceClaim>;
   create(input: InsuranceClaimCreateInput, tenantId: string): Promise<InsuranceClaim>;
   update(id: string, input: InsuranceClaimUpdateInput, tenantId: string): Promise<InsuranceClaim>;
   archive(id: string, tenantId: string, userId: string): Promise<InsuranceClaim>;
@@ -142,11 +143,24 @@ export const insuranceRepository: InsuranceRepository = {
 
     return ((data as any)?.[0] ?? {
       total_count: 0,
-      pending_count: 0,
+      draft_count: 0,
+      submitted_count: 0,
+      processing_count: 0,
       approved_count: 0,
-      rejected_count: 0,
+      denied_count: 0,
+      reimbursed_count: 0,
       providers_count: 0,
     }) as InsuranceSummary;
+  },
+  async getById(id, tenantId) {
+    const result = await supabase
+      .from("insurance_claims")
+      .select(CLAIM_COLUMNS)
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
+      .single();
+    return assertOk(result) as InsuranceClaim;
   },
   async create(input, tenantId) {
     const payload: Record<string, unknown> = {
@@ -159,6 +173,10 @@ export const insuranceRepository: InsuranceRepository = {
 
     if (input.claim_date !== undefined) payload.claim_date = input.claim_date;
     if (input.status !== undefined) payload.status = input.status;
+    if (input.submitted_at !== undefined) payload.submitted_at = input.submitted_at;
+    if (input.approved_at !== undefined) payload.approved_at = input.approved_at;
+    if (input.reimbursed_at !== undefined) payload.reimbursed_at = input.reimbursed_at;
+    if (input.payer_reference !== undefined) payload.payer_reference = input.payer_reference;
 
     const result = await supabase
       .from("insurance_claims")
@@ -177,6 +195,10 @@ export const insuranceRepository: InsuranceRepository = {
     if (input.amount !== undefined) payload.amount = input.amount;
     if (input.claim_date !== undefined) payload.claim_date = input.claim_date;
     if (input.status !== undefined) payload.status = input.status;
+    if (input.submitted_at !== undefined) payload.submitted_at = input.submitted_at;
+    if (input.approved_at !== undefined) payload.approved_at = input.approved_at;
+    if (input.reimbursed_at !== undefined) payload.reimbursed_at = input.reimbursed_at;
+    if (input.payer_reference !== undefined) payload.payer_reference = input.payer_reference;
 
     if (Object.keys(payload).length === 0) {
       const result = await supabase

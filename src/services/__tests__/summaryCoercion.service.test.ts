@@ -78,18 +78,24 @@ describe("summary coercion", () => {
   it("coerces insurance summary numeric strings", async () => {
     insuranceRepo.getSummary.mockResolvedValue({
       total_count: "8",
-      pending_count: "2",
-      approved_count: "5",
-      rejected_count: "1",
+      draft_count: "2",
+      submitted_count: "1",
+      processing_count: "1",
+      approved_count: "3",
+      denied_count: "1",
+      reimbursed_count: "0",
       providers_count: "3",
     } as any);
 
     const result = await insuranceService.getSummary();
 
     expect(result.total_count).toBe(8);
-    expect(result.pending_count).toBe(2);
-    expect(result.approved_count).toBe(5);
-    expect(result.rejected_count).toBe(1);
+    expect(result.draft_count).toBe(2);
+    expect(result.submitted_count).toBe(1);
+    expect(result.processing_count).toBe(1);
+    expect(result.approved_count).toBe(3);
+    expect(result.denied_count).toBe(1);
+    expect(result.reimbursed_count).toBe(0);
     expect(result.providers_count).toBe(3);
   });
 });

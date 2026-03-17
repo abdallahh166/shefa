@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+﻿import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enforceCors, getAllowedOriginsFromEnv, buildRedirectUrl } from "../_shared/cors.ts";
 import { verifyCaptcha } from "../_shared/captcha.ts";
 import { initSentry } from "../_shared/sentry.ts";
@@ -18,41 +18,6 @@ function slugify(value: string) {
 
 function isValidSlug(value: string) {
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
-}
-
-async function sendVerificationEmail(
-  apiKey: string,
-  to: string,
-  actionLink: string,
-  clinicName: string,
-  fullName: string,
-) {
-  const subject = "Confirm your clinic account";
-  const html = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-      <h2>Welcome to ${clinicName}</h2>
-      <p>Hi ${fullName},</p>
-      <p>Please confirm your email address to activate your clinic account.</p>
-      <p><a href="${actionLink}" target="_blank" rel="noreferrer">Verify your email</a></p>
-      <p>If you did not request this, you can ignore this email.</p>
-    </div>
-  `;
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: "Clinic Onboarding <onboarding@resend.dev>",
-      to: [to],
-      subject,
-      html,
-    }),
-  });
-
-  return res.ok;
 }
 
 // --- Durable rate limiter (DB-backed) ---
@@ -93,12 +58,11 @@ Deno.serve(async (req) => {
   });
 
   try {
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
+    const client = createClient(supabaseUrl, anonKey);
 
-    const { data: allowed, error: rateError } = await adminClient.rpc(
+    const { data: allowed, error: rateError } = await client.rpc(
       "check_rate_limit",
       {
         _key: `register-clinic:${clientIp}`,
@@ -164,7 +128,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: emailAllowed, error: emailRateError } = await adminClient.rpc(
+    const { data: emailAllowed, error: emailRateError } = await client.rpc(
       "check_rate_limit",
       {
         _key: `register-clinic-email:${normalizedEmail}`,
@@ -234,113 +198,71 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: tenant, error: tenantErr } = await adminClient
-      .from("tenants")
-      .insert({ name: normalizedClinicName, slug, pending_owner_email: normalizedEmail })
-      .select("id")
-      .single();
-
-    if (tenantErr || !tenant?.id) {
-      let errorMessage = "Failed to create clinic";
-
-      // Check for duplicate slug constraint violation
-      if (tenantErr?.message?.includes("slug") || tenantErr?.code === "23505") {
-        errorMessage =
-          "A clinic with this name already exists. Please choose a different name.";
-      }
-
-      return new Response(JSON.stringify({ error: errorMessage }), {
-        status: 400,
-        headers: baseHeaders,
-      });
-    }
-
-    const { error: subErr } = await adminClient.from("subscriptions").upsert(
-      {
-        tenant_id: tenant.id,
-        plan: "free",
-        status: "active",
-        amount: 0,
-        currency: "EGP",
-        billing_cycle: "monthly",
-      },
-      { onConflict: "tenant_id", ignoreDuplicates: true },
+    const { data: isAvailable, error: availError } = await client.rpc(
+      "is_tenant_slug_available",
+      { _slug: slug },
     );
 
-    if (subErr) {
-      await adminClient.from("tenants").delete().eq("id", tenant.id);
+    if (availError) {
+      throw availError;
+    }
+
+    if (!isAvailable) {
       return new Response(
-        JSON.stringify({ error: "Failed to initialize subscription" }),
-        {
-          status: 400,
-          headers: baseHeaders,
-        },
+        JSON.stringify({ error: "A clinic with this name already exists. Please choose a different name." }),
+        { status: 400, headers: baseHeaders },
       );
     }
 
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    if (!resendApiKey) {
-      await adminClient.from("tenants").delete().eq("id", tenant.id);
-      return new Response(JSON.stringify({ error: "Email provider not configured" }), {
-        status: 500,
+    const { data: tenantId, error: tenantErr } = await client.rpc(
+      "create_tenant_for_signup",
+      { _name: normalizedClinicName, _slug: slug, _owner_email: normalizedEmail },
+    );
+
+    if (tenantErr || !tenantId) {
+      return new Response(JSON.stringify({ error: tenantErr?.message ?? "Failed to create clinic" }), {
+        status: 400,
         headers: baseHeaders,
       });
     }
 
     const redirectTo = buildRedirectUrl(req, "/login", allowedOrigins);
 
-    const { data: linkData, error: linkErr } = await adminClient.auth.admin.generateLink({
-      type: "signup",
+    const { data: signUpData, error: signUpErr } = await client.auth.signUp({
       email: normalizedEmail,
       password: passwordStr,
       options: {
         data: {
           full_name: normalizedFullName,
-          tenant_id: tenant.id,
+          tenant_id: tenantId,
         },
-        redirectTo,
+        emailRedirectTo: redirectTo,
       },
     });
 
-    if (linkErr || !linkData?.action_link) {
-      await adminClient.from("tenants").delete().eq("id", tenant.id);
-      return new Response(JSON.stringify({ error: linkErr?.message ?? "Failed to create user" }), {
+    if (signUpErr) {
+      await client.rpc("cancel_tenant_signup", {
+        _tenant_id: tenantId,
+        _owner_email: normalizedEmail,
+      });
+      return new Response(JSON.stringify({ error: signUpErr.message ?? "Failed to create user" }), {
         status: 400,
         headers: baseHeaders,
       });
     }
 
-    const emailSent = await sendVerificationEmail(
-      resendApiKey,
-      normalizedEmail,
-      linkData.action_link,
-      normalizedClinicName,
-      normalizedFullName,
-    );
-
-    if (!emailSent) {
-      if (linkData?.user?.id) {
-        await adminClient.auth.admin.deleteUser(linkData.user.id);
-      }
-      await adminClient.from("tenants").delete().eq("id", tenant.id);
-      return new Response(JSON.stringify({ error: "Failed to send verification email" }), {
-        status: 502,
-        headers: baseHeaders,
-      });
-    }
-
-    // Audit log
-    await adminClient.rpc("log_audit_event", {
-      _tenant_id: tenant.id,
-      _user_id: linkData?.user?.id ?? "00000000-0000-0000-0000-000000000000",
+    // Best-effort audit log
+    await client.rpc("log_audit_event", {
+      _tenant_id: tenantId,
+      _user_id: signUpData.user?.id ?? "00000000-0000-0000-0000-000000000000",
       _action: "clinic_created",
       _entity_type: "tenant",
-      _entity_id: tenant.id,
+      _entity_id: tenantId,
       _details: { clinic_name: normalizedClinicName, owner_email: normalizedEmail },
-    });
+    }).catch(() => undefined);
 
     return new Response(
-      JSON.stringify({ success: true, tenant_id: tenant.id, slug }),
+      JSON.stringify({ success: true, tenant_id: tenantId, slug }),
       {
         status: 200,
         headers: baseHeaders,

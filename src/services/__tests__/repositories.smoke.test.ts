@@ -50,6 +50,11 @@ function createQueryBuilder() {
   return builder;
 }
 
+const mockTenant = vi.hoisted(() => ({
+  tenantId: "00000000-0000-0000-0000-000000000111",
+  userId: "00000000-0000-0000-0000-000000000222",
+}));
+
 const mockSupabase = vi.hoisted(() => ({
   from: vi.fn(() => createQueryBuilder()),
   rpc: vi.fn(async () => mockState.responseRpc),
@@ -85,6 +90,9 @@ const mockSupabase = vi.hoisted(() => ({
 }));
 
 vi.mock("@/services/supabase/client", () => ({ supabase: mockSupabase }));
+vi.mock("@/services/supabase/tenant", () => ({
+  getTenantContext: () => ({ tenantId: mockTenant.tenantId, userId: mockTenant.userId }),
+}));
 
 import { adminRepository } from "@/services/admin/admin.repository";
 import { appointmentRepository } from "@/services/appointments/appointment.repository";
@@ -120,8 +128,8 @@ import { userPreferencesRepository } from "@/services/settings/userPreferences.r
 import { settingsUsersRepository } from "@/services/settings/users.repository";
 import { subscriptionRepository } from "@/services/subscription/subscription.repository";
 
-const tenantId = "00000000-0000-0000-0000-000000000111";
-const userId = "00000000-0000-0000-0000-000000000222";
+const tenantId = mockTenant.tenantId;
+const userId = mockTenant.userId;
 const recordId = "00000000-0000-0000-0000-000000000333";
 
 describe("repositories smoke", () => {
@@ -342,7 +350,7 @@ describe("repositories smoke", () => {
       page: 1,
       pageSize: 10,
       search: "claim",
-      filters: { status: "pending", patient_id: recordId },
+      filters: { status: "draft", patient_id: recordId },
       sort: { column: "claim_date", ascending: true } as any,
     }, tenantId);
     await insuranceRepository.listPaged({ page: 1, pageSize: 5 }, tenantId);
@@ -360,7 +368,7 @@ describe("repositories smoke", () => {
       service: "Service",
       amount: 100,
       claim_date: "2026-03-10",
-      status: "pending",
+      status: "draft",
     }, tenantId);
     await insuranceRepository.create({
       patient_id: recordId,
@@ -384,7 +392,7 @@ describe("repositories smoke", () => {
       service: "Updated Service",
       amount: 140,
       claim_date: "2026-03-18",
-      status: "rejected",
+      status: "denied",
     }, tenantId);
     await insuranceRepository.archive(recordId, tenantId, userId);
     await insuranceRepository.restore(recordId, tenantId);

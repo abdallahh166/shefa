@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+﻿import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enforceCors, getAllowedOriginsFromEnv } from "../_shared/cors.ts";
 import { verifyCaptcha } from "../_shared/captcha.ts";
 import { initSentry } from "../_shared/sentry.ts";
@@ -21,7 +21,7 @@ const RATE_LIMIT_WINDOW_SECONDS = 60; // 1 minute
 const RATE_LIMIT_MAX = 10; // max requests per IP per window
 
 async function findAvailableSlugs(
-  adminClient: ReturnType<typeof createClient>,
+  client: ReturnType<typeof createClient>,
   baseSlug: string,
 ): Promise<string[]> {
   const candidates: string[] = [];
@@ -32,13 +32,9 @@ async function findAvailableSlugs(
     candidates.push(`${baseSlug}-${i}`);
   }
 
-  const { data: existing } = await adminClient
-    .from("tenants")
-    .select("slug")
-    .in("slug", candidates);
-
-  const takenSet = new Set((existing ?? []).map((r: { slug: string }) => r.slug));
-  return candidates.filter((c) => !takenSet.has(c)).slice(0, 4);
+  const { data } = await client.rpc("filter_available_tenant_slugs", { _slugs: candidates });
+  const available = Array.isArray(data) ? (data as string[]) : [];
+  return available.slice(0, 4);
 }
 
 Deno.serve(async (req) => {
@@ -74,12 +70,12 @@ Deno.serve(async (req) => {
   });
 
   try {
-    const adminClient = createClient(
+    const client = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!,
     );
 
-    const { data: allowed, error: rateError } = await adminClient.rpc(
+    const { data: allowed, error: rateError } = await client.rpc(
       "check_rate_limit",
       {
         _key: `check-slug:${clientIp}`,
@@ -154,16 +150,19 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { data } = await adminClient
-      .from("tenants")
-      .select("id")
-      .eq("slug", slugToCheck)
-      .maybeSingle();
+    const { data: isAvailable, error: availError } = await client.rpc(
+      "is_tenant_slug_available",
+      { _slug: slugToCheck },
+    );
 
-    if (data) {
+    if (availError) {
+      throw availError;
+    }
+
+    if (!isAvailable) {
       // Slug is taken — generate suggestions
       const baseSlug = customSlug ? slugToCheck : slugify(String(clinicName).trim());
-      const suggestions = await findAvailableSlugs(adminClient, baseSlug);
+      const suggestions = await findAvailableSlugs(client, baseSlug);
       return new Response(
         JSON.stringify({ available: false, slug: slugToCheck, suggestions }),
         { status: 200, headers: baseHeaders },

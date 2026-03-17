@@ -62,6 +62,7 @@
     calendar: "تقويم",
     start: "بدء",
     complete: "إكمال",
+    joinCall: "انضم للمكالمة",
     approve: "موافقة",
     reject: "رفض",
     remove: "إزالة",
@@ -279,6 +280,11 @@
     approvalRate: "معدل الموافقة",
     approved: "موافق عليها",
     rejected: "مرفوضة",
+    draft: "مسودة",
+    submitted: "مُرسلة",
+    processing: "قيد المعالجة",
+    denied: "مرفوضة",
+    reimbursed: "تم السداد",
     claimSubmitted: "تم إرسال المطالبة",
   },
   reports: {
@@ -563,5 +569,3 @@
     footerCopy: "© 2026 MedFlow. جميع الحقوق محفوظة.",
   },
 };
-
-

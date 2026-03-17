@@ -14,6 +14,12 @@ vi.mock("@/services/patients/patient.repository", () => ({
   },
 }));
 
+vi.mock("@/services/events/domainEvent.repository", () => ({
+  domainEventRepository: {
+    insert: vi.fn(),
+  },
+}));
+
 vi.mock("@/services/supabase/tenant", () => ({
   getTenantContext: () => ({
     tenantId: "00000000-0000-0000-0000-000000000111",

@@ -38,7 +38,7 @@ const settingsUsersRepository = vi.hoisted(() => ({ listProfilesWithRolesPaged: 
 const subscriptionRepository = vi.hoisted(() => ({ getByTenant: vi.fn() }));
 const clientErrorLogRepository = vi.hoisted(() => ({ insert: vi.fn() }));
 const realtimeRepository = vi.hoisted(() => ({ subscribeToTenantTables: vi.fn() }));
-const jobRepository = vi.hoisted(() => ({ invoke: vi.fn() }));
+const jobRepository = vi.hoisted(() => ({ invoke: vi.fn(), enqueue: vi.fn() }));
 
 vi.mock("@/core/env/env", () => ({
   env: {
@@ -252,6 +252,7 @@ describe("services smoke", () => {
     clientErrorLogRepository.insert.mockResolvedValue(undefined);
     realtimeRepository.subscribeToTenantTables.mockReturnValue({ unsubscribe: vi.fn() });
     jobRepository.invoke.mockResolvedValue(undefined);
+    jobRepository.enqueue.mockResolvedValue(undefined);
   });
 
   it("executes key service flows", async () => {

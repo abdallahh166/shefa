@@ -6,12 +6,13 @@ import { StatusFilter } from "@/shared/components/StatusFilter";
 import { Button } from "@/components/primitives/Button";
 import { PermissionGuard } from "@/core/auth/PermissionGuard";
 import { PageContainer, SectionHeader } from "@/components/layout/AppLayout";
-import { CalendarPlus, CheckCircle, XCircle, Play, CalendarDays, List } from "lucide-react";
+import { CalendarPlus, CheckCircle, XCircle, Play, CalendarDays, List, Video } from "lucide-react";
 import { formatDate } from "@/shared/utils/formatDate";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { useAuth } from "@/core/auth/authStore";
 import { NewAppointmentModal } from "./NewAppointmentModal";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { AppointmentCalendar, AppointmentCalendarItem, AppointmentCalendarView } from "./AppointmentCalendar";
 import { appointmentService } from "@/services/appointments/appointment.service";
@@ -56,6 +57,7 @@ export const AppointmentsPage = () => {
   const { t, locale, calendarType } = useI18n();
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const canManage = hasPermission("manage_appointments");
 
   const [showModal, setShowModal] = useState(false);
@@ -186,6 +188,11 @@ export const AppointmentsPage = () => {
     }
   };
 
+  const handleJoinCall = (id: string) => {
+    if (!user?.tenantSlug) return;
+    navigate(`/tenant/${user.tenantSlug}/appointments/${id}/video`);
+  };
+
   const columns: Column<(typeof listDisplayData)[0]>[] = [
     {
       key: "patient_name",
@@ -222,6 +229,16 @@ export const AppointmentsPage = () => {
         a.status === "scheduled" ? (
           <div className="flex gap-1">
             <Button
+              onClick={() => handleJoinCall(a.id)}
+              variant="ghost"
+              size="icon-sm"
+              className="text-primary hover:bg-primary/10"
+              title={t("common.joinCall") ?? "Join Call"}
+              aria-label={t("common.joinCall") ?? "Join Call"}
+            >
+              <Video className="h-3.5 w-3.5" />
+            </Button>
+            <Button
               onClick={() => handleUpdateStatus(a.id, "in_progress")}
               variant="ghost"
               size="icon-sm"
@@ -243,16 +260,28 @@ export const AppointmentsPage = () => {
             </Button>
           </div>
         ) : a.status === "in_progress" ? (
-          <Button
-            onClick={() => handleUpdateStatus(a.id, "completed")}
-            variant="ghost"
-            size="icon-sm"
-            className="text-success hover:bg-success/10"
-            title={t("common.complete")}
-            aria-label={t("common.complete")}
-          >
-            <CheckCircle className="h-3.5 w-3.5" />
-          </Button>
+          <div className="flex gap-1">
+            <Button
+              onClick={() => handleJoinCall(a.id)}
+              variant="ghost"
+              size="icon-sm"
+              className="text-primary hover:bg-primary/10"
+              title={t("common.joinCall") ?? "Join Call"}
+              aria-label={t("common.joinCall") ?? "Join Call"}
+            >
+              <Video className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              onClick={() => handleUpdateStatus(a.id, "completed")}
+              variant="ghost"
+              size="icon-sm"
+              className="text-success hover:bg-success/10"
+              title={t("common.complete")}
+              aria-label={t("common.complete")}
+            >
+              <CheckCircle className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         ) : null,
     },
   ];

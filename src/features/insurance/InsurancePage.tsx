@@ -17,7 +17,14 @@ import { insuranceService } from "@/services/insurance/insurance.service";
 import { queryKeys } from "@/services/queryKeys";
 import type { InsuranceClaimWithPatient } from "@/domain/insurance/insurance.types";
 
-const statusVariant: Record<string, "success" | "warning" | "destructive"> = { approved: "success", pending: "warning", rejected: "destructive" };
+const statusVariant: Record<string, "success" | "warning" | "destructive" | "info" | "default"> = {
+  draft: "default",
+  submitted: "info",
+  processing: "warning",
+  approved: "success",
+  denied: "destructive",
+  reimbursed: "success",
+};
 
 type ClaimRow = InsuranceClaimWithPatient;
 
@@ -28,7 +35,7 @@ type ClaimDisplayRow = {
   service: string;
   amount: number;
   claim_date: string;
-  status: "approved" | "pending" | "rejected";
+  status: "draft" | "submitted" | "processing" | "approved" | "denied" | "reimbursed";
 };
 
 export const InsurancePage = () => {
@@ -70,7 +77,16 @@ export const InsurancePage = () => {
     setPage(1);
   }, [statusFilter, searchTerm]);
 
-  const { data: insuranceSummary = { total_count: 0, pending_count: 0, approved_count: 0, rejected_count: 0, providers_count: 0 } } = useQuery({
+  const { data: insuranceSummary = {
+    total_count: 0,
+    draft_count: 0,
+    submitted_count: 0,
+    processing_count: 0,
+    approved_count: 0,
+    denied_count: 0,
+    reimbursed_count: 0,
+    providers_count: 0,
+  } } = useQuery({
     queryKey: queryKeys.insurance.summary(user?.tenantId),
     enabled: !!user?.tenantId,
     queryFn: async () => insuranceService.getSummary(),
@@ -90,7 +106,7 @@ export const InsurancePage = () => {
   }));
 
   const total = totalClaims;
-  const pending = insuranceSummary.pending_count;
+  const pending = insuranceSummary.submitted_count + insuranceSummary.processing_count;
   const approved = insuranceSummary.approved_count;
   const providerCount = insuranceSummary.providers_count;
   const totalCount = insuranceSummary.total_count;
@@ -100,10 +116,15 @@ export const InsurancePage = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.insurance.root(user?.tenantId) });
   };
 
-  const handleUpdateStatus = async (id: string, newStatus: string) => {
+  const handleUpdateStatus = async (id: string, newStatus: ClaimDisplayRow["status"]) => {
     try {
-      await insuranceService.update(id, { status: newStatus as ClaimDisplayRow["status"] });
-      toast({ title: newStatus === "approved" ? t("insurance.approved") : t("insurance.rejected") });
+      await insuranceService.update(id, { status: newStatus });
+      const title =
+        newStatus === "approved" ? t("insurance.approved") :
+        newStatus === "denied" ? t("insurance.denied") :
+        newStatus === "reimbursed" ? t("insurance.reimbursed") :
+        t("insurance.claimSubmitted");
+      toast({ title });
       invalidateClaims();
     } catch (err) {
       const message = err instanceof Error ? err.message : t("common.error");
@@ -113,8 +134,11 @@ export const InsurancePage = () => {
 
   const getClaimStatusLabel = (status: string) => {
     if (status === "approved") return t("insurance.approved");
-    if (status === "rejected") return t("insurance.rejected");
-    if (status === "pending") return t("billing.pending");
+    if (status === "denied") return t("insurance.denied");
+    if (status === "reimbursed") return t("insurance.reimbursed");
+    if (status === "submitted") return t("insurance.submitted");
+    if (status === "processing") return t("insurance.processing");
+    if (status === "draft") return t("insurance.draft");
     return status;
   };
 
@@ -128,7 +152,29 @@ export const InsurancePage = () => {
     {
       key: "actions",
       header: t("common.actions"),
-      render: (c) => c.status === "pending" ? (
+      render: (c) => c.status === "draft" ? (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => handleUpdateStatus(c.id, "submitted")}
+          className="text-info hover:text-info"
+          aria-label={t("insurance.submitted")}
+          title={t("insurance.submitted")}
+        >
+          <CheckCircle className="h-4 w-4" />
+        </Button>
+      ) : c.status === "submitted" ? (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => handleUpdateStatus(c.id, "processing")}
+          className="text-warning hover:text-warning"
+          aria-label={t("insurance.processing")}
+          title={t("insurance.processing")}
+        >
+          <CheckCircle className="h-4 w-4" />
+        </Button>
+      ) : c.status === "processing" ? (
         <div className="flex gap-1">
           <Button
             variant="ghost"
@@ -143,7 +189,7 @@ export const InsurancePage = () => {
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={() => handleUpdateStatus(c.id, "rejected")}
+            onClick={() => handleUpdateStatus(c.id, "denied")}
             className="text-destructive hover:text-destructive"
             aria-label={t("common.reject")}
             title={t("common.reject")}
@@ -151,6 +197,17 @@ export const InsurancePage = () => {
             <XCircle className="h-4 w-4" />
           </Button>
         </div>
+      ) : c.status === "approved" ? (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => handleUpdateStatus(c.id, "reimbursed")}
+          className="text-success hover:text-success"
+          aria-label={t("insurance.reimbursed")}
+          title={t("insurance.reimbursed")}
+        >
+          <CheckCircle className="h-4 w-4" />
+        </Button>
       ) : null,
     },
   ];
@@ -192,9 +249,12 @@ export const InsurancePage = () => {
         filterSlot={
           <StatusFilter
             options={[
+              { value: "draft", label: t("insurance.draft") },
+              { value: "submitted", label: t("insurance.submitted") },
+              { value: "processing", label: t("insurance.processing") },
               { value: "approved", label: t("insurance.approved") },
-              { value: "pending", label: t("billing.pending") },
-              { value: "rejected", label: t("insurance.rejected") },
+              { value: "denied", label: t("insurance.denied") },
+              { value: "reimbursed", label: t("insurance.reimbursed") },
             ]}
             selected={statusFilter}
             onChange={setStatusFilter}
