@@ -1,27 +1,13 @@
 ﻿import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enforceCors, getAllowedOriginsFromEnv } from "../_shared/cors.ts";
 import { initSentry } from "../_shared/sentry.ts";
-import { logError, logInfo, logWarn } from "../_shared/logger.ts";
+import { logError, logInfo, logWarn, persistSystemLog } from "../_shared/logger.ts";
 import { createRequestId } from "../_shared/request.ts";
 import { requireAdmin } from "../_shared/auth.ts";
 
 const allowedOrigins = getAllowedOriginsFromEnv();
 
 const DEFAULT_BATCH_SIZE = 10;
-
-async function logSystemEvent(
-  adminClient: ReturnType<typeof createClient>,
-  level: "info" | "warn" | "error",
-  message: string,
-  metadata?: Record<string, unknown>,
-) {
-  await adminClient.from("system_logs").insert({
-    level,
-    service: "job-worker",
-    message,
-    metadata: metadata ?? {},
-  });
-}
 
 Deno.serve(async (req) => {
   initSentry();
@@ -134,10 +120,16 @@ Deno.serve(async (req) => {
           .update({ status: "completed", locked_at: null, locked_by: null })
           .eq("id", job.id);
 
-        await logSystemEvent(adminClient, "info", "job_completed", {
-          job_id: job.id,
-          job_type: job.type,
+        await persistSystemLog(adminClient, "job-worker", "info", "job_completed", {
+          request_id: requestId,
           tenant_id: job.tenant_id,
+          user_id: userId ?? undefined,
+          action_type: "job_worker",
+          resource_type: "job",
+          metadata: {
+            job_id: job.id,
+            job_type: job.type,
+          },
         });
         processed += 1;
       } catch (err) {
@@ -158,12 +150,18 @@ Deno.serve(async (req) => {
           })
           .eq("id", job.id);
 
-        await logSystemEvent(adminClient, "error", "job_failed", {
-          job_id: job.id,
-          job_type: job.type,
+        await persistSystemLog(adminClient, "job-worker", "error", "job_failed", {
+          request_id: requestId,
           tenant_id: job.tenant_id,
-          attempts,
-          error: err instanceof Error ? err.message : String(err),
+          user_id: userId ?? undefined,
+          action_type: "job_worker",
+          resource_type: "job",
+          metadata: {
+            job_id: job.id,
+            job_type: job.type,
+            attempts,
+            error: err instanceof Error ? err.message : String(err),
+          },
         });
       }
     }
@@ -177,8 +175,15 @@ Deno.serve(async (req) => {
       metadata: { error: err instanceof Error ? err.message : String(err) },
     });
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
-    await logSystemEvent(adminClient, "error", "job_worker_failed", {
-      error: err instanceof Error ? err.message : String(err),
+    await persistSystemLog(adminClient, "job-worker", "error", "job_worker_failed", {
+      request_id: requestId,
+      tenant_id: tenantId ?? undefined,
+      user_id: userId ?? undefined,
+      action_type: "job_worker",
+      resource_type: "job",
+      metadata: {
+        error: err instanceof Error ? err.message : String(err),
+      },
     });
     logError("job_worker_failed", {
       request_id: requestId,

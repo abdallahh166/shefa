@@ -155,6 +155,7 @@ describe("repositories smoke", () => {
     await adminRepository.listProfilesWithRolesPaged({ limit: 10, offset: 0, search: "john" });
     await adminRepository.listSubscriptionsPaged({ limit: 10, offset: 0, search: "clinic", plan: "starter", status: "active" });
     await adminRepository.getSubscriptionStats();
+    await adminRepository.getOperationsAlertSummary();
     await adminRepository.updateSubscription(recordId, { plan: "pro" });
     await adminRepository.listTenantsPaged({ limit: 5, offset: 0 });
     await adminRepository.listTenantsPaged({ limit: 5, offset: 0, plan: "pro" });

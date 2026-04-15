@@ -12,6 +12,7 @@ import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import {
   Building2, Users, CreditCard, TrendingUp,
   BarChart3, LogOut, Eye, ChevronRight, Crown, HeartPulse,
+  Activity, AlertTriangle, Server,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -20,16 +21,24 @@ import { toast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/primitives/Inputs";
 import { adminService } from "@/services/admin/admin.service";
 import { adminImpersonationService } from "@/services/admin/adminImpersonation.service";
+import { isFreshAuthRequiredError } from "@/services/auth/recentAuth.service";
 import { queryKeys } from "@/services/queryKeys";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
+import { requestReauthentication } from "@/features/auth/reauthPrompt";
 
 type AdminTab = "overview" | "clinics" | "users" | "subscriptions";
 
 const PLAN_OPTIONS = ["free", "starter", "pro", "enterprise"] as const;
 const STATUS_OPTIONS = ["active", "trialing", "expired", "canceled"] as const;
 
+function updatePayloadFromAction(action: { field: "plan" | "status"; value: string }) {
+  return action.field === "plan"
+    ? { plan: action.value as "enterprise" | "free" | "pro" | "starter" }
+    : { status: action.value as "active" | "canceled" | "expired" | "trialing" };
+}
+
 export const AdminDashboardPage = () => {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -134,6 +143,14 @@ export const AdminDashboardPage = () => {
     queryFn: () => adminService.getSubscriptionStats(),
   });
 
+  const {
+    data: operationsAlerts,
+    isLoading: loadingOperationsAlerts,
+  } = useQuery({
+    queryKey: queryKeys.admin.operationsAlerts(),
+    queryFn: () => adminService.getOperationsAlerts(),
+  });
+
   const { data: recentTenantsResponse } = useQuery({
     queryKey: queryKeys.admin.tenants({ page: 1, pageSize: 5 }),
     queryFn: () => adminService.listTenantsPaged({ page: 1, pageSize: 5 }),
@@ -148,13 +165,32 @@ export const AdminDashboardPage = () => {
   const totalUsers = profilesResponse?.total ?? 0;
   const activeSubs = subscriptionStats?.active_count ?? 0;
   const totalRevenue = subscriptionStats?.total_revenue ?? 0;
+  const operationsSummary = operationsAlerts?.summary;
+  const operationsSeverityVariant =
+    operationsAlerts?.overall_severity === "critical"
+      ? "destructive"
+      : operationsAlerts?.overall_severity === "warning"
+        ? "warning"
+        : "success";
 
   const handleLogout = async () => {
     await logout();
     navigate("/login");
   };
 
-  const handleImpersonateTenant = async (tenant: { id: string; slug: string; name: string }) => {
+  const requestFreshAuth = async () => {
+    await requestReauthentication({
+      title: t("auth.reauthTitle"),
+      description: t("auth.reauthAdminActionDesc"),
+      actionLabel: t("auth.reauthAction"),
+      cancelLabel: t("common.cancel"),
+    });
+  };
+
+  const handleImpersonateTenant = async (
+    tenant: { id: string; slug: string; name: string },
+    allowRetry = true,
+  ) => {
     setImpersonatingTenantId(tenant.id);
     try {
       await adminImpersonationService.start(tenant);
@@ -164,6 +200,15 @@ export const AdminDashboardPage = () => {
       });
       navigate(`/tenant/${tenant.slug}/dashboard`);
     } catch (err: any) {
+      if (allowRetry && isFreshAuthRequiredError(err)) {
+        try {
+          await requestFreshAuth();
+          await handleImpersonateTenant(tenant, false);
+        } catch {
+          return;
+        }
+        return;
+      }
       toast({
         title: "Unable to open clinic",
         description: err?.message || "Failed to start impersonation",
@@ -176,18 +221,29 @@ export const AdminDashboardPage = () => {
 
   const handleSubUpdate = async () => {
     if (!confirmAction) return;
+    const action = confirmAction;
     setActionLoading(true);
     try {
-      const updatePayload =
-        confirmAction.field === "plan"
-          ? { plan: confirmAction.value as "enterprise" | "free" | "pro" | "starter" }
-          : { status: confirmAction.value as "active" | "canceled" | "expired" | "trialing" };
-      await adminService.updateSubscription(confirmAction.id, updatePayload);
-      toast({ title: "Updated", description: `Subscription ${confirmAction.field} changed to ${confirmAction.value}` });
+      const updatePayload = updatePayloadFromAction(action);
+      await adminService.updateSubscription(action.id, updatePayload);
+      toast({ title: "Updated", description: `Subscription ${action.field} changed to ${action.value}` });
       queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "tenants"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.subscriptionStats() });
     } catch (err: any) {
+      if (isFreshAuthRequiredError(err)) {
+        try {
+          await requestFreshAuth();
+          await adminService.updateSubscription(action.id, updatePayloadFromAction(action));
+          toast({ title: "Updated", description: `Subscription ${action.field} changed to ${action.value}` });
+          queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] });
+          queryClient.invalidateQueries({ queryKey: ["admin", "tenants"] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.admin.subscriptionStats() });
+        } catch {
+          return;
+        }
+        return;
+      }
       toast({ title: "Error", description: err?.message || "Failed to update", variant: "destructive" });
     } finally {
       setActionLoading(false);
@@ -400,6 +456,107 @@ export const AdminDashboardPage = () => {
               <StatCard title="Total Users" value={String(totalUsers)} icon={Users} accent="info" />
               <StatCard title="Active Subscriptions" value={String(activeSubs)} icon={CreditCard} accent="success" />
               <StatCard title="Monthly Revenue" value={`EGP ${totalRevenue.toLocaleString()}`} icon={TrendingUp} accent="warning" />
+            </div>
+
+            <div className="rounded-2xl border bg-card p-5 space-y-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold">Operations Alerts</h3>
+                    <StatusBadge variant={operationsSeverityVariant as "success" | "warning" | "destructive"}>
+                      {operationsAlerts?.overall_severity ?? "healthy"}
+                    </StatusBadge>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Job backlog, worker failures, edge-function failures, and recent client-side error spikes.
+                  </p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Alert window: last 15 minutes
+                </p>
+              </div>
+
+              {loadingOperationsAlerts ? (
+                <div className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
+                  Loading operations telemetry...
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                    <StatCard
+                      title="Pending Jobs"
+                      value={String(operationsSummary?.pending_jobs_count ?? 0)}
+                      icon={Activity}
+                      accent={(operationsSummary?.pending_jobs_count ?? 0) >= 20 ? "warning" : "info"}
+                      subtitle={`${operationsSummary?.processing_jobs_count ?? 0} processing`}
+                    />
+                    <StatCard
+                      title="Retrying Jobs"
+                      value={String(operationsSummary?.retrying_jobs_count ?? 0)}
+                      icon={AlertTriangle}
+                      accent={(operationsSummary?.retrying_jobs_count ?? 0) > 0 ? "warning" : "success"}
+                      subtitle={`${operationsSummary?.recent_job_failures_count ?? 0} worker failures in 15m`}
+                    />
+                    <StatCard
+                      title="Dead Letters"
+                      value={String(operationsSummary?.dead_letter_jobs_count ?? 0)}
+                      icon={Server}
+                      accent={(operationsSummary?.dead_letter_jobs_count ?? 0) > 0 ? "destructive" : "success"}
+                      subtitle={`${operationsSummary?.stale_processing_jobs_count ?? 0} stuck processing`}
+                    />
+                    <StatCard
+                      title="Edge Failures"
+                      value={String(operationsSummary?.recent_edge_failures_count ?? 0)}
+                      icon={BarChart3}
+                      accent={(operationsSummary?.recent_edge_failures_count ?? 0) > 0 ? "destructive" : "success"}
+                      subtitle={`${operationsSummary?.recent_client_errors_count ?? 0} client errors in 15m`}
+                    />
+                  </div>
+
+                  <div className="rounded-xl border bg-muted/20 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <h4 className="text-sm font-medium">Active Signals</h4>
+                      {operationsAlerts?.active_alerts.length ? (
+                        <span className="text-xs text-muted-foreground">
+                          {operationsAlerts.active_alerts.length} active
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {operationsAlerts?.active_alerts.length ? (
+                      <div className="mt-3 space-y-3">
+                        {operationsAlerts.active_alerts.map((alert) => (
+                          <div key={alert.key} className="flex flex-col gap-2 rounded-lg border bg-background p-3 md:flex-row md:items-start md:justify-between">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{alert.title}</span>
+                                <StatusBadge
+                                  variant={
+                                    alert.severity === "critical"
+                                      ? "destructive"
+                                      : alert.severity === "warning"
+                                        ? "warning"
+                                        : "success"
+                                  }
+                                  dot
+                                >
+                                  {alert.severity}
+                                </StatusBadge>
+                              </div>
+                              <p className="text-sm text-muted-foreground">{alert.description}</p>
+                            </div>
+                            <div className="text-sm font-semibold">{alert.count}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm text-muted-foreground">
+                        No active production alerts right now. The queue and edge functions are currently healthy.
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Recent clinics */}

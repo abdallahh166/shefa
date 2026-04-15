@@ -1,7 +1,7 @@
 ﻿import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enforceCors, getAllowedOriginsFromEnv } from "../_shared/cors.ts";
 import { initSentry } from "../_shared/sentry.ts";
-import { logError, logInfo } from "../_shared/logger.ts";
+import { logError, logInfo, persistSystemLog } from "../_shared/logger.ts";
 import { createRequestId } from "../_shared/request.ts";
 
 const allowedOrigins = getAllowedOriginsFromEnv();
@@ -351,6 +351,21 @@ Deno.serve(async (req) => {
             next_attempt_at: isDead ? null : nextAttemptAt,
           })
           .eq("id", reminder.id);
+
+        if (isDead) {
+          await persistSystemLog(supabase, "appointment-reminders", "error", "appointment_reminder_dead_letter", {
+            request_id: requestId,
+            tenant_id: reminder.tenant_id,
+            action_type: "appointment_reminders",
+            resource_type: "appointment",
+            metadata: {
+              appointment_id: reminder.appointment_id,
+              channel: reminder.channel,
+              attempts,
+              error: err instanceof Error ? err.message : String(err),
+            },
+          });
+        }
       }
     }
 
@@ -374,6 +389,17 @@ Deno.serve(async (req) => {
       resource_type: "appointment",
       metadata: { error: err instanceof Error ? err.message : String(err) },
     });
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (supabaseUrl && serviceRoleKey) {
+      const supabase = createClient(supabaseUrl, serviceRoleKey);
+      await persistSystemLog(supabase, "appointment-reminders", "error", "appointment_reminders_failed", {
+        request_id: requestId,
+        action_type: "appointment_reminders",
+        resource_type: "appointment",
+        metadata: { error: err instanceof Error ? err.message : String(err) },
+      });
+    }
     return new Response(
       JSON.stringify({
         error: err instanceof Error ? err.message : "Internal server error",

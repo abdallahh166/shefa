@@ -1,4 +1,9 @@
-import type { AdminSubscription, AdminTenant, AdminSubscriptionStats } from "@/domain/admin/admin.types";
+import type {
+  AdminOperationsAlertSummary,
+  AdminSubscription,
+  AdminTenant,
+  AdminSubscriptionStats,
+} from "@/domain/admin/admin.types";
 import type { ProfileWithRoles } from "@/domain/settings/profile.types";
 import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
@@ -36,6 +41,7 @@ export interface AdminRepository {
   }): Promise<{ data: AdminSubscription[]; count: number }>;
   updateSubscription(id: string, input: Partial<Pick<AdminSubscription, "plan" | "status">>): Promise<AdminSubscription>;
   getSubscriptionStats(): Promise<AdminSubscriptionStats>;
+  getOperationsAlertSummary(): Promise<AdminOperationsAlertSummary>;
 }
 
 export const adminRepository: AdminRepository = {
@@ -214,6 +220,21 @@ export const adminRepository: AdminRepository = {
     }
 
     return (data ?? {}) as AdminSubscriptionStats;
+  },
+  async getOperationsAlertSummary() {
+    const { data, error } = await supabase.rpc("admin_operations_alert_summary");
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to load operations alert summary", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    if (Array.isArray(data)) {
+      return ((data[0] ?? {}) as AdminOperationsAlertSummary);
+    }
+
+    return ((data ?? {}) as AdminOperationsAlertSummary);
   },
   async updateSubscription(id, input) {
     const payload: Record<string, unknown> = {};

@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SessionTimeout } from "./features/auth/SessionTimeout";
+import { ReauthDialog } from "./features/auth/ReauthDialog";
 import { ProtectedRoute } from "./core/auth/ProtectedRoute";
 import { PortalProtectedRoute } from "./core/auth/PortalProtectedRoute";
 import { SubscriptionProvider } from "./core/subscription/SubscriptionContext";
@@ -48,6 +49,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <SessionTimeout />
+      <ReauthDialog />
       <SubscriptionProvider>
         <ErrorBoundary>
           <BrowserRouter

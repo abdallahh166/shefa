@@ -1,7 +1,7 @@
 import { enforceCors, getAllowedOriginsFromEnv } from "../_shared/cors.ts";
 import { requireAdmin } from "../_shared/auth.ts";
 import { initSentry } from "../_shared/sentry.ts";
-import { logError, logInfo } from "../_shared/logger.ts";
+import { logError, logInfo, persistSystemLog } from "../_shared/logger.ts";
 import { createRequestId } from "../_shared/request.ts";
 
 const allowedOrigins = getAllowedOriginsFromEnv();
@@ -50,6 +50,14 @@ Deno.serve(async (req) => {
 
   if (error) {
     logError("process_insurance_claims_failed", {
+      request_id: requestId,
+      tenant_id: tenantId,
+      user_id: userId,
+      action_type: "process_insurance_claims",
+      resource_type: "job",
+      metadata: { error: error.message ?? "Failed to load claims" },
+    });
+    await persistSystemLog(adminClient, "process-insurance-claims", "error", "process_insurance_claims_failed", {
       request_id: requestId,
       tenant_id: tenantId,
       user_id: userId,

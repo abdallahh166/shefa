@@ -84,6 +84,7 @@ interface AuthState {
   isLoading: boolean;
   tenantOverride: TenantOverride;
   impersonationSession: ImpersonationSession;
+  lastVerifiedAt: string | null;
   setUser: (user: AppUser | null, supabaseUser?: SupaUser | null) => void;
   setLoading: (loading: boolean) => void;
   logout: () => Promise<void>;
@@ -93,6 +94,7 @@ interface AuthState {
   clearTenantOverride: () => void;
   startImpersonation: (tenant: Exclude<TenantOverride, null>, session: Exclude<ImpersonationSession, null>) => void;
   stopImpersonation: () => void;
+  markSessionVerified: (verifiedAt?: string) => void;
   initialize: () => Promise<void>;
 }
 
@@ -105,6 +107,7 @@ export const useAuth = create<AuthState>()(
       isLoading: true,
       tenantOverride: null,
       impersonationSession: null,
+      lastVerifiedAt: null,
       setUser: (user, supabaseUser) => set({
         user,
         supabaseUser: supabaseUser ?? null,
@@ -112,6 +115,7 @@ export const useAuth = create<AuthState>()(
         isLoading: false,
         tenantOverride: user?.role === "super_admin" ? get().tenantOverride : null,
         impersonationSession: user?.role === "super_admin" ? get().impersonationSession : null,
+        lastVerifiedAt: user ? get().lastVerifiedAt : null,
       }),
       setLoading: (isLoading) => set({ isLoading }),
       logout: async () => {
@@ -122,6 +126,7 @@ export const useAuth = create<AuthState>()(
           isAuthenticated: false,
           tenantOverride: null,
           impersonationSession: null,
+          lastVerifiedAt: null,
         });
       },
       hasPermission: (permission) => {
@@ -145,6 +150,9 @@ export const useAuth = create<AuthState>()(
       stopImpersonation: () => {
         set({ tenantOverride: null, impersonationSession: null });
       },
+      markSessionVerified: (verifiedAt) => {
+        set({ lastVerifiedAt: verifiedAt ?? new Date().toISOString() });
+      },
       initialize: async () => {
         set({ isLoading: true });
         const timeout = new Promise<never>((_, reject) =>
@@ -161,9 +169,12 @@ export const useAuth = create<AuthState>()(
               loadUserProfile(supaUser, set),
               timeout,
             ]);
-            const { user } = get();
+            const { user, lastVerifiedAt } = get();
             if (!user || user.role !== "super_admin") {
               set({ tenantOverride: null, impersonationSession: null });
+            }
+            if (user && !lastVerifiedAt) {
+              set({ lastVerifiedAt: new Date().toISOString() });
             }
           } else {
             set({
@@ -172,6 +183,7 @@ export const useAuth = create<AuthState>()(
               isAuthenticated: false,
               tenantOverride: null,
               impersonationSession: null,
+              lastVerifiedAt: null,
             });
           }
         } catch {
@@ -181,6 +193,7 @@ export const useAuth = create<AuthState>()(
             isAuthenticated: false,
             tenantOverride: null,
             impersonationSession: null,
+            lastVerifiedAt: null,
           });
         } finally {
           set({ isLoading: false });
@@ -194,6 +207,7 @@ export const useAuth = create<AuthState>()(
         isAuthenticated: state.isAuthenticated,
         tenantOverride: state.tenantOverride,
         impersonationSession: state.impersonationSession,
+        lastVerifiedAt: state.lastVerifiedAt,
       }),
     }
   )
@@ -237,6 +251,7 @@ async function loadUserProfile(
       isAuthenticated: true,
       tenantOverride: useAuth.getState().user?.role === "super_admin" ? useAuth.getState().tenantOverride : null,
       impersonationSession: useAuth.getState().user?.role === "super_admin" ? useAuth.getState().impersonationSession : null,
+      lastVerifiedAt: useAuth.getState().lastVerifiedAt,
     });
   } else {
     set({
@@ -245,13 +260,14 @@ async function loadUserProfile(
       isAuthenticated: false,
       tenantOverride: null,
       impersonationSession: null,
+      lastVerifiedAt: null,
     });
   }
 }
 
 // Listen for auth changes
 authService.onAuthStateChange(async (event, sessionUser) => {
-  const { setUser, setLoading } = useAuth.getState();
+  const { setUser, setLoading, markSessionVerified } = useAuth.getState();
   if (event === "SIGNED_IN" && sessionUser) {
     setLoading(true);
     await loadUserProfile(sessionUser as SupaUser, (partial) => {
@@ -261,6 +277,7 @@ authService.onAuthStateChange(async (event, sessionUser) => {
         setUser(null);
       }
     });
+    markSessionVerified();
     setLoading(false);
   } else if (event === "SIGNED_OUT") {
     setUser(null);

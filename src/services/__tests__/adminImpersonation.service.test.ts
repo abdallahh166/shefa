@@ -43,6 +43,7 @@ describe("adminImpersonationService", () => {
     getState.mockReturnValue({
       user: superAdmin,
       hasPermission: () => true,
+      lastVerifiedAt: new Date().toISOString(),
       impersonationSession: null,
       startImpersonation,
     });
@@ -77,6 +78,7 @@ describe("adminImpersonationService", () => {
     getState.mockReturnValue({
       user: superAdmin,
       hasPermission: () => true,
+      lastVerifiedAt: new Date().toISOString(),
       tenantOverride: targetTenant,
       impersonationSession: {
         requestId: "req-123",
@@ -115,6 +117,7 @@ describe("adminImpersonationService", () => {
     getState.mockReturnValue({
       user: superAdmin,
       hasPermission: () => false,
+      lastVerifiedAt: new Date().toISOString(),
       impersonationSession: null,
       startImpersonation,
     });
@@ -128,6 +131,7 @@ describe("adminImpersonationService", () => {
     getState.mockReturnValue({
       user: superAdmin,
       hasPermission: () => true,
+      lastVerifiedAt: new Date().toISOString(),
       impersonationSession: {
         requestId: "req-existing",
         startedAt: "2026-04-15T00:00:00.000Z",

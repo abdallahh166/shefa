@@ -1,7 +1,7 @@
 import { enforceCors, getAllowedOriginsFromEnv } from "../_shared/cors.ts";
 import { requireAdmin } from "../_shared/auth.ts";
 import { initSentry } from "../_shared/sentry.ts";
-import { logError, logInfo } from "../_shared/logger.ts";
+import { logError, logInfo, persistSystemLog } from "../_shared/logger.ts";
 import { createRequestId } from "../_shared/request.ts";
 
 const allowedOrigins = getAllowedOriginsFromEnv();
@@ -68,6 +68,14 @@ Deno.serve(async (req) => {
       action_type: "send_appointment_notifications",
       resource_type: "job",
       metadata: { error: text },
+    });
+    await persistSystemLog(adminClient, "send-appointment-notifications", "error", "send_appointment_notifications_failed", {
+      request_id: requestId,
+      tenant_id: tenantId,
+      user_id: userId,
+      action_type: "send_appointment_notifications",
+      resource_type: "job",
+      metadata: { error: text || "Reminder job failed" },
     });
     return new Response(JSON.stringify({ error: text || "Reminder job failed" }), {
       status: 502,

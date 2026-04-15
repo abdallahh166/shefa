@@ -16,7 +16,9 @@ import { AppLayout, type AppLayoutLabels, type NavItem, type AppUser } from "@/c
 import { Button } from "@/components/primitives/Button";
 import { toast } from "@/hooks/use-toast";
 import { adminImpersonationService } from "@/services/admin/adminImpersonation.service";
+import { isFreshAuthRequiredError } from "@/services/auth/recentAuth.service";
 import { useState } from "react";
+import { requestReauthentication } from "@/features/auth/reauthPrompt";
 
 interface NavConfigItem {
   path: string;
@@ -52,7 +54,7 @@ export const ClinicLayout = () => {
     navigate("/login");
   };
 
-  const handleExitImpersonation = async () => {
+  const handleExitImpersonation = async (allowRetry = true) => {
     setIsExitingImpersonation(true);
     try {
       const result = await adminImpersonationService.stop();
@@ -62,6 +64,20 @@ export const ClinicLayout = () => {
       });
       navigate("/admin");
     } catch (err: any) {
+      if (allowRetry && isFreshAuthRequiredError(err)) {
+        try {
+          await requestReauthentication({
+            title: t("auth.reauthTitle"),
+            description: t("auth.reauthAdminActionDesc"),
+            actionLabel: t("auth.reauthAction"),
+            cancelLabel: t("common.cancel"),
+          });
+          await handleExitImpersonation(false);
+        } catch {
+          return;
+        }
+        return;
+      }
       toast({
         title: "Unable to exit clinic view",
         description: err?.message || "Failed to stop impersonation",

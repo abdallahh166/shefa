@@ -12,18 +12,27 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
-const WARNING_BEFORE_MS = 60 * 1000; // Show warning 60s before logout
 const ACTIVITY_EVENTS = ["mousedown", "keydown", "touchstart", "scroll"] as const;
 
+function getSessionPolicy(role?: string) {
+  if (role === "super_admin") {
+    return { idleTimeoutMs: 10 * 60 * 1000, warningBeforeMs: 45 * 1000 };
+  }
+  if (role === "clinic_admin") {
+    return { idleTimeoutMs: 12 * 60 * 1000, warningBeforeMs: 45 * 1000 };
+  }
+  return { idleTimeoutMs: 15 * 60 * 1000, warningBeforeMs: 60 * 1000 };
+}
+
 export const SessionTimeout = () => {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, user } = useAuth();
   const { t } = useI18n();
   const [showWarning, setShowWarning] = useState(false);
   const [countdown, setCountdown] = useState(60);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const warningRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sessionPolicy = getSessionPolicy(user?.role);
 
   const clearAllTimers = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -46,7 +55,7 @@ export const SessionTimeout = () => {
     // Set warning timer
     warningRef.current = setTimeout(() => {
       setShowWarning(true);
-      setCountdown(Math.floor(WARNING_BEFORE_MS / 1000));
+      setCountdown(Math.floor(sessionPolicy.warningBeforeMs / 1000));
 
       countdownRef.current = setInterval(() => {
         setCountdown((prev) => {
@@ -57,13 +66,13 @@ export const SessionTimeout = () => {
           return prev - 1;
         });
       }, 1000);
-    }, IDLE_TIMEOUT_MS - WARNING_BEFORE_MS);
+    }, sessionPolicy.idleTimeoutMs - sessionPolicy.warningBeforeMs);
 
     // Set logout timer
     timeoutRef.current = setTimeout(() => {
       handleLogout();
-    }, IDLE_TIMEOUT_MS);
-  }, [isAuthenticated, clearAllTimers, handleLogout]);
+    }, sessionPolicy.idleTimeoutMs);
+  }, [isAuthenticated, clearAllTimers, handleLogout, sessionPolicy.idleTimeoutMs, sessionPolicy.warningBeforeMs]);
 
   const handleContinue = useCallback(() => {
     setShowWarning(false);

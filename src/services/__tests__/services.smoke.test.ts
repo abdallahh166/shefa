@@ -10,6 +10,7 @@ const adminRepository = vi.hoisted(() => ({
   listProfilesWithRolesPaged: vi.fn(),
   listSubscriptionsPaged: vi.fn(),
   getSubscriptionStats: vi.fn(),
+  getOperationsAlertSummary: vi.fn(),
   updateSubscription: vi.fn(),
 }));
 
@@ -56,6 +57,7 @@ vi.mock("@/core/auth/authStore", () => ({
     getState: () => ({
       hasPermission: () => true,
       user: { id: userId, role: "super_admin" },
+      lastVerifiedAt: new Date().toISOString(),
     }),
   },
 }));
@@ -112,6 +114,19 @@ describe("services smoke", () => {
       active_count: 0,
       total_revenue: 0,
       plan_counts: { free: 0, starter: 0, pro: 0, enterprise: 0 },
+    });
+    adminRepository.getOperationsAlertSummary.mockResolvedValue({
+      pending_jobs_count: 0,
+      processing_jobs_count: 0,
+      retrying_jobs_count: 0,
+      dead_letter_jobs_count: 0,
+      stale_processing_jobs_count: 0,
+      recent_job_failures_count: 0,
+      recent_edge_failures_count: 0,
+      recent_client_errors_count: 0,
+      last_job_failure_at: null,
+      last_edge_failure_at: null,
+      last_client_error_at: null,
     });
     adminRepository.updateSubscription.mockResolvedValue({
       id: recordId,
@@ -260,6 +275,7 @@ describe("services smoke", () => {
     await adminService.listProfilesWithRolesPaged({ page: 1, pageSize: 10, search: "john" });
     await adminService.listSubscriptionsPaged({ page: 1, pageSize: 10, search: "clinic", plan: "pro", status: "active" });
     await adminService.getSubscriptionStats();
+    await adminService.getOperationsAlerts();
     await adminService.updateSubscription(recordId, { plan: "pro" });
 
     await clinicSlugService.checkSlug({ clinicName: "Clinic", customSlug: "clinic" });
@@ -332,6 +348,7 @@ describe("services smoke", () => {
     await jobService.invoke("refresh-materialized-views", { tenantId });
 
     expect(queryKeys.patients.root(tenantId)).toEqual(["patients", tenantId]);
+    expect(queryKeys.admin.operationsAlerts()).toEqual(["admin", "operationsAlerts"]);
     expect(servicesIndex.authService).toBeDefined();
   });
 });

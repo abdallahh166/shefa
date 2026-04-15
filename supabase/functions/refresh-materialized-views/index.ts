@@ -1,7 +1,7 @@
 import { enforceCors, getAllowedOriginsFromEnv } from "../_shared/cors.ts";
 import { requireAdmin } from "../_shared/auth.ts";
 import { initSentry } from "../_shared/sentry.ts";
-import { logError, logInfo } from "../_shared/logger.ts";
+import { logError, logInfo, persistSystemLog } from "../_shared/logger.ts";
 import { createRequestId } from "../_shared/request.ts";
 
 const allowedOrigins = getAllowedOriginsFromEnv();
@@ -44,6 +44,14 @@ Deno.serve(async (req) => {
   const { error: refreshError } = await adminClient.rpc("refresh_report_materialized_views");
   if (refreshError) {
     logError("refresh_materialized_views_failed", {
+      request_id: requestId,
+      tenant_id: tenantId,
+      user_id: userId,
+      action_type: "refresh_materialized_views",
+      resource_type: "job",
+      metadata: { error: refreshError.message ?? "Refresh failed" },
+    });
+    await persistSystemLog(adminClient, "refresh-materialized-views", "error", "refresh_materialized_views_failed", {
       request_id: requestId,
       tenant_id: tenantId,
       user_id: userId,

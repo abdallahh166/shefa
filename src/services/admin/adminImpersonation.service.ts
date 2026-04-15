@@ -5,6 +5,7 @@ import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import { auditLogService } from "@/services/settings/audit.service";
 import { BusinessRuleError, ServiceError, toServiceError } from "@/services/supabase/errors";
 import { assertAnyPermission } from "@/services/supabase/permissions";
+import { recentAuthService } from "@/services/auth/recentAuth.service";
 
 const tenantOverrideSchema = z.object({
   id: uuidSchema,
@@ -35,6 +36,7 @@ export const adminImpersonationService = {
   async start(input: TargetTenant) {
     try {
       assertAnyPermission(["super_admin"], "Only super admins can impersonate clinics");
+      recentAuthService.assertRecentAuth({ action: "tenant_impersonation_start" });
       const currentUser = requireCurrentUser();
       const targetTenant = tenantOverrideSchema.parse(input);
       const { impersonationSession, startImpersonation } = useAuth.getState();
@@ -85,6 +87,7 @@ export const adminImpersonationService = {
   async stop() {
     try {
       assertAnyPermission(["super_admin"], "Only super admins can end clinic impersonation");
+      recentAuthService.assertRecentAuth({ action: "tenant_impersonation_end" });
       const currentUser = requireCurrentUser();
       const { impersonationSession, tenantOverride, stopImpersonation } = useAuth.getState();
 

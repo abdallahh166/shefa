@@ -1,7 +1,7 @@
 import { enforceCors, getAllowedOriginsFromEnv } from "../_shared/cors.ts";
 import { requireAdmin } from "../_shared/auth.ts";
 import { initSentry } from "../_shared/sentry.ts";
-import { logError, logInfo } from "../_shared/logger.ts";
+import { logError, logInfo, persistSystemLog } from "../_shared/logger.ts";
 import { createRequestId } from "../_shared/request.ts";
 
 const allowedOrigins = getAllowedOriginsFromEnv();
@@ -50,6 +50,14 @@ Deno.serve(async (req) => {
 
   if (error) {
     logError("send_invoice_emails_failed", {
+      request_id: requestId,
+      tenant_id: tenantId,
+      user_id: userId,
+      action_type: "send_invoice_emails",
+      resource_type: "job",
+      metadata: { error: error.message ?? "Failed to load invoices" },
+    });
+    await persistSystemLog(adminClient, "send-invoice-emails", "error", "send_invoice_emails_failed", {
       request_id: requestId,
       tenant_id: tenantId,
       user_id: userId,

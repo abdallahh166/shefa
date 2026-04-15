@@ -45,3 +45,41 @@ export const adminSubscriptionStatsSchema = z.object({
   total_revenue: z.coerce.number().nonnegative(),
   plan_counts: z.record(subscriptionPlanEnum, z.coerce.number().int().nonnegative()),
 });
+
+export const operationsAlertSeverityEnum = z.enum(["healthy", "warning", "critical"]);
+
+export const adminOperationsAlertSummarySchema = z.object({
+  pending_jobs_count: z.coerce.number().int().nonnegative(),
+  processing_jobs_count: z.coerce.number().int().nonnegative(),
+  retrying_jobs_count: z.coerce.number().int().nonnegative(),
+  dead_letter_jobs_count: z.coerce.number().int().nonnegative(),
+  stale_processing_jobs_count: z.coerce.number().int().nonnegative(),
+  recent_job_failures_count: z.coerce.number().int().nonnegative(),
+  recent_edge_failures_count: z.coerce.number().int().nonnegative(),
+  recent_client_errors_count: z.coerce.number().int().nonnegative(),
+  last_job_failure_at: dateTimeStringSchema.nullable().optional(),
+  last_edge_failure_at: dateTimeStringSchema.nullable().optional(),
+  last_client_error_at: dateTimeStringSchema.nullable().optional(),
+});
+
+export const adminOperationsAlertSchema = z.object({
+  key: z.enum([
+    "dead_letters",
+    "stale_jobs",
+    "edge_failures",
+    "job_failures",
+    "retrying_jobs",
+    "queue_backlog",
+    "client_errors",
+  ]),
+  title: z.string().trim().min(1).max(120),
+  description: z.string().trim().min(1).max(240),
+  severity: operationsAlertSeverityEnum,
+  count: z.coerce.number().int().nonnegative(),
+});
+
+export const adminOperationsAlertsResponseSchema = z.object({
+  summary: adminOperationsAlertSummarySchema,
+  overall_severity: operationsAlertSeverityEnum,
+  active_alerts: z.array(adminOperationsAlertSchema),
+});

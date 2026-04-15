@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { securityService } from "@/services/settings/security.service";
+import { isFreshAuthRequiredError } from "@/services/auth/recentAuth.service";
+import { requestReauthentication } from "@/features/auth/reauthPrompt";
 
 export const SecurityTab = () => {
   const { t } = useI18n();
@@ -16,7 +18,7 @@ export const SecurityTab = () => {
   const [showPasswords, setShowPasswords] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
 
-  const handleChangePassword = async () => {
+  const handleChangePassword = async (allowRetry = true) => {
     if (newPassword !== confirmPassword) {
       toast({ title: t("common.passwordsDontMatch"), variant: "destructive" });
       return;
@@ -32,6 +34,20 @@ export const SecurityTab = () => {
       setNewPassword("");
       setConfirmPassword("");
     } catch (err) {
+      if (allowRetry && isFreshAuthRequiredError(err)) {
+        try {
+          await requestReauthentication({
+            title: t("auth.reauthTitle"),
+            description: t("auth.reauthPasswordChangeDesc"),
+            actionLabel: t("auth.reauthAction"),
+            cancelLabel: t("common.cancel"),
+          });
+          await handleChangePassword(false);
+        } catch {
+          return;
+        }
+        return;
+      }
       const message = err instanceof Error ? err.message : t("common.error");
       toast({ title: t("common.error"), description: message, variant: "destructive" });
     } finally {
