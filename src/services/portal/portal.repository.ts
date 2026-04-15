@@ -4,6 +4,39 @@ import { ServiceError } from "@/services/supabase/errors";
 const ACCOUNT_COLUMNS = "id, tenant_id, patient_id, status, auth_user_id, patients(full_name), tenants:tenant_id(name, slug)";
 
 export const portalRepository = {
+  async getLoginMetadata(clinicSlug: string, email: string) {
+    const { data, error } = await supabase.rpc("get_portal_login_metadata", {
+      _slug: clinicSlug,
+      _email: email,
+    });
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to load portal login metadata", {
+        code: error.code,
+        details: error,
+      });
+    }
+    const row = Array.isArray(data) ? data[0] : data;
+    return row ?? null;
+  },
+  async sendMagicLink(email: string, redirectTo: string, metadata: { tenant_id: string; patient_id: string }) {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: redirectTo,
+        data: {
+          portal: true,
+          tenant_id: metadata.tenant_id,
+          patient_id: metadata.patient_id,
+        },
+      },
+    });
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to send magic link", {
+        code: error.code,
+        details: error,
+      });
+    }
+  },
   async getAccountByAuthUserId(userId: string) {
     const { data, error } = await supabase
       .from("patient_accounts")

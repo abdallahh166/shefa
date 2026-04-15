@@ -1,8 +1,8 @@
-﻿import { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import AgoraRTC, { IAgoraRTCClient, ICameraVideoTrack, IMicrophoneAudioTrack } from "agora-rtc-sdk-ng";
-import { supabase } from "@/services/supabase/client";
 import { Button } from "@/components/primitives/Button";
+import { telemedicineService } from "@/services/telemedicine/telemedicine.service";
 
 export const TelemedicineCallPage = () => {
   const { appointmentId } = useParams();
@@ -18,19 +18,14 @@ export const TelemedicineCallPage = () => {
     let mounted = true;
     let rtcClient: IAgoraRTCClient | null = null;
     let tracks: [IMicrophoneAudioTrack, ICameraVideoTrack] | null = null;
+
     const joinCall = async () => {
       try {
         if (!appointmentId) {
           throw new Error("Missing appointmentId");
         }
-        const { data, error: tokenError } = await supabase.functions.invoke("agora-token", {
-          body: { appointment_id: appointmentId },
-        });
-        if (tokenError) {
-          throw tokenError;
-        }
 
-        const { appId, channel, token, uid } = data as { appId: string; channel: string; token: string; uid: number };
+        const { appId, channel, token, uid } = await telemedicineService.getAgoraToken(appointmentId);
         rtcClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
 
         rtcClient.on("user-published", async (user, mediaType) => {
@@ -86,7 +81,7 @@ export const TelemedicineCallPage = () => {
 
   return (
     <div className="min-h-screen bg-background p-6">
-      <div className="max-w-4xl mx-auto space-y-4">
+      <div className="mx-auto max-w-4xl space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-semibold">Telemedicine Session</h1>
           <Button variant="ghost" onClick={() => navigate(-1)}>Back</Button>
@@ -97,12 +92,12 @@ export const TelemedicineCallPage = () => {
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-lg border p-3">
-            <p className="text-xs text-muted-foreground mb-2">Your Video</p>
-            <div ref={localVideoRef} className="aspect-video bg-muted rounded-md" />
+            <p className="mb-2 text-xs text-muted-foreground">Your Video</p>
+            <div ref={localVideoRef} className="aspect-video rounded-md bg-muted" />
           </div>
           <div className="rounded-lg border p-3">
-            <p className="text-xs text-muted-foreground mb-2">Remote Video</p>
-            <div ref={remoteVideoRef} className="aspect-video bg-muted rounded-md" />
+            <p className="mb-2 text-xs text-muted-foreground">Remote Video</p>
+            <div ref={remoteVideoRef} className="aspect-video rounded-md bg-muted" />
           </div>
         </div>
       </div>

@@ -1,8 +1,8 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { supabase } from "@/services/supabase/client";
 import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Inputs";
+import { portalService } from "@/services/portal/portal.service";
 
 export const PortalLoginPage = () => {
   const { clinicSlug } = useParams();
@@ -23,30 +23,11 @@ export const PortalLoginPage = () => {
         throw new Error("Email is required");
       }
 
-      const { data: metadata, error: metadataError } = await supabase.rpc("get_portal_login_metadata", {
-        _slug: clinicSlug,
-        _email: normalizedEmail,
-      });
-      const metaRow = Array.isArray(metadata) ? metadata[0] : metadata;
-      if (metadataError || !metaRow?.tenant_id || !metaRow?.patient_id) {
-        throw new Error("No portal invite found for this email");
-      }
-
-      const redirectTo = `${window.location.origin}/portal/${clinicSlug}`;
-      const { error: signInError } = await supabase.auth.signInWithOtp({
+      await portalService.sendMagicLink({
+        clinicSlug,
         email: normalizedEmail,
-        options: {
-          emailRedirectTo: redirectTo,
-          data: {
-            portal: true,
-            tenant_id: metaRow.tenant_id,
-            patient_id: metaRow.patient_id,
-          },
-        },
+        redirectTo: `${window.location.origin}/portal/${clinicSlug}`,
       });
-      if (signInError) {
-        throw signInError;
-      }
       setSent(true);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to send magic link";
@@ -57,8 +38,8 @@ export const PortalLoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen grid place-items-center bg-muted/20">
-      <div className="w-full max-w-md rounded-xl border bg-background p-6 space-y-4">
+    <div className="grid min-h-screen place-items-center bg-muted/20">
+      <div className="w-full max-w-md space-y-4 rounded-xl border bg-background p-6">
         <div>
           <h1 className="text-xl font-semibold">Patient Portal</h1>
           <p className="text-sm text-muted-foreground">Enter your email to receive a magic link.</p>

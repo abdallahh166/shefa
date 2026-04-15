@@ -1,7 +1,21 @@
-﻿import { portalRepository } from "./portal.repository";
+import { portalLoginInputSchema, portalLoginMetadataSchema } from "@/domain/portal/portal.schema";
 import { toServiceError } from "@/services/supabase/errors";
+import { portalRepository } from "./portal.repository";
 
 export const portalService = {
+  async sendMagicLink(input: { clinicSlug: string; email: string; redirectTo: string }) {
+    try {
+      const parsed = portalLoginInputSchema.parse(input);
+      const metadata = await portalRepository.getLoginMetadata(parsed.clinicSlug, parsed.email);
+      if (!metadata) {
+        throw new Error("No portal invite found for this email");
+      }
+      const safeMetadata = portalLoginMetadataSchema.parse(metadata);
+      await portalRepository.sendMagicLink(parsed.email, parsed.redirectTo, safeMetadata);
+    } catch (err) {
+      throw toServiceError(err, "Failed to send magic link");
+    }
+  },
   async getAccountByAuthUserId(userId: string) {
     try {
       return await portalRepository.getAccountByAuthUserId(userId);
