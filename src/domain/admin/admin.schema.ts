@@ -47,6 +47,8 @@ export const adminSubscriptionStatsSchema = z.object({
 });
 
 export const operationsAlertSeverityEnum = z.enum(["healthy", "warning", "critical"]);
+export const adminJobStatusEnum = z.enum(["pending", "processing", "completed", "failed", "dead_letter"]);
+export const adminSystemLogLevelEnum = z.enum(["info", "warn", "error"]);
 
 export const adminOperationsAlertSummarySchema = z.object({
   pending_jobs_count: z.coerce.number().int().nonnegative(),
@@ -82,4 +84,42 @@ export const adminOperationsAlertsResponseSchema = z.object({
   summary: adminOperationsAlertSummarySchema,
   overall_severity: operationsAlertSeverityEnum,
   active_alerts: z.array(adminOperationsAlertSchema),
+});
+
+export const adminRecentJobActivitySchema = z.object({
+  id: uuidSchema,
+  tenant_id: uuidSchema,
+  tenant_name: z.string().trim().min(1).max(200).nullable().optional(),
+  type: z.string().trim().min(1).max(120),
+  status: adminJobStatusEnum,
+  attempts: z.coerce.number().int().nonnegative(),
+  max_attempts: z.coerce.number().int().positive(),
+  last_error: z.string().trim().max(5000).nullable().optional(),
+  locked_at: dateTimeStringSchema.nullable().optional(),
+  locked_by: z.string().trim().max(120).nullable().optional(),
+  run_at: dateTimeStringSchema,
+  updated_at: dateTimeStringSchema,
+});
+
+export const adminRecentSystemErrorSchema = z.object({
+  id: uuidSchema,
+  level: adminSystemLogLevelEnum,
+  service: z.string().trim().min(1).max(120),
+  message: z.string().trim().min(1).max(5000),
+  tenant_id: uuidSchema.nullable().optional(),
+  tenant_name: z.string().trim().min(1).max(200).nullable().optional(),
+  request_id: z.string().trim().max(120).nullable().optional(),
+  created_at: dateTimeStringSchema,
+});
+
+export const adminClientErrorTrendPointSchema = z.object({
+  bucket_start: dateTimeStringSchema,
+  error_count: z.coerce.number().int().nonnegative(),
+  affected_tenants_count: z.coerce.number().int().nonnegative(),
+});
+
+export const adminOperationsDashboardResponseSchema = adminOperationsAlertsResponseSchema.extend({
+  recent_job_activity: z.array(adminRecentJobActivitySchema),
+  recent_system_errors: z.array(adminRecentSystemErrorSchema),
+  client_error_trend: z.array(adminClientErrorTrendPointSchema),
 });

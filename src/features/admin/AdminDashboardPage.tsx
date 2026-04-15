@@ -25,8 +25,13 @@ import { isFreshAuthRequiredError } from "@/services/auth/recentAuth.service";
 import { queryKeys } from "@/services/queryKeys";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { requestReauthentication } from "@/features/auth/reauthPrompt";
+import type {
+  AdminClientErrorTrendPoint,
+  AdminRecentJobActivity,
+  AdminRecentSystemError,
+} from "@/domain/admin/admin.types";
 
-type AdminTab = "overview" | "clinics" | "users" | "subscriptions";
+type AdminTab = "overview" | "operations" | "clinics" | "users" | "subscriptions";
 
 const PLAN_OPTIONS = ["free", "starter", "pro", "enterprise"] as const;
 const STATUS_OPTIONS = ["active", "trialing", "expired", "canceled"] as const;
@@ -35,6 +40,10 @@ function updatePayloadFromAction(action: { field: "plan" | "status"; value: stri
   return action.field === "plan"
     ? { plan: action.value as "enterprise" | "free" | "pro" | "starter" }
     : { status: action.value as "active" | "canceled" | "expired" | "trialing" };
+}
+
+function formatTrendBucketLabel(bucketStart: string, locale: "en" | "ar") {
+  return formatDate(bucketStart, locale, "time");
 }
 
 export const AdminDashboardPage = () => {
@@ -144,11 +153,12 @@ export const AdminDashboardPage = () => {
   });
 
   const {
-    data: operationsAlerts,
-    isLoading: loadingOperationsAlerts,
+    data: operationsDashboard,
+    isLoading: loadingOperationsDashboard,
   } = useQuery({
-    queryKey: queryKeys.admin.operationsAlerts(),
-    queryFn: () => adminService.getOperationsAlerts(),
+    queryKey: queryKeys.admin.operationsDashboard(),
+    queryFn: () => adminService.getOperationsDashboard(),
+    enabled: activeTab === "overview" || activeTab === "operations",
   });
 
   const { data: recentTenantsResponse } = useQuery({
@@ -165,11 +175,11 @@ export const AdminDashboardPage = () => {
   const totalUsers = profilesResponse?.total ?? 0;
   const activeSubs = subscriptionStats?.active_count ?? 0;
   const totalRevenue = subscriptionStats?.total_revenue ?? 0;
-  const operationsSummary = operationsAlerts?.summary;
+  const operationsSummary = operationsDashboard?.summary;
   const operationsSeverityVariant =
-    operationsAlerts?.overall_severity === "critical"
+    operationsDashboard?.overall_severity === "critical"
       ? "destructive"
-      : operationsAlerts?.overall_severity === "warning"
+      : operationsDashboard?.overall_severity === "warning"
         ? "warning"
         : "success";
 
@@ -253,6 +263,7 @@ export const AdminDashboardPage = () => {
 
   const tabs: { key: AdminTab; icon: any; label: string }[] = [
     { key: "overview", icon: BarChart3, label: "Overview" },
+    { key: "operations", icon: Server, label: "Operations" },
     { key: "clinics", icon: Building2, label: "Clinics" },
     { key: "users", icon: Users, label: "Users" },
     { key: "subscriptions", icon: CreditCard, label: "Subscriptions" },
@@ -387,6 +398,91 @@ export const AdminDashboardPage = () => {
     { key: "expires_at", header: "Expires", sortable: true, render: (s) => s.expires_at ? formatDate(s.expires_at, locale, "date") : "-" },
   ];
 
+  const jobActivityColumns: Column<AdminRecentJobActivity>[] = [
+    {
+      key: "type",
+      header: "Job",
+      render: (job) => (
+        <div>
+          <p className="font-medium">{job.type}</p>
+          <p className="text-xs text-muted-foreground">{job.tenant_name || "Unknown tenant"}</p>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (job) => (
+        <StatusBadge
+          variant={
+            job.status === "dead_letter"
+              ? "destructive"
+              : job.status === "failed"
+                ? "warning"
+                : "info"
+          }
+        >
+          {job.status}
+        </StatusBadge>
+      ),
+    },
+    {
+      key: "attempts",
+      header: "Attempts",
+      render: (job) => `${job.attempts}/${job.max_attempts}`,
+    },
+    {
+      key: "last_error",
+      header: "Last Error",
+      render: (job) => (
+        <span className="line-clamp-2 max-w-[320px] text-sm text-muted-foreground">
+          {job.last_error || "No error message"}
+        </span>
+      ),
+    },
+    {
+      key: "updated_at",
+      header: "Updated",
+      render: (job) => formatDate(job.updated_at, locale, "datetime"),
+    },
+  ];
+
+  const systemErrorColumns: Column<AdminRecentSystemError>[] = [
+    {
+      key: "service",
+      header: "Service",
+      render: (log) => (
+        <div>
+          <p className="font-medium">{log.service}</p>
+          <p className="text-xs text-muted-foreground">{log.tenant_name || "Platform-wide"}</p>
+        </div>
+      ),
+    },
+    {
+      key: "level",
+      header: "Level",
+      render: (log) => (
+        <StatusBadge variant={log.level === "error" ? "destructive" : "warning"}>
+          {log.level}
+        </StatusBadge>
+      ),
+    },
+    {
+      key: "message",
+      header: "Message",
+      render: (log) => (
+        <span className="line-clamp-2 max-w-[360px] text-sm text-muted-foreground">
+          {log.message}
+        </span>
+      ),
+    },
+    {
+      key: "created_at",
+      header: "Created",
+      render: (log) => formatDate(log.created_at, locale, "datetime"),
+    },
+  ];
+
   const planCounts = subscriptionStats?.plan_counts ?? {};
   const totalPlanCount = PLAN_OPTIONS.reduce((sum, plan) => sum + Number((planCounts as any)[plan] ?? 0), 0);
 
@@ -396,6 +492,9 @@ export const AdminDashboardPage = () => {
     const variant = plan === "pro" ? "success" : plan === "enterprise" ? "info" : plan === "starter" ? "warning" : "default";
     return { plan, count, pct, variant };
   });
+
+  const trendPoints = operationsDashboard?.client_error_trend ?? [];
+  const trendMax = trendPoints.reduce((max, point) => Math.max(max, point.error_count), 0);
 
   return (
     <div className="min-h-screen bg-background" dir={locale === "ar" ? "rtl" : "ltr"}>
@@ -464,7 +563,7 @@ export const AdminDashboardPage = () => {
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold">Operations Alerts</h3>
                     <StatusBadge variant={operationsSeverityVariant as "success" | "warning" | "destructive"}>
-                      {operationsAlerts?.overall_severity ?? "healthy"}
+                      {operationsDashboard?.overall_severity ?? "healthy"}
                     </StatusBadge>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
@@ -476,7 +575,7 @@ export const AdminDashboardPage = () => {
                 </p>
               </div>
 
-              {loadingOperationsAlerts ? (
+              {loadingOperationsDashboard ? (
                 <div className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
                   Loading operations telemetry...
                 </div>
@@ -516,16 +615,16 @@ export const AdminDashboardPage = () => {
                   <div className="rounded-xl border bg-muted/20 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <h4 className="text-sm font-medium">Active Signals</h4>
-                      {operationsAlerts?.active_alerts.length ? (
+                      {operationsDashboard?.active_alerts.length ? (
                         <span className="text-xs text-muted-foreground">
-                          {operationsAlerts.active_alerts.length} active
+                          {operationsDashboard.active_alerts.length} active
                         </span>
                       ) : null}
                     </div>
 
-                    {operationsAlerts?.active_alerts.length ? (
+                    {operationsDashboard?.active_alerts.length ? (
                       <div className="mt-3 space-y-3">
-                        {operationsAlerts.active_alerts.map((alert) => (
+                        {operationsDashboard.active_alerts.map((alert) => (
                           <div key={alert.key} className="flex flex-col gap-2 rounded-lg border bg-background p-3 md:flex-row md:items-start md:justify-between">
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
@@ -591,6 +690,115 @@ export const AdminDashboardPage = () => {
                   <p className="text-xs text-muted-foreground mt-2">{pct}% of total</p>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "operations" && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              <StatCard
+                title="Pending Jobs"
+                value={String(operationsSummary?.pending_jobs_count ?? 0)}
+                icon={Activity}
+                accent={(operationsSummary?.pending_jobs_count ?? 0) >= 20 ? "warning" : "info"}
+                subtitle={`${operationsSummary?.processing_jobs_count ?? 0} processing`}
+              />
+              <StatCard
+                title="Retrying Jobs"
+                value={String(operationsSummary?.retrying_jobs_count ?? 0)}
+                icon={AlertTriangle}
+                accent={(operationsSummary?.retrying_jobs_count ?? 0) > 0 ? "warning" : "success"}
+                subtitle={`${operationsSummary?.recent_job_failures_count ?? 0} worker failures in 15m`}
+              />
+              <StatCard
+                title="Recent Edge Failures"
+                value={String(operationsSummary?.recent_edge_failures_count ?? 0)}
+                icon={Server}
+                accent={(operationsSummary?.recent_edge_failures_count ?? 0) > 0 ? "destructive" : "success"}
+                subtitle={operationsSummary?.last_edge_failure_at ? formatDate(operationsSummary.last_edge_failure_at, locale, "datetime") : "No recent failures"}
+              />
+              <StatCard
+                title="Recent Client Errors"
+                value={String(operationsSummary?.recent_client_errors_count ?? 0)}
+                icon={BarChart3}
+                accent={(operationsSummary?.recent_client_errors_count ?? 0) >= 5 ? "warning" : "info"}
+                subtitle={operationsSummary?.last_client_error_at ? formatDate(operationsSummary.last_client_error_at, locale, "datetime") : "No recent client errors"}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <div className="xl:col-span-2 rounded-2xl border bg-card p-5 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold">Recent Job Failures</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Latest retrying, failed, and dead-letter jobs across all tenants.
+                    </p>
+                  </div>
+                  <StatusBadge variant={operationsSeverityVariant as "success" | "warning" | "destructive"}>
+                    {operationsDashboard?.overall_severity ?? "healthy"}
+                  </StatusBadge>
+                </div>
+
+                <DataTable
+                  columns={jobActivityColumns}
+                  data={operationsDashboard?.recent_job_activity ?? []}
+                  keyExtractor={(job) => job.id}
+                  emptyMessage="No recent job failures or retries."
+                  tableLabel="Recent job failures"
+                />
+              </div>
+
+              <div className="rounded-2xl border bg-card p-5 space-y-4">
+                <div>
+                  <h3 className="font-semibold">Client Error Trend</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Browser-side error volume across the last six 15-minute buckets.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {trendPoints.length ? (
+                    trendPoints.map((point: AdminClientErrorTrendPoint) => {
+                      const width = trendMax > 0 ? Math.max(8, Math.round((point.error_count / trendMax) * 100)) : 8;
+                      return (
+                        <div key={point.bucket_start} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>{formatTrendBucketLabel(point.bucket_start, locale)}</span>
+                            <span>{point.error_count} errors / {point.affected_tenants_count} tenants</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-muted">
+                            <div
+                              className="h-2 rounded-full bg-primary transition-all"
+                              style={{ width: `${width}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No client error trend data available yet.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-card p-5 space-y-4">
+              <div>
+                <h3 className="font-semibold">Recent System Errors</h3>
+                <p className="text-sm text-muted-foreground">
+                  Latest warning and error logs captured by workers and edge functions.
+                </p>
+              </div>
+
+              <DataTable
+                columns={systemErrorColumns}
+                data={operationsDashboard?.recent_system_errors ?? []}
+                keyExtractor={(log) => log.id}
+                emptyMessage="No recent system errors."
+                tableLabel="Recent system errors"
+              />
             </div>
           </div>
         )}

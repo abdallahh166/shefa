@@ -98,6 +98,7 @@ export const queryKeys = {
       ["admin", "subscriptions", args] as const,
     subscriptionStats: () => ["admin", "subscriptionStats"] as const,
     operationsAlerts: () => ["admin", "operationsAlerts"] as const,
+    operationsDashboard: () => ["admin", "operationsDashboard"] as const,
   },
   reports: {
     root: (tenantId?: string) => tenantKey("reports", tenantId),

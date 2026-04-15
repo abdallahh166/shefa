@@ -11,6 +11,9 @@ const adminRepository = vi.hoisted(() => ({
   listSubscriptionsPaged: vi.fn(),
   getSubscriptionStats: vi.fn(),
   getOperationsAlertSummary: vi.fn(),
+  getRecentJobActivity: vi.fn(),
+  getRecentSystemErrors: vi.fn(),
+  getClientErrorTrend: vi.fn(),
   updateSubscription: vi.fn(),
 }));
 
@@ -128,6 +131,9 @@ describe("services smoke", () => {
       last_edge_failure_at: null,
       last_client_error_at: null,
     });
+    adminRepository.getRecentJobActivity.mockResolvedValue([]);
+    adminRepository.getRecentSystemErrors.mockResolvedValue([]);
+    adminRepository.getClientErrorTrend.mockResolvedValue([]);
     adminRepository.updateSubscription.mockResolvedValue({
       id: recordId,
       tenant_id: tenantId,
@@ -276,6 +282,7 @@ describe("services smoke", () => {
     await adminService.listSubscriptionsPaged({ page: 1, pageSize: 10, search: "clinic", plan: "pro", status: "active" });
     await adminService.getSubscriptionStats();
     await adminService.getOperationsAlerts();
+    await adminService.getOperationsDashboard();
     await adminService.updateSubscription(recordId, { plan: "pro" });
 
     await clinicSlugService.checkSlug({ clinicName: "Clinic", customSlug: "clinic" });
@@ -349,6 +356,7 @@ describe("services smoke", () => {
 
     expect(queryKeys.patients.root(tenantId)).toEqual(["patients", tenantId]);
     expect(queryKeys.admin.operationsAlerts()).toEqual(["admin", "operationsAlerts"]);
+    expect(queryKeys.admin.operationsDashboard()).toEqual(["admin", "operationsDashboard"]);
     expect(servicesIndex.authService).toBeDefined();
   });
 });

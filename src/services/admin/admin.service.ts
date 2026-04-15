@@ -1,7 +1,11 @@
 import { z } from "zod";
 import {
+  adminClientErrorTrendPointSchema,
+  adminOperationsDashboardResponseSchema,
   adminOperationsAlertsResponseSchema,
   adminOperationsAlertSummarySchema,
+  adminRecentJobActivitySchema,
+  adminRecentSystemErrorSchema,
   adminSubscriptionSchema,
   adminSubscriptionUpdateSchema,
   adminSubscriptionStatsSchema,
@@ -11,9 +15,12 @@ import {
   subscriptionStatusEnum,
 } from "@/domain/admin/admin.schema";
 import type {
+  AdminClientErrorTrendPoint,
   AdminOperationsAlert,
   AdminOperationsAlertSummary,
   AdminSubscriptionUpdateInput,
+  AdminRecentJobActivity,
+  AdminRecentSystemError,
 } from "@/domain/admin/admin.types";
 import { profileWithRolesSchema } from "@/domain/settings/profile.schema";
 import { uuidSchema } from "@/domain/shared/identifiers.schema";
@@ -131,6 +138,34 @@ function buildOperationsAlerts(summary: AdminOperationsAlertSummary): AdminOpera
   });
 }
 
+function buildOperationsAlertResponse(summary: AdminOperationsAlertSummary) {
+  const activeAlerts = buildOperationsAlerts(summary);
+  const overallSeverity = activeAlerts[0]?.severity ?? "healthy";
+
+  return adminOperationsAlertsResponseSchema.parse({
+    summary,
+    overall_severity: overallSeverity,
+    active_alerts: activeAlerts,
+  });
+}
+
+function sortRecentJobActivity(rows: AdminRecentJobActivity[]) {
+  return [...rows].sort((left, right) => {
+    const statusRank = left.status === "dead_letter" ? 2 : left.status === "failed" ? 1 : 0;
+    const rightStatusRank = right.status === "dead_letter" ? 2 : right.status === "failed" ? 1 : 0;
+    if (rightStatusRank !== statusRank) return rightStatusRank - statusRank;
+    return new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime();
+  });
+}
+
+function sortRecentSystemErrors(rows: AdminRecentSystemError[]) {
+  return [...rows].sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime());
+}
+
+function sortClientErrorTrend(rows: AdminClientErrorTrendPoint[]) {
+  return [...rows].sort((left, right) => new Date(left.bucket_start).getTime() - new Date(right.bucket_start).getTime());
+}
+
 export const adminService = {
   async listTenantsPaged(input?: {
     page?: number;
@@ -221,15 +256,33 @@ export const adminService = {
   async getOperationsAlerts() {
     try {
       const summary = adminOperationsAlertSummarySchema.parse(await adminRepository.getOperationsAlertSummary());
-      const activeAlerts = buildOperationsAlerts(summary);
-      const overallSeverity = activeAlerts[0]?.severity ?? "healthy";
-      return adminOperationsAlertsResponseSchema.parse({
-        summary,
-        overall_severity: overallSeverity,
-        active_alerts: activeAlerts,
-      });
+      return buildOperationsAlertResponse(summary);
     } catch (err) {
       throw toServiceError(err, "Failed to load operations alerts");
+    }
+  },
+  async getOperationsDashboard() {
+    try {
+      const summary = adminOperationsAlertSummarySchema.parse(await adminRepository.getOperationsAlertSummary());
+      const recentJobActivity = sortRecentJobActivity(
+        z.array(adminRecentJobActivitySchema).parse(await adminRepository.getRecentJobActivity(8)),
+      );
+      const recentSystemErrors = sortRecentSystemErrors(
+        z.array(adminRecentSystemErrorSchema).parse(await adminRepository.getRecentSystemErrors(8)),
+      );
+      const clientErrorTrend = sortClientErrorTrend(
+        z.array(adminClientErrorTrendPointSchema).parse(await adminRepository.getClientErrorTrend(15, 6)),
+      );
+      const alertResponse = buildOperationsAlertResponse(summary);
+
+      return adminOperationsDashboardResponseSchema.parse({
+        ...alertResponse,
+        recent_job_activity: recentJobActivity,
+        recent_system_errors: recentSystemErrors,
+        client_error_trend: clientErrorTrend,
+      });
+    } catch (err) {
+      throw toServiceError(err, "Failed to load operations dashboard");
     }
   },
   async updateSubscription(id: string, input: AdminSubscriptionUpdateInput) {

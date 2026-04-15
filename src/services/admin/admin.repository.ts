@@ -1,5 +1,8 @@
 import type {
+  AdminClientErrorTrendPoint,
   AdminOperationsAlertSummary,
+  AdminRecentJobActivity,
+  AdminRecentSystemError,
   AdminSubscription,
   AdminTenant,
   AdminSubscriptionStats,
@@ -42,6 +45,9 @@ export interface AdminRepository {
   updateSubscription(id: string, input: Partial<Pick<AdminSubscription, "plan" | "status">>): Promise<AdminSubscription>;
   getSubscriptionStats(): Promise<AdminSubscriptionStats>;
   getOperationsAlertSummary(): Promise<AdminOperationsAlertSummary>;
+  getRecentJobActivity(limit?: number): Promise<AdminRecentJobActivity[]>;
+  getRecentSystemErrors(limit?: number): Promise<AdminRecentSystemError[]>;
+  getClientErrorTrend(bucketMinutes?: number, bucketCount?: number): Promise<AdminClientErrorTrendPoint[]>;
 }
 
 export const adminRepository: AdminRepository = {
@@ -235,6 +241,42 @@ export const adminRepository: AdminRepository = {
     }
 
     return ((data ?? {}) as AdminOperationsAlertSummary);
+  },
+  async getRecentJobActivity(limit = 10) {
+    const { data, error } = await supabase.rpc("admin_recent_job_activity", { _limit: limit });
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to load recent job activity", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return (Array.isArray(data) ? data : []) as AdminRecentJobActivity[];
+  },
+  async getRecentSystemErrors(limit = 10) {
+    const { data, error } = await supabase.rpc("admin_recent_system_errors", { _limit: limit });
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to load recent system errors", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return (Array.isArray(data) ? data : []) as AdminRecentSystemError[];
+  },
+  async getClientErrorTrend(bucketMinutes = 15, bucketCount = 6) {
+    const { data, error } = await supabase.rpc("admin_client_error_trend", {
+      _bucket_minutes: bucketMinutes,
+      _bucket_count: bucketCount,
+    });
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to load client error trend", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return (Array.isArray(data) ? data : []) as AdminClientErrorTrendPoint[];
   },
   async updateSubscription(id, input) {
     const payload: Record<string, unknown> = {};
