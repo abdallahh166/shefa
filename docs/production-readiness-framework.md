@@ -191,3 +191,8 @@ Current repository-wide gaps:
 - limited end-to-end validation
 - observability is present but not yet fully operationalized with alerting/SLOs
 - healthcare compliance controls are partially implemented in code but not closed operationally
+
+Operational baseline docs created so far:
+- [phi-retention-and-deletion.md](c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/phi-retention-and-deletion.md)
+- [backup-and-restore.md](c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/backup-and-restore.md)
+- [backup-restore-validation-checklist.md](c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/backup-restore-validation-checklist.md)

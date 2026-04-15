@@ -12,6 +12,7 @@ Assessment basis:
 
 This report uses the framework in [production-readiness-framework.md](/c:/Users/Boo/Desktop/Shefaa/shefaa/docs/production-readiness-framework.md).
 Execution planning is captured in [production-readiness-roadmap.md](/c:/Users/Boo/Desktop/Shefaa/shefaa/docs/production-readiness-roadmap.md).
+Operational policy references now include [phi-retention-and-deletion.md](/c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/phi-retention-and-deletion.md), [backup-and-restore.md](/c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/backup-and-restore.md), and [backup-restore-validation-checklist.md](/c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/backup-restore-validation-checklist.md).
 
 ## Executive Summary
 
@@ -339,7 +340,7 @@ Most important gaps before broader clinic rollout:
 - MFA and privileged session controls
 - end-to-end test coverage for patient portal, reminders, and telemedicine
 - production alerting for jobs, edge functions, and report refresh failures
-- operational compliance work: BAAs, retention, incident response, access review, backup drills
+- operational compliance work: BAAs, incident response, access review, backup drills, and retention-policy enforcement automation
 - full rollout of procurement, queue, and partner integration workflows
 
 ## Recommended Next Wave
@@ -347,5 +348,5 @@ Most important gaps before broader clinic rollout:
 1. Harden privileged access with MFA, admin-session policies, and access review.
 2. Add end-to-end tests for appointments, portal login, reminders, and telemedicine join flow.
 3. Operationalize observability with alerting on queue backlog, edge-function failures, and report-refresh failures.
-4. Complete compliance controls around retention, vendor review, and clinical audit policy.
+4. Complete compliance controls around vendor review, retention enforcement, and clinical audit policy.
 5. Finish the partially built operational modules: reminders, procurement, queue, and external integrations.

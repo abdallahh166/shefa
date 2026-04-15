@@ -12,6 +12,8 @@ We run a scheduled workflow (`.github/workflows/backup-verify.yml`) that:
 2. Restores the dump into an ephemeral Postgres container.
 3. Runs `scripts/backup-smoke.sql` to validate schema and core tables.
 
+The detailed drill cadence, sign-off expectations, and post-restore validation steps are defined in [backup-restore-validation-checklist.md](c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/backup-restore-validation-checklist.md).
+
 ### Required Secrets
 - `SUPABASE_DB_URL` (read-only preferred)
 - `SUPABASE_DB_PASSWORD` (if your URL omits password)
@@ -27,6 +29,8 @@ We run a scheduled workflow (`.github/workflows/backup-verify.yml`) that:
    - Load dashboard
    - Create patient (non-destructive test)
 
+Monthly and quarterly restore drills should follow the checklist in [backup-restore-validation-checklist.md](c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/backup-restore-validation-checklist.md), including tenant isolation and RLS verification after restore.
+
 ## Incident Checklist
 - Confirm incident scope and last known good time.
 - Communicate outage to stakeholders.
@@ -35,6 +39,8 @@ We run a scheduled workflow (`.github/workflows/backup-verify.yml`) that:
 - Document timeline and outcomes.
 
 ## Audit Log Retention
-- **Retention target:** 12 months in primary table.
+- **Retention target:** 12 months in primary table, 6 years total once archived.
 - **Archive strategy:** quarterly export to cold storage (CSV or parquet).
 - **Deletion policy:** purge anything older than retention after archive completes.
+
+See the authoritative retention matrix in [phi-retention-and-deletion.md](c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/phi-retention-and-deletion.md).
