@@ -14,6 +14,9 @@ import {
 } from "lucide-react";
 import { AppLayout, type AppLayoutLabels, type NavItem, type AppUser } from "@/components/layout/AppLayout";
 import { Button } from "@/components/primitives/Button";
+import { toast } from "@/hooks/use-toast";
+import { adminImpersonationService } from "@/services/admin/adminImpersonation.service";
+import { useState } from "react";
 
 interface NavConfigItem {
   path: string;
@@ -38,19 +41,35 @@ const navItems: NavConfigItem[] = [
 
 export const ClinicLayout = () => {
   const { clinicSlug } = useParams();
-  const { user, logout, hasPermission, tenantOverride, clearTenantOverride } = useAuth();
+  const { user, logout, hasPermission, tenantOverride } = useAuth();
   const { hasFeature } = useFeatureAccess();
   const { t } = useI18n();
   const navigate = useNavigate();
+  const [isExitingImpersonation, setIsExitingImpersonation] = useState(false);
 
   const handleLogout = async () => {
     await logout();
     navigate("/login");
   };
 
-  const handleExitImpersonation = () => {
-    clearTenantOverride();
-    navigate("/admin");
+  const handleExitImpersonation = async () => {
+    setIsExitingImpersonation(true);
+    try {
+      const result = await adminImpersonationService.stop();
+      toast({
+        title: "Impersonation ended",
+        description: `Exited ${result.targetTenant.name}.`,
+      });
+      navigate("/admin");
+    } catch (err: any) {
+      toast({
+        title: "Unable to exit clinic view",
+        description: err?.message || "Failed to stop impersonation",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExitingImpersonation(false);
+    }
   };
 
   const visibleNav = navItems.filter((item) => hasPermission(item.permission) && (!item.feature || hasFeature(item.feature)));
@@ -96,7 +115,8 @@ export const ClinicLayout = () => {
                 variant="outline"
                 size="sm"
                 className="h-8 text-xs"
-                onClick={handleExitImpersonation}
+                disabled={isExitingImpersonation}
+                onClick={() => void handleExitImpersonation()}
               >
                 Exit {tenantOverride.name}
               </Button>

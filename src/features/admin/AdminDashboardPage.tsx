@@ -19,6 +19,7 @@ import { formatDate } from "@/shared/utils/formatDate";
 import { toast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/primitives/Inputs";
 import { adminService } from "@/services/admin/admin.service";
+import { adminImpersonationService } from "@/services/admin/adminImpersonation.service";
 import { queryKeys } from "@/services/queryKeys";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 
@@ -29,7 +30,7 @@ const STATUS_OPTIONS = ["active", "trialing", "expired", "canceled"] as const;
 
 export const AdminDashboardPage = () => {
   const { locale } = useI18n();
-  const { user, logout, setTenantOverride } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
@@ -41,6 +42,7 @@ export const AdminDashboardPage = () => {
   const [clinicSearch, setClinicSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
   const [subSearch, setSubSearch] = useState("");
+  const [impersonatingTenantId, setImpersonatingTenantId] = useState<string | null>(null);
   const [clinicSort, setClinicSort] = useState<{ column: "name" | "created_at"; direction: "asc" | "desc" }>({
     column: "created_at",
     direction: "desc",
@@ -152,6 +154,26 @@ export const AdminDashboardPage = () => {
     navigate("/login");
   };
 
+  const handleImpersonateTenant = async (tenant: { id: string; slug: string; name: string }) => {
+    setImpersonatingTenantId(tenant.id);
+    try {
+      await adminImpersonationService.start(tenant);
+      toast({
+        title: "Impersonation started",
+        description: `You are now viewing ${tenant.name} as a super admin.`,
+      });
+      navigate(`/tenant/${tenant.slug}/dashboard`);
+    } catch (err: any) {
+      toast({
+        title: "Unable to open clinic",
+        description: err?.message || "Failed to start impersonation",
+        variant: "destructive",
+      });
+    } finally {
+      setImpersonatingTenantId(null);
+    }
+  };
+
   const handleSubUpdate = async () => {
     if (!confirmAction) return;
     setActionLoading(true);
@@ -208,10 +230,8 @@ export const AdminDashboardPage = () => {
           size="icon-sm"
           aria-label="View clinic"
           title="View clinic"
-          onClick={() => {
-            setTenantOverride({ id: c.id, slug: c.slug, name: c.name });
-            navigate(`/tenant/${c.slug}/dashboard`);
-          }}
+          disabled={impersonatingTenantId === c.id}
+          onClick={() => void handleImpersonateTenant({ id: c.id, slug: c.slug, name: c.name })}
         >
           <Eye className="h-4 w-4" />
         </Button>
@@ -396,10 +416,7 @@ export const AdminDashboardPage = () => {
                 keyExtractor={(t) => t.id}
                 emptyMessage="No clinics yet"
                 tableLabel="Recent clinics"
-                onRowClick={(t) => {
-                  setTenantOverride({ id: t.id, slug: t.slug, name: t.name });
-                  navigate(`/tenant/${t.slug}/dashboard`);
-                }}
+                onRowClick={(t) => void handleImpersonateTenant({ id: t.id, slug: t.slug, name: t.name })}
               />
             </div>
 

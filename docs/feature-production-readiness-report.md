@@ -11,6 +11,7 @@ Assessment basis:
 - supporting docs in `docs/**`
 
 This report uses the framework in [production-readiness-framework.md](/c:/Users/Boo/Desktop/Shefaa/shefaa/docs/production-readiness-framework.md).
+Execution planning is captured in [production-readiness-roadmap.md](/c:/Users/Boo/Desktop/Shefaa/shefaa/docs/production-readiness-roadmap.md).
 
 ## Executive Summary
 

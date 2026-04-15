@@ -2,7 +2,7 @@
 import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
 import { formatDate } from "@/shared/utils/formatDate";
-import { Loader2, ShieldCheck, UserPlus, Building } from "lucide-react";
+import { Loader2, ShieldCheck, UserPlus, Building, LogIn, LogOut } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { auditLogService } from "@/services/settings/audit.service";
 import { queryKeys } from "@/services/queryKeys";
@@ -12,6 +12,8 @@ import { Button } from "@/components/primitives/Button";
 const ACTION_ICONS: Record<string, typeof ShieldCheck> = {
   clinic_created: Building,
   staff_invited: UserPlus,
+  tenant_impersonation_started: LogIn,
+  tenant_impersonation_ended: LogOut,
 };
 
 export const AuditLogTab = () => {

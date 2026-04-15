@@ -70,12 +70,20 @@ export type TenantOverride = {
   name: string;
 } | null;
 
+export type ImpersonationSession = {
+  requestId: string;
+  startedAt: string;
+  actor: Pick<AppUser, "id" | "name" | "email" | "role">;
+  targetTenant: Exclude<TenantOverride, null>;
+} | null;
+
 interface AuthState {
   user: AppUser | null;
   supabaseUser: SupaUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   tenantOverride: TenantOverride;
+  impersonationSession: ImpersonationSession;
   setUser: (user: AppUser | null, supabaseUser?: SupaUser | null) => void;
   setLoading: (loading: boolean) => void;
   logout: () => Promise<void>;
@@ -83,6 +91,8 @@ interface AuthState {
   hasRole: (role: Role) => boolean;
   setTenantOverride: (tenant: TenantOverride) => void;
   clearTenantOverride: () => void;
+  startImpersonation: (tenant: Exclude<TenantOverride, null>, session: Exclude<ImpersonationSession, null>) => void;
+  stopImpersonation: () => void;
   initialize: () => Promise<void>;
 }
 
@@ -94,16 +104,25 @@ export const useAuth = create<AuthState>()(
       isAuthenticated: false,
       isLoading: true,
       tenantOverride: null,
+      impersonationSession: null,
       setUser: (user, supabaseUser) => set({
         user,
         supabaseUser: supabaseUser ?? null,
         isAuthenticated: !!user,
         isLoading: false,
+        tenantOverride: user?.role === "super_admin" ? get().tenantOverride : null,
+        impersonationSession: user?.role === "super_admin" ? get().impersonationSession : null,
       }),
       setLoading: (isLoading) => set({ isLoading }),
       logout: async () => {
         await authService.logout();
-        set({ user: null, supabaseUser: null, isAuthenticated: false, tenantOverride: null });
+        set({
+          user: null,
+          supabaseUser: null,
+          isAuthenticated: false,
+          tenantOverride: null,
+          impersonationSession: null,
+        });
       },
       hasPermission: (permission) => {
         const { user } = get();
@@ -112,10 +131,19 @@ export const useAuth = create<AuthState>()(
       },
       hasRole: (role) => get().user?.role === role,
       setTenantOverride: (tenant) => {
-        set({ tenantOverride: tenant });
+        set({
+          tenantOverride: tenant,
+          impersonationSession: null,
+        });
       },
       clearTenantOverride: () => {
-        set({ tenantOverride: null });
+        set({ tenantOverride: null, impersonationSession: null });
+      },
+      startImpersonation: (tenant, session) => {
+        set({ tenantOverride: tenant, impersonationSession: session });
+      },
+      stopImpersonation: () => {
+        set({ tenantOverride: null, impersonationSession: null });
       },
       initialize: async () => {
         set({ isLoading: true });
@@ -133,11 +161,27 @@ export const useAuth = create<AuthState>()(
               loadUserProfile(supaUser, set),
               timeout,
             ]);
+            const { user } = get();
+            if (!user || user.role !== "super_admin") {
+              set({ tenantOverride: null, impersonationSession: null });
+            }
           } else {
-            set({ user: null, supabaseUser: null, isAuthenticated: false });
+            set({
+              user: null,
+              supabaseUser: null,
+              isAuthenticated: false,
+              tenantOverride: null,
+              impersonationSession: null,
+            });
           }
         } catch {
-          set({ user: null, supabaseUser: null, isAuthenticated: false });
+          set({
+            user: null,
+            supabaseUser: null,
+            isAuthenticated: false,
+            tenantOverride: null,
+            impersonationSession: null,
+          });
         } finally {
           set({ isLoading: false });
         }
@@ -148,6 +192,8 @@ export const useAuth = create<AuthState>()(
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        tenantOverride: state.tenantOverride,
+        impersonationSession: state.impersonationSession,
       }),
     }
   )
@@ -189,9 +235,17 @@ async function loadUserProfile(
       },
       supabaseUser: supaUser,
       isAuthenticated: true,
+      tenantOverride: useAuth.getState().user?.role === "super_admin" ? useAuth.getState().tenantOverride : null,
+      impersonationSession: useAuth.getState().user?.role === "super_admin" ? useAuth.getState().impersonationSession : null,
     });
   } else {
-    set({ user: null, supabaseUser: null, isAuthenticated: false });
+    set({
+      user: null,
+      supabaseUser: null,
+      isAuthenticated: false,
+      tenantOverride: null,
+      impersonationSession: null,
+    });
   }
 }
 

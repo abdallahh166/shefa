@@ -21,6 +21,7 @@ export { userInviteService } from "./settings/userInvite.service";
 export { clinicSlugService } from "./auth/clinicSlug.service";
 export { authService } from "./auth/auth.service";
 export { adminService } from "./admin/admin.service";
+export { adminImpersonationService } from "./admin/adminImpersonation.service";
 export { subscriptionService } from "./subscription/subscription.service";
 export { userPreferencesService } from "./settings/userPreferences.service";
 export { clientErrorLogService } from "./observability/clientErrorLog.service";
