@@ -12,7 +12,7 @@ Assessment basis:
 
 This report uses the framework in [production-readiness-framework.md](/c:/Users/Boo/Desktop/Shefaa/shefaa/docs/production-readiness-framework.md).
 Execution planning is captured in [production-readiness-roadmap.md](/c:/Users/Boo/Desktop/Shefaa/shefaa/docs/production-readiness-roadmap.md).
-Operational policy references now include [phi-retention-and-deletion.md](/c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/phi-retention-and-deletion.md), [backup-and-restore.md](/c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/backup-and-restore.md), and [backup-restore-validation-checklist.md](/c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/backup-restore-validation-checklist.md).
+Operational policy references now include [phi-retention-and-deletion.md](/c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/phi-retention-and-deletion.md), [backup-and-restore.md](/c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/backup-and-restore.md), [backup-restore-validation-checklist.md](/c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/backup-restore-validation-checklist.md), and [incident-response-and-access-review.md](/c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/incident-response-and-access-review.md).
 
 ## Executive Summary
 

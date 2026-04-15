@@ -38,6 +38,8 @@ Monthly and quarterly restore drills should follow the checklist in [backup-rest
 - Verify RLS and tenant isolation post-restore.
 - Document timeline and outcomes.
 
+Use [incident-response-and-access-review.md](c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/incident-response-and-access-review.md) as the primary incident command and escalation guide when restore work happens as part of a live production incident.
+
 ## Audit Log Retention
 - **Retention target:** 12 months in primary table, 6 years total once archived.
 - **Archive strategy:** quarterly export to cold storage (CSV or parquet).
