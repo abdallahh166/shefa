@@ -102,6 +102,7 @@ export const queryKeys = {
   reports: {
     root: (tenantId?: string) => tenantKey("reports", tenantId),
     access: (tenantId?: string) => [...tenantKey("reports", tenantId), "access"] as const,
+    refreshStatus: (tenantId?: string) => [...tenantKey("reports", tenantId), "refreshStatus"] as const,
     overview: (tenantId?: string) => [...tenantKey("reports", tenantId), "overview"] as const,
     revenueByMonth: (tenantId?: string) => [...tenantKey("reports", tenantId), "revenueByMonth"] as const,
     patientGrowth: (tenantId?: string) => [...tenantKey("reports", tenantId), "patientGrowth"] as const,

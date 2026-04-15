@@ -8,7 +8,7 @@ import {
 } from "recharts";
 import {
   TrendingUp, Users, CalendarDays, DollarSign, Download, Printer,
-  Activity, FileBarChart, Star, ArrowUpRight, ArrowDownRight,
+  Activity, FileBarChart, Star, ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle2,
 } from "lucide-react";
 import { StatCard } from "@/shared/components/StatCard";
 import { DataTable, Column } from "@/shared/components/DataTable";
@@ -20,11 +20,20 @@ import { reportService } from "@/services/reports/report.service";
 import { queryKeys } from "@/services/queryKeys";
 import { useChartColors } from "@/shared/hooks/useChartColors";
 import { toast } from "@/hooks/use-toast";
+import { StatusBadge } from "@/shared/components/StatusBadge";
+import { formatDate } from "@/shared/utils/formatDate";
 
 type Tab = "revenue" | "patients" | "doctors" | "appointments";
 
+const minutesSince = (value?: string | null) => {
+  if (!value) return null;
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) return null;
+  return Math.max(0, Math.round((Date.now() - timestamp) / 60000));
+};
+
 export const ReportsPage = () => {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const { user, hasPermission } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("revenue");
   const canViewReports = hasPermission("view_reports") || hasPermission("super_admin");
@@ -62,6 +71,15 @@ export const ReportsPage = () => {
     enabled: !!user?.tenantId && canRenderReports,
     queryFn: () => reportService.getOverview(),
     staleTime: 1000 * 60 * 5,
+    retry: false,
+    onError: notifyReportError,
+  });
+
+  const { data: refreshStatus } = useQuery({
+    queryKey: queryKeys.reports.refreshStatus(user?.tenantId),
+    enabled: !!user?.tenantId && canRenderReports,
+    queryFn: () => reportService.getRefreshStatus(),
+    staleTime: 1000 * 60 * 2,
     retry: false,
     onError: notifyReportError,
   });
@@ -119,6 +137,26 @@ export const ReportsPage = () => {
     retry: false,
     onError: notifyReportError,
   });
+
+  const refreshStatusLabel =
+    refreshStatus?.health === "failing"
+      ? t("reports.healthFailing")
+      : refreshStatus?.health === "stale"
+        ? t("reports.healthStale")
+        : t("reports.healthHealthy");
+
+  const refreshStatusMessage = (() => {
+    if (!refreshStatus) return "";
+    if (refreshStatus.health === "failing") return t("reports.refreshFailing");
+    if (!refreshStatus.last_succeeded_at) return t("reports.refreshNeverCompleted");
+
+    const elapsedMinutes = minutesSince(refreshStatus.last_succeeded_at);
+    const suffix = elapsedMinutes !== null ? ` (${elapsedMinutes} ${t("reports.minutesSinceLastSuccess")})` : "";
+
+    return refreshStatus.health === "stale"
+      ? `${t("reports.refreshStale")}${suffix}.`
+      : `${t("reports.refreshHealthy")}${suffix}.`;
+  })();
 
   if (!canRenderReports) {
     return (
@@ -283,6 +321,62 @@ export const ReportsPage = () => {
           </div>
         )}
       />
+
+      {refreshStatus && (
+        <div
+          className={cn(
+            "rounded-xl border p-4",
+            refreshStatus.health === "failing"
+              ? "border-destructive/30 bg-destructive/5"
+              : refreshStatus.health === "stale"
+                ? "border-warning/30 bg-warning/5"
+                : "border-success/30 bg-success/5",
+          )}
+        >
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                {refreshStatus.health === "healthy" ? (
+                  <CheckCircle2 className="h-4 w-4 text-success" />
+                ) : (
+                  <AlertTriangle className={cn("h-4 w-4", refreshStatus.health === "failing" ? "text-destructive" : "text-warning")} />
+                )}
+                <span className="font-medium">{t("reports.refreshHealth")}</span>
+                <StatusBadge
+                  variant={
+                    refreshStatus.health === "failing"
+                      ? "destructive"
+                      : refreshStatus.health === "stale"
+                        ? "warning"
+                      : "success"
+                  }
+                >
+                  {refreshStatusLabel}
+                </StatusBadge>
+              </div>
+              <p className="text-sm text-muted-foreground">{refreshStatusMessage}</p>
+            </div>
+            <div className="space-y-1 text-xs text-muted-foreground">
+              <p>
+                {t("reports.lastSuccess")}:{" "}
+                {refreshStatus.last_succeeded_at
+                  ? formatDate(refreshStatus.last_succeeded_at, locale, "datetime")
+                  : t("reports.notYetRefreshed")}
+              </p>
+              {refreshStatus.last_failed_at ? (
+                <p>
+                  {t("reports.lastFailure")}: {formatDate(refreshStatus.last_failed_at, locale, "datetime")}
+                </p>
+              ) : null}
+            </div>
+          </div>
+          {refreshStatus.last_error && refreshStatus.health !== "healthy" ? (
+            <p className="mt-3 rounded-lg bg-background/70 px-3 py-2 text-xs text-muted-foreground">
+              {t("reports.latestError")}: {refreshStatus.last_error}
+            </p>
+          ) : null}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title={t("billing.totalRevenue")} value={`$${totalRevenue.toLocaleString()}`} icon={DollarSign} accent="warning" />

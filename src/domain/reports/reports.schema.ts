@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { dateStringSchema } from "../shared/date.schema";
+import { dateStringSchema, dateTimeStringSchema } from "../shared/date.schema";
 
 export const reportOverviewSchema = z.object({
   total_revenue: z.coerce.number().min(0),
@@ -40,4 +40,20 @@ export const doctorPerformanceRowSchema = z.object({
   appointments: z.coerce.number().int().min(0),
   completed: z.coerce.number().int().min(0),
   rating: z.coerce.number().min(0),
+});
+
+export const reportRefreshHealthEnum = z.enum(["healthy", "stale", "failing"]);
+
+export const reportRefreshStatusSchema = z.object({
+  last_started_at: dateTimeStringSchema.nullable().optional(),
+  last_succeeded_at: dateTimeStringSchema.nullable().optional(),
+  last_failed_at: dateTimeStringSchema.nullable().optional(),
+  last_error: z.string().trim().max(5000).nullable().optional(),
+  is_stale: z.boolean(),
+  stale_after_minutes: z.coerce.number().int().positive(),
+});
+
+export const reportRefreshHealthSchema = reportRefreshStatusSchema.extend({
+  health: reportRefreshHealthEnum,
+  status_message: z.string().trim().min(1).max(240),
 });

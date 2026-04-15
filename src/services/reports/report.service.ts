@@ -5,6 +5,8 @@ import {
   doctorPerformanceRowSchema,
   patientGrowthRowSchema,
   reportOverviewSchema,
+  reportRefreshHealthSchema,
+  reportRefreshStatusSchema,
   revenueByMonthRowSchema,
   revenueByServiceRowSchema,
 } from "@/domain/reports/reports.schema";
@@ -65,6 +67,13 @@ const handleReportError = <T>(err: unknown, fallbackMessage: string, fallbackVal
   throw mapped;
 };
 
+const minutesSince = (value?: string | null) => {
+  if (!value) return null;
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) return null;
+  return Math.max(0, Math.round((Date.now() - timestamp) / 60000));
+};
+
 export const reportService = {
   async canViewReports() {
     try {
@@ -75,6 +84,55 @@ export const reportService = {
       const mapped = toServiceError(err, "Failed to verify report access");
       if (mapped instanceof AuthorizationError) return false;
       throw mapped;
+    }
+  },
+  async getRefreshStatus() {
+    try {
+      const { tenantId } = getTenantContext();
+      const raw = await reportRepository.getRefreshStatus(tenantId);
+      if (!raw) {
+        return reportRefreshHealthSchema.parse({
+          last_started_at: null,
+          last_succeeded_at: null,
+          last_failed_at: null,
+          last_error: null,
+          is_stale: true,
+          stale_after_minutes: 120,
+          health: "stale",
+          status_message: "Reporting has not completed an initial refresh yet.",
+        });
+      }
+
+      const parsed = reportRefreshStatusSchema.parse(raw);
+      const failedAfterSuccess =
+        !!parsed.last_failed_at &&
+        (!parsed.last_succeeded_at || new Date(parsed.last_failed_at).getTime() > new Date(parsed.last_succeeded_at).getTime());
+
+      const health = failedAfterSuccess ? "failing" : parsed.is_stale ? "stale" : "healthy";
+      const staleMinutes = minutesSince(parsed.last_succeeded_at);
+      const statusMessage =
+        health === "failing"
+          ? "Reporting refresh is failing. Data may be stale until the next successful refresh."
+          : health === "stale"
+            ? `Reporting data is stale${staleMinutes !== null ? ` (${staleMinutes} minutes since the last successful refresh)` : ""}.`
+            : `Reporting data is fresh${staleMinutes !== null ? ` (${staleMinutes} minutes since the last successful refresh)` : ""}.`;
+
+      return reportRefreshHealthSchema.parse({
+        ...parsed,
+        health,
+        status_message: statusMessage,
+      });
+    } catch (err) {
+      return handleReportError(err, "Failed to load report refresh status", {
+        last_started_at: null,
+        last_succeeded_at: null,
+        last_failed_at: null,
+        last_error: null,
+        is_stale: true,
+        stale_after_minutes: 120,
+        health: "stale",
+        status_message: "Reporting refresh status is unavailable right now.",
+      });
     }
   },
   async getOverview() {

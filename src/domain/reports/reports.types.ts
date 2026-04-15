@@ -1,6 +1,8 @@
 import type { z } from "zod";
 import {
   reportOverviewSchema,
+  reportRefreshHealthSchema,
+  reportRefreshStatusSchema,
   revenueByMonthRowSchema,
   patientGrowthRowSchema,
   appointmentTypeRowSchema,
@@ -16,3 +18,5 @@ export type AppointmentTypeRow = z.infer<typeof appointmentTypeRowSchema>;
 export type AppointmentStatusRow = z.infer<typeof appointmentStatusRowSchema>;
 export type RevenueByServiceRow = z.infer<typeof revenueByServiceRowSchema>;
 export type DoctorPerformanceRow = z.infer<typeof doctorPerformanceRowSchema>;
+export type ReportRefreshStatus = z.infer<typeof reportRefreshStatusSchema>;
+export type ReportRefreshHealth = z.infer<typeof reportRefreshHealthSchema>;

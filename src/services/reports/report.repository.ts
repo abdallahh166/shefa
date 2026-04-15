@@ -4,6 +4,7 @@ import type {
   DoctorPerformanceRow,
   PatientGrowthRow,
   ReportOverview,
+  ReportRefreshStatus,
   RevenueByMonthRow,
   RevenueByServiceRow,
 } from "@/domain/reports/reports.types";
@@ -12,6 +13,7 @@ import { ServiceError } from "@/services/supabase/errors";
 
 export interface ReportRepository {
   assertAccess(tenantId: string): Promise<void>;
+  getRefreshStatus(tenantId: string): Promise<ReportRefreshStatus | null>;
   getOverview(tenantId: string): Promise<ReportOverview>;
   getRevenueByMonth(tenantId: string, months?: number): Promise<RevenueByMonthRow[]>;
   getPatientGrowth(tenantId: string, months?: number): Promise<PatientGrowthRow[]>;
@@ -30,6 +32,16 @@ export const reportRepository: ReportRepository = {
         details: error,
       });
     }
+  },
+  async getRefreshStatus(_tenantId) {
+    const { data, error } = await supabase.rpc("get_report_refresh_status");
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to load report refresh status", {
+        code: error.code,
+        details: error,
+      });
+    }
+    return ((data as any)?.[0] ?? null) as ReportRefreshStatus | null;
   },
   async getOverview(_tenantId) {
     const { data, error } = await supabase.rpc("get_report_overview");

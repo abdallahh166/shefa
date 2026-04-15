@@ -615,6 +615,7 @@ describe("repositories smoke", () => {
     sub.unsubscribe();
 
     await reportRepository.assertAccess(tenantId);
+    await reportRepository.getRefreshStatus(tenantId);
     await reportRepository.getOverview(tenantId);
     await reportRepository.getRevenueByMonth(tenantId, 6);
     await reportRepository.getPatientGrowth(tenantId, 6);
