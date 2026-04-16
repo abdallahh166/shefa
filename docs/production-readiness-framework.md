@@ -197,3 +197,4 @@ Operational baseline docs created so far:
 - [backup-and-restore.md](c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/backup-and-restore.md)
 - [backup-restore-validation-checklist.md](c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/backup-restore-validation-checklist.md)
 - [incident-response-and-access-review.md](c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/incident-response-and-access-review.md)
+- [vendor-compliance-inventory.md](c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/vendor-compliance-inventory.md)
