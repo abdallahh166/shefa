@@ -4,7 +4,7 @@ import { StatCard } from "@/shared/components/StatCard";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { StatusFilter } from "@/shared/components/StatusFilter";
 import { DataTable, Column } from "@/shared/components/DataTable";
-import { Shield, Plus, CheckCircle, XCircle, Send, Wallet } from "lucide-react";
+import { Shield, Plus, CheckCircle, XCircle, Send, Wallet, TimerReset } from "lucide-react";
 import { Button } from "@/components/primitives/Button";
 import { Input, Textarea } from "@/components/primitives/Inputs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -47,6 +47,14 @@ const getActionCopy = (action: ClaimAction) => {
   if (action === "approved") return { title: "Approve claim", cta: "Approve claim" };
   if (action === "denied") return { title: "Deny claim", cta: "Deny claim" };
   return { title: "Record reimbursement", cta: "Mark reimbursed" };
+};
+
+const getClaimAgeDays = (claim: InsuranceClaimWithPatient) => {
+  const anchor = claim.submitted_at ?? `${claim.claim_date}T00:00:00`;
+  const start = new Date(anchor);
+  if (Number.isNaN(start.getTime())) return 0;
+  const diff = Date.now() - start.getTime();
+  return Math.max(0, Math.floor(diff / 86400000));
 };
 
 export const InsurancePage = () => {
@@ -112,6 +120,18 @@ export const InsurancePage = () => {
     queryFn: async () => insuranceService.getSummary(),
   });
 
+  const { data: operationsSummary = {
+    open_claims_count: 0,
+    aged_0_7_count: 0,
+    aged_8_14_count: 0,
+    aged_15_plus_count: 0,
+    oldest_open_claim_days: 0,
+  } } = useQuery({
+    queryKey: queryKeys.insurance.operations(user?.tenantId),
+    enabled: !!user?.tenantId,
+    queryFn: async () => insuranceService.getOperationsSummary(),
+  });
+
   const claims: InsuranceClaimWithPatient[] = listPage?.data ?? [];
   const totalClaims = listPage?.count ?? 0;
   const total = totalClaims;
@@ -170,6 +190,14 @@ export const InsurancePage = () => {
       header: t("common.date"),
       sortable: true,
       render: (claim) => formatDate(claim.claim_date, locale, "date", calendarType),
+    },
+    {
+      key: "age_days",
+      header: "Age",
+      render: (claim) => {
+        const ageDays = getClaimAgeDays(claim);
+        return <span>{ageDays}d</span>;
+      },
     },
     {
       key: "payer_reference",
@@ -254,10 +282,33 @@ export const InsurancePage = () => {
         )}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard title={t("insurance.activeProviders")} value={String(providerCount)} icon={Shield} />
-        <StatCard title={t("insurance.pendingClaims")} value={String(inFlight)} icon={Shield} />
-        <StatCard title={t("insurance.approvalRate")} value={`${approvalRate}%`} icon={Shield} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
+        <StatCard title="Draft" value={String(insuranceSummary.draft_count)} icon={Shield} accent="primary" />
+        <StatCard title="Submitted" value={String(insuranceSummary.submitted_count)} icon={Send} accent="info" />
+        <StatCard title="Processing" value={String(insuranceSummary.processing_count)} icon={TimerReset} accent="warning" />
+        <StatCard title="Approved" value={String(insuranceSummary.approved_count)} icon={CheckCircle} accent="success" />
+        <StatCard title="Denied" value={String(insuranceSummary.denied_count)} icon={XCircle} accent="destructive" />
+        <StatCard title="Reimbursed" value={String(insuranceSummary.reimbursed_count)} icon={Wallet} accent="success" />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StatCard
+          title="Open Claims"
+          value={String(operationsSummary.open_claims_count)}
+          icon={Shield}
+          accent="warning"
+          subtitle={`${providerCount} active payer${providerCount === 1 ? "" : "s"}`}
+        />
+        <StatCard title="0-7 Days" value={String(operationsSummary.aged_0_7_count)} icon={TimerReset} accent="success" />
+        <StatCard title="8-14 Days" value={String(operationsSummary.aged_8_14_count)} icon={TimerReset} accent="warning" />
+        <StatCard title="15+ Days" value={String(operationsSummary.aged_15_plus_count)} icon={TimerReset} accent="destructive" />
+        <StatCard
+          title="Oldest Open"
+          value={`${operationsSummary.oldest_open_claim_days}d`}
+          icon={Shield}
+          accent="destructive"
+          subtitle={`Approval rate ${approvalRate}%`}
+        />
       </div>
 
       <DataTable

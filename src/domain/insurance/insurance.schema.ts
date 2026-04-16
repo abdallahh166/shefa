@@ -63,3 +63,11 @@ export const insuranceSummarySchema = z.object({
   reimbursed_count: z.coerce.number().int().min(0),
   providers_count: z.coerce.number().int().min(0),
 });
+
+export const insuranceOperationsSummarySchema = z.object({
+  open_claims_count: z.coerce.number().int().min(0),
+  aged_0_7_count: z.coerce.number().int().min(0),
+  aged_8_14_count: z.coerce.number().int().min(0),
+  aged_15_plus_count: z.coerce.number().int().min(0),
+  oldest_open_claim_days: z.coerce.number().int().min(0),
+});

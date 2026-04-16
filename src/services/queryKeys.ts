@@ -50,6 +50,7 @@ export const queryKeys = {
     list: (args?: { tenantId?: string; page?: number; pageSize?: number; search?: string; filters?: Record<string, unknown>; sort?: { column: string; ascending?: boolean } }) =>
       listKey("insurance", args),
     summary: (tenantId?: string) => [...tenantKey("insurance", tenantId), "summary"] as const,
+    operations: (tenantId?: string) => [...tenantKey("insurance", tenantId), "operations"] as const,
   },
   laboratory: {
     root: (tenantId?: string) => tenantKey("laboratory", tenantId),

@@ -33,6 +33,7 @@ vi.mock("@/services/billing/billing.repository", () => ({
 vi.mock("@/services/insurance/insurance.repository", () => ({
   insuranceRepository: {
     getSummary: vi.fn(),
+    getOperationsSummary: vi.fn(),
   },
 }));
 
@@ -97,5 +98,23 @@ describe("summary coercion", () => {
     expect(result.denied_count).toBe(1);
     expect(result.reimbursed_count).toBe(0);
     expect(result.providers_count).toBe(3);
+  });
+
+  it("coerces insurance operations summary numeric strings", async () => {
+    insuranceRepo.getOperationsSummary.mockResolvedValue({
+      open_claims_count: "6",
+      aged_0_7_count: "3",
+      aged_8_14_count: "2",
+      aged_15_plus_count: "1",
+      oldest_open_claim_days: "19",
+    } as any);
+
+    const result = await insuranceService.getOperationsSummary();
+
+    expect(result.open_claims_count).toBe(6);
+    expect(result.aged_0_7_count).toBe(3);
+    expect(result.aged_8_14_count).toBe(2);
+    expect(result.aged_15_plus_count).toBe(1);
+    expect(result.oldest_open_claim_days).toBe(19);
   });
 });

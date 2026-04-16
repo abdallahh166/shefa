@@ -4,6 +4,7 @@ import type {
   InsuranceClaimListParams,
   InsuranceClaimUpdateInput,
   InsuranceClaimWithPatient,
+  InsuranceOperationsSummary,
   InsuranceSummary,
 } from "@/domain/insurance/insurance.types";
 import type { PagedResult } from "@/domain/shared/pagination.types";
@@ -32,6 +33,7 @@ export interface InsuranceRepository {
   listPaged(params: InsuranceClaimListParams, tenantId: string): Promise<PagedResult<InsuranceClaim>>;
   listPagedWithRelations(params: InsuranceClaimListParams, tenantId: string): Promise<PagedResult<InsuranceClaimWithPatient>>;
   getSummary(tenantId: string): Promise<InsuranceSummary>;
+  getOperationsSummary(tenantId: string): Promise<InsuranceOperationsSummary>;
   getById(id: string, tenantId: string): Promise<InsuranceClaim>;
   create(input: InsuranceClaimCreateInput, tenantId: string): Promise<InsuranceClaim>;
   update(id: string, input: InsuranceClaimUpdateInput, tenantId: string): Promise<InsuranceClaim>;
@@ -151,6 +153,23 @@ export const insuranceRepository: InsuranceRepository = {
       reimbursed_count: 0,
       providers_count: 0,
     }) as InsuranceSummary;
+  },
+  async getOperationsSummary(_tenantId) {
+    const { data, error } = await (supabase.rpc as any)("get_insurance_operations_summary");
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to load insurance operations summary", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return ((data as any)?.[0] ?? {
+      open_claims_count: 0,
+      aged_0_7_count: 0,
+      aged_8_14_count: 0,
+      aged_15_plus_count: 0,
+      oldest_open_claim_days: 0,
+    }) as InsuranceOperationsSummary;
   },
   async getById(id, tenantId) {
     const result = await supabase

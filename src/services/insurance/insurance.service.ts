@@ -5,6 +5,7 @@ import {
   insuranceClaimSchema,
   insuranceClaimUpdateSchema,
   insuranceClaimWithPatientSchema,
+  insuranceOperationsSummarySchema,
   insuranceSummarySchema,
 } from "@/domain/insurance/insurance.schema";
 import { uuidSchema } from "@/domain/shared/identifiers.schema";
@@ -75,6 +76,16 @@ export const insuranceService = {
       return insuranceSummarySchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to load insurance summary");
+    }
+  },
+  async getOperationsSummary() {
+    try {
+      assertAnyPermission(["view_billing", "manage_billing"]);
+      const { tenantId } = getTenantContext();
+      const result = await insuranceRepository.getOperationsSummary(tenantId);
+      return insuranceOperationsSummarySchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to load insurance operations summary");
     }
   },
   async create(input: InsuranceClaimCreateInput) {
