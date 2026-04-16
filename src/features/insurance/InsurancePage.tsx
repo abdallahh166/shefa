@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { StatCard } from "@/shared/components/StatCard";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { StatusFilter } from "@/shared/components/StatusFilter";
 import { DataTable, Column } from "@/shared/components/DataTable";
-import { Shield, Plus, CheckCircle, XCircle } from "lucide-react";
+import { Shield, Plus, CheckCircle, XCircle, Send, Wallet } from "lucide-react";
 import { Button } from "@/components/primitives/Button";
+import { Input, Textarea } from "@/components/primitives/Inputs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { PageContainer, SectionHeader } from "@/components/layout/AppLayout";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { useAuth } from "@/core/auth/authStore";
@@ -26,16 +29,24 @@ const statusVariant: Record<string, "success" | "warning" | "destructive" | "inf
   reimbursed: "success",
 };
 
-type ClaimRow = InsuranceClaimWithPatient;
+type ClaimAction = "submitted" | "processing" | "approved" | "denied" | "reimbursed";
 
-type ClaimDisplayRow = {
-  id: string;
-  patient_name: string;
-  provider: string;
-  service: string;
-  amount: number;
-  claim_date: string;
-  status: "draft" | "submitted" | "processing" | "approved" | "denied" | "reimbursed";
+const getClaimStatusLabel = (status: string) => {
+  if (status === "approved") return "Approved";
+  if (status === "denied") return "Denied";
+  if (status === "reimbursed") return "Reimbursed";
+  if (status === "submitted") return "Submitted";
+  if (status === "processing") return "Processing";
+  if (status === "draft") return "Draft";
+  return status;
+};
+
+const getActionCopy = (action: ClaimAction) => {
+  if (action === "submitted") return { title: "Submit claim", cta: "Submit claim" };
+  if (action === "processing") return { title: "Move to processing", cta: "Mark processing" };
+  if (action === "approved") return { title: "Approve claim", cta: "Approve claim" };
+  if (action === "denied") return { title: "Deny claim", cta: "Deny claim" };
+  return { title: "Record reimbursement", cta: "Mark reimbursed" };
 };
 
 export const InsurancePage = () => {
@@ -44,6 +55,13 @@ export const InsurancePage = () => {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [selectedClaim, setSelectedClaim] = useState<InsuranceClaimWithPatient | null>(null);
+  const [selectedAction, setSelectedAction] = useState<ClaimAction | null>(null);
+  const [actionSaving, setActionSaving] = useState(false);
+  const [actionForm, setActionForm] = useState({
+    payer_reference: "",
+    denial_reason: "",
+  });
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [sort, setSort] = useState<{ column: string; direction: "asc" | "desc" }>({
@@ -54,15 +72,17 @@ export const InsurancePage = () => {
 
   useRealtimeSubscription(["insurance_claims"]);
 
+  const listArgs = useMemo(() => ({
+    tenantId: user?.tenantId,
+    page,
+    pageSize,
+    search: searchTerm.trim() || undefined,
+    filters: statusFilter ? { status: statusFilter } : undefined,
+    sort: { column: sort.column, ascending: sort.direction === "asc" },
+  }), [page, pageSize, searchTerm, sort.column, sort.direction, statusFilter, user?.tenantId]);
+
   const { data: listPage, isLoading } = useQuery({
-    queryKey: queryKeys.insurance.list({
-      tenantId: user?.tenantId,
-      page,
-      pageSize,
-      search: searchTerm.trim() || undefined,
-      filters: statusFilter ? { status: statusFilter } : undefined,
-      sort: { column: sort.column, ascending: sort.direction === "asc" },
-    }),
+    queryKey: queryKeys.insurance.list(listArgs),
     queryFn: async () => insuranceService.listPagedWithRelations({
       page,
       pageSize,
@@ -92,125 +112,138 @@ export const InsurancePage = () => {
     queryFn: async () => insuranceService.getSummary(),
   });
 
-  const liveClaims: ClaimRow[] = listPage?.data ?? [];
+  const claims: InsuranceClaimWithPatient[] = listPage?.data ?? [];
   const totalClaims = listPage?.count ?? 0;
-
-  const claims: ClaimDisplayRow[] = liveClaims.map((c) => ({
-    id: c.id,
-    patient_name: c.patients?.full_name ?? "-",
-    provider: c.provider,
-    service: c.service,
-    amount: Number(c.amount),
-    claim_date: c.claim_date,
-    status: c.status,
-  }));
-
   const total = totalClaims;
-  const pending = insuranceSummary.submitted_count + insuranceSummary.processing_count;
-  const approved = insuranceSummary.approved_count;
+  const inFlight = insuranceSummary.submitted_count + insuranceSummary.processing_count;
   const providerCount = insuranceSummary.providers_count;
-  const totalCount = insuranceSummary.total_count;
-  const rate = totalCount ? Math.round((approved / totalCount) * 100) : 0;
+  const dispositionBase = insuranceSummary.approved_count + insuranceSummary.denied_count;
+  const approvalRate = dispositionBase ? Math.round((insuranceSummary.approved_count / dispositionBase) * 100) : 0;
 
   const invalidateClaims = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.insurance.root(user?.tenantId) });
   };
 
-  const handleUpdateStatus = async (id: string, newStatus: ClaimDisplayRow["status"]) => {
+  const openActionDialog = (claim: InsuranceClaimWithPatient, action: ClaimAction) => {
+    setSelectedClaim(claim);
+    setSelectedAction(action);
+    setActionForm({
+      payer_reference: claim.payer_reference ?? "",
+      denial_reason: claim.denial_reason ?? "",
+    });
+  };
+
+  const closeActionDialog = () => {
+    setSelectedClaim(null);
+    setSelectedAction(null);
+    setActionForm({ payer_reference: "", denial_reason: "" });
+  };
+
+  const handleConfirmAction = async () => {
+    if (!selectedClaim || !selectedAction) return;
+
+    setActionSaving(true);
     try {
-      await insuranceService.update(id, { status: newStatus });
-      const title =
-        newStatus === "approved" ? t("insurance.approved") :
-        newStatus === "denied" ? t("insurance.denied") :
-        newStatus === "reimbursed" ? t("insurance.reimbursed") :
-        t("insurance.claimSubmitted");
-      toast({ title });
+      await insuranceService.update(selectedClaim.id, {
+        status: selectedAction,
+        payer_reference: actionForm.payer_reference || null,
+        denial_reason: actionForm.denial_reason || null,
+      });
+      toast({ title: `${getClaimStatusLabel(selectedAction)} updated` });
+      closeActionDialog();
       invalidateClaims();
     } catch (err) {
       const message = err instanceof Error ? err.message : t("common.error");
       toast({ title: t("common.error"), description: message, variant: "destructive" });
+    } finally {
+      setActionSaving(false);
     }
   };
 
-  const getClaimStatusLabel = (status: string) => {
-    if (status === "approved") return t("insurance.approved");
-    if (status === "denied") return t("insurance.denied");
-    if (status === "reimbursed") return t("insurance.reimbursed");
-    if (status === "submitted") return t("insurance.submitted");
-    if (status === "processing") return t("insurance.processing");
-    if (status === "draft") return t("insurance.draft");
-    return status;
-  };
-
-  const columns: Column<ClaimDisplayRow>[] = [
-    { key: "patient_name", header: t("appointments.patient"), searchable: true },
-    { key: "provider", header: t("common.provider"), searchable: true },
-    { key: "service", header: t("common.service"), searchable: true },
-    { key: "amount", header: t("common.amount"), render: (c) => formatCurrency(c.amount, locale) },
-    { key: "claim_date", header: t("common.date"), sortable: true, render: (c) => formatDate(c.claim_date, locale, "date", calendarType) },
-    { key: "status", header: t("common.status"), sortable: true, render: (c) => <StatusBadge variant={statusVariant[c.status] ?? "default"}>{getClaimStatusLabel(c.status)}</StatusBadge> },
+  const columns: Column<InsuranceClaimWithPatient>[] = [
+    { key: "patient_name", header: t("appointments.patient"), searchable: true, render: (claim) => claim.patients?.full_name ?? "-" },
+    { key: "provider", header: t("common.provider"), searchable: true, render: (claim) => claim.provider },
+    { key: "service", header: t("common.service"), searchable: true, render: (claim) => claim.service },
+    { key: "amount", header: t("common.amount"), render: (claim) => formatCurrency(Number(claim.amount), locale) },
+    {
+      key: "claim_date",
+      header: t("common.date"),
+      sortable: true,
+      render: (claim) => formatDate(claim.claim_date, locale, "date", calendarType),
+    },
+    {
+      key: "payer_reference",
+      header: "Payer Ref",
+      render: (claim) => claim.payer_reference ?? <span className="text-muted-foreground">-</span>,
+    },
+    {
+      key: "status",
+      header: t("common.status"),
+      sortable: true,
+      render: (claim) => (
+        <StatusBadge variant={statusVariant[claim.status] ?? "default"}>
+          {getClaimStatusLabel(claim.status)}
+        </StatusBadge>
+      ),
+    },
+    {
+      key: "notes",
+      header: "Outcome",
+      render: (claim) => (
+        claim.denial_reason
+          ? <span className="max-w-xs truncate text-sm text-muted-foreground">{claim.denial_reason}</span>
+          : <span className="text-muted-foreground">-</span>
+      ),
+    },
     {
       key: "actions",
       header: t("common.actions"),
-      render: (c) => c.status === "draft" ? (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => handleUpdateStatus(c.id, "submitted")}
-          className="text-info hover:text-info"
-          aria-label={t("insurance.submitted")}
-          title={t("insurance.submitted")}
-        >
-          <CheckCircle className="h-4 w-4" />
-        </Button>
-      ) : c.status === "submitted" ? (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => handleUpdateStatus(c.id, "processing")}
-          className="text-warning hover:text-warning"
-          aria-label={t("insurance.processing")}
-          title={t("insurance.processing")}
-        >
-          <CheckCircle className="h-4 w-4" />
-        </Button>
-      ) : c.status === "processing" ? (
-        <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => handleUpdateStatus(c.id, "approved")}
-            className="text-success hover:text-success"
-            aria-label={t("common.approve")}
-            title={t("common.approve")}
-          >
-            <CheckCircle className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => handleUpdateStatus(c.id, "denied")}
-            className="text-destructive hover:text-destructive"
-            aria-label={t("common.reject")}
-            title={t("common.reject")}
-          >
-            <XCircle className="h-4 w-4" />
-          </Button>
+      render: (claim) => (
+        <div className="flex flex-wrap justify-end gap-2">
+          {claim.status === "draft" ? (
+            <Button variant="outline" size="sm" className="gap-1" onClick={() => openActionDialog(claim, "submitted")}>
+              <Send className="h-4 w-4" />
+              Submit
+            </Button>
+          ) : null}
+          {claim.status === "submitted" ? (
+            <>
+              <Button variant="outline" size="sm" className="gap-1" onClick={() => openActionDialog(claim, "processing")}>
+                <CheckCircle className="h-4 w-4" />
+                Process
+              </Button>
+              <Button variant="ghost" size="sm" className="gap-1 text-destructive hover:bg-destructive/10" onClick={() => openActionDialog(claim, "denied")}>
+                <XCircle className="h-4 w-4" />
+                Deny
+              </Button>
+            </>
+          ) : null}
+          {claim.status === "processing" ? (
+            <>
+              <Button variant="outline" size="sm" className="gap-1" onClick={() => openActionDialog(claim, "approved")}>
+                <CheckCircle className="h-4 w-4" />
+                Approve
+              </Button>
+              <Button variant="ghost" size="sm" className="gap-1 text-destructive hover:bg-destructive/10" onClick={() => openActionDialog(claim, "denied")}>
+                <XCircle className="h-4 w-4" />
+                Deny
+              </Button>
+            </>
+          ) : null}
+          {claim.status === "approved" ? (
+            <Button variant="outline" size="sm" className="gap-1" onClick={() => openActionDialog(claim, "reimbursed")}>
+              <Wallet className="h-4 w-4" />
+              Reimburse
+            </Button>
+          ) : null}
         </div>
-      ) : c.status === "approved" ? (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => handleUpdateStatus(c.id, "reimbursed")}
-          className="text-success hover:text-success"
-          aria-label={t("insurance.reimbursed")}
-          title={t("insurance.reimbursed")}
-        >
-          <CheckCircle className="h-4 w-4" />
-        </Button>
-      ) : null,
+      ),
     },
   ];
+
+  const actionCopy = selectedAction ? getActionCopy(selectedAction) : null;
+  const needsPayerReference = selectedAction === "submitted" || selectedAction === "approved" || selectedAction === "reimbursed";
+  const needsDenialReason = selectedAction === "denied";
 
   return (
     <PageContainer className="space-y-6">
@@ -221,16 +254,16 @@ export const InsurancePage = () => {
         )}
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard title={t("insurance.activeProviders")} value={String(providerCount)} icon={Shield} />
-        <StatCard title={t("insurance.pendingClaims")} value={String(pending)} icon={Shield} />
-        <StatCard title={t("insurance.approvalRate")} value={`${rate}%`} icon={Shield} />
+        <StatCard title={t("insurance.pendingClaims")} value={String(inFlight)} icon={Shield} />
+        <StatCard title={t("insurance.approvalRate")} value={`${approvalRate}%`} icon={Shield} />
       </div>
 
       <DataTable
         columns={columns}
         data={claims}
-        keyExtractor={(c) => c.id}
+        keyExtractor={(claim) => claim.id}
         searchable
         serverSearch
         searchValue={searchTerm}
@@ -246,20 +279,20 @@ export const InsurancePage = () => {
         pageSize={pageSize}
         total={total}
         onPageChange={setPage}
-        filterSlot={
+        filterSlot={(
           <StatusFilter
             options={[
-              { value: "draft", label: t("insurance.draft") },
-              { value: "submitted", label: t("insurance.submitted") },
-              { value: "processing", label: t("insurance.processing") },
-              { value: "approved", label: t("insurance.approved") },
-              { value: "denied", label: t("insurance.denied") },
-              { value: "reimbursed", label: t("insurance.reimbursed") },
+              { value: "draft", label: "Draft" },
+              { value: "submitted", label: "Submitted" },
+              { value: "processing", label: "Processing" },
+              { value: "approved", label: "Approved" },
+              { value: "denied", label: "Denied" },
+              { value: "reimbursed", label: "Reimbursed" },
             ]}
             selected={statusFilter}
             onChange={setStatusFilter}
           />
-        }
+        )}
       />
 
       <NewClaimModal
@@ -269,6 +302,48 @@ export const InsurancePage = () => {
           invalidateClaims();
         }}
       />
+
+      <Dialog open={!!selectedClaim && !!selectedAction} onOpenChange={(next) => !next && closeActionDialog()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{actionCopy?.title ?? "Update claim"}</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              {selectedClaim ? `${selectedClaim.provider} · ${selectedClaim.patients?.full_name ?? "-"}` : "Update the claim with the payer outcome details."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {needsPayerReference ? (
+              <div className="space-y-2">
+                <Label>Payer reference{selectedAction === "reimbursed" ? " *" : ""}</Label>
+                <Input
+                  value={actionForm.payer_reference}
+                  onChange={(event) => setActionForm((prev) => ({ ...prev, payer_reference: event.target.value }))}
+                  placeholder="Claim control number, EOB reference, remittance ID"
+                />
+              </div>
+            ) : null}
+            {needsDenialReason ? (
+              <div className="space-y-2">
+                <Label>Denial reason *</Label>
+                <Textarea
+                  rows={4}
+                  value={actionForm.denial_reason}
+                  onChange={(event) => setActionForm((prev) => ({ ...prev, denial_reason: event.target.value }))}
+                  placeholder="Missing prior authorization, uncovered service, member eligibility issue, etc."
+                />
+              </div>
+            ) : null}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={closeActionDialog}>
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={() => void handleConfirmAction()} disabled={actionSaving}>
+              {actionSaving ? t("common.loading") : actionCopy?.cta ?? "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   );
 };

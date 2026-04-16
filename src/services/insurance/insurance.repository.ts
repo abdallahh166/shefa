@@ -12,7 +12,7 @@ import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
 
 const CLAIM_COLUMNS =
-  "id, tenant_id, patient_id, provider, service, amount, claim_date, status, submitted_at, approved_at, reimbursed_at, payer_reference, deleted_at, deleted_by, created_at, updated_at";
+  "id, tenant_id, patient_id, provider, service, amount, claim_date, status, submitted_at, processing_started_at, approved_at, reimbursed_at, payer_reference, denial_reason, deleted_at, deleted_by, created_at, updated_at";
 const CLAIM_WITH_PATIENT_COLUMNS = `${CLAIM_COLUMNS}, patients(full_name)`;
 
 const SEARCH_COLUMNS = ["provider", "service", "status"];
@@ -174,9 +174,11 @@ export const insuranceRepository: InsuranceRepository = {
     if (input.claim_date !== undefined) payload.claim_date = input.claim_date;
     if (input.status !== undefined) payload.status = input.status;
     if (input.submitted_at !== undefined) payload.submitted_at = input.submitted_at;
+    if (input.processing_started_at !== undefined) payload.processing_started_at = input.processing_started_at;
     if (input.approved_at !== undefined) payload.approved_at = input.approved_at;
     if (input.reimbursed_at !== undefined) payload.reimbursed_at = input.reimbursed_at;
     if (input.payer_reference !== undefined) payload.payer_reference = input.payer_reference;
+    if (input.denial_reason !== undefined) payload.denial_reason = input.denial_reason;
 
     const result = await supabase
       .from("insurance_claims")
@@ -196,9 +198,11 @@ export const insuranceRepository: InsuranceRepository = {
     if (input.claim_date !== undefined) payload.claim_date = input.claim_date;
     if (input.status !== undefined) payload.status = input.status;
     if (input.submitted_at !== undefined) payload.submitted_at = input.submitted_at;
+    if (input.processing_started_at !== undefined) payload.processing_started_at = input.processing_started_at;
     if (input.approved_at !== undefined) payload.approved_at = input.approved_at;
     if (input.reimbursed_at !== undefined) payload.reimbursed_at = input.reimbursed_at;
     if (input.payer_reference !== undefined) payload.payer_reference = input.payer_reference;
+    if (input.denial_reason !== undefined) payload.denial_reason = input.denial_reason;
 
     if (Object.keys(payload).length === 0) {
       const result = await supabase

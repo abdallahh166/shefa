@@ -31,6 +31,7 @@ export const NewClaimModal = ({ open, onClose, onSuccess }: NewClaimModalProps) 
     provider: "",
     service: "",
     amount: "",
+    claim_date: new Date().toISOString().slice(0, 10),
   });
 
   const { data: patientPage } = useQuery({
@@ -67,9 +68,18 @@ export const NewClaimModal = ({ open, onClose, onSuccess }: NewClaimModalProps) 
         provider: form.provider,
         service: form.service,
         amount: Number.parseFloat(form.amount),
-        status: "pending",
+        claim_date: form.claim_date,
+        status: "draft",
       } as InsuranceClaimCreateInput);
-      toast({ title: t("insurance.claimSubmitted") });
+      toast({ title: "Claim saved as draft" });
+      setForm({
+        patient_id: "",
+        provider: "",
+        service: "",
+        amount: "",
+        claim_date: new Date().toISOString().slice(0, 10),
+      });
+      setPatientSearch("");
       onSuccess();
       onClose();
     } catch (err) {
@@ -134,6 +144,14 @@ export const NewClaimModal = ({ open, onClose, onSuccess }: NewClaimModalProps) 
               value={form.amount}
               onChange={(e) => setForm({ ...form, amount: e.target.value })}
               placeholder="350.00"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>{t("common.date")} *</Label>
+            <Input
+              type="date"
+              value={form.claim_date}
+              onChange={(e) => setForm({ ...form, claim_date: e.target.value })}
             />
           </div>
           <DialogFooter className="gap-2 sm:gap-2">
