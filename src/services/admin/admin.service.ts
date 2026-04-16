@@ -25,6 +25,7 @@ import type {
 import { profileWithRolesSchema } from "@/domain/settings/profile.schema";
 import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import { toServiceError } from "@/services/supabase/errors";
+import { assertAnyPermission } from "@/services/supabase/permissions";
 import { useAuth } from "@/core/auth/authStore";
 import { auditLogService } from "@/services/settings/audit.service";
 import { recentAuthService } from "@/services/auth/recentAuth.service";
@@ -166,6 +167,10 @@ function sortClientErrorTrend(rows: AdminClientErrorTrendPoint[]) {
   return [...rows].sort((left, right) => new Date(left.bucket_start).getTime() - new Date(right.bucket_start).getTime());
 }
 
+function assertSuperAdminAccess() {
+  assertAnyPermission(["super_admin"], "Only super admins can access admin operations");
+}
+
 export const adminService = {
   async listTenantsPaged(input?: {
     page?: number;
@@ -175,6 +180,7 @@ export const adminService = {
     sort?: { column: "name" | "created_at"; direction?: "asc" | "desc" };
   }) {
     try {
+      assertSuperAdminAccess();
       const parsed = paginationSchema
         .pick({ page: true, pageSize: true, search: true, plan: true })
         .extend({ sort: tenantSortSchema })
@@ -200,6 +206,7 @@ export const adminService = {
     sort?: { column: "full_name" | "created_at"; direction?: "asc" | "desc" };
   }) {
     try {
+      assertSuperAdminAccess();
       const parsed = paginationSchema
         .pick({ page: true, pageSize: true, search: true })
         .extend({ sort: profileSortSchema })
@@ -226,6 +233,7 @@ export const adminService = {
     sort?: { column: "plan" | "status" | "amount" | "expires_at" | "created_at"; direction?: "asc" | "desc" };
   }) {
     try {
+      assertSuperAdminAccess();
       const parsed = paginationSchema
         .pick({ page: true, pageSize: true, search: true, plan: true, status: true })
         .extend({ sort: subscriptionSortSchema })
@@ -247,6 +255,7 @@ export const adminService = {
   },
   async getSubscriptionStats() {
     try {
+      assertSuperAdminAccess();
       const result = await adminRepository.getSubscriptionStats();
       return adminSubscriptionStatsSchema.parse(result);
     } catch (err) {
@@ -255,6 +264,7 @@ export const adminService = {
   },
   async getOperationsAlerts() {
     try {
+      assertSuperAdminAccess();
       const summary = adminOperationsAlertSummarySchema.parse(await adminRepository.getOperationsAlertSummary());
       return buildOperationsAlertResponse(summary);
     } catch (err) {
@@ -263,6 +273,7 @@ export const adminService = {
   },
   async getOperationsDashboard() {
     try {
+      assertSuperAdminAccess();
       const summary = adminOperationsAlertSummarySchema.parse(await adminRepository.getOperationsAlertSummary());
       const recentJobActivity = sortRecentJobActivity(
         z.array(adminRecentJobActivitySchema).parse(await adminRepository.getRecentJobActivity(8)),
@@ -287,6 +298,7 @@ export const adminService = {
   },
   async updateSubscription(id: string, input: AdminSubscriptionUpdateInput) {
     try {
+      assertSuperAdminAccess();
       recentAuthService.assertRecentAuth({ action: "subscription_update" });
       const parsedId = uuidSchema.parse(id);
       const parsed = adminSubscriptionUpdateSchema.parse(input);

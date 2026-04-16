@@ -7,6 +7,7 @@ import {
 import type { FeatureFlagKey, FeatureFlagUpsertInput } from "@/domain/featureFlags/featureFlag.types";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { toServiceError } from "@/services/supabase/errors";
+import { assertAnyPermission } from "@/services/supabase/permissions";
 import { auditLogService } from "@/services/settings/audit.service";
 import { featureFlagRepository } from "./featureFlag.repository";
 
@@ -33,6 +34,7 @@ export const featureFlagService = {
   },
   async setFlag(input: FeatureFlagUpsertInput) {
     try {
+      assertAnyPermission(["manage_clinic", "super_admin"]);
       const parsed = featureFlagUpsertSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
       const result = await featureFlagRepository.upsert(tenantId, parsed);

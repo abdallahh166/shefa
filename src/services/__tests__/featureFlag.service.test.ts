@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { featureFlagService } from "@/services/featureFlags/featureFlag.service";
 import { featureFlagRepository } from "@/services/featureFlags/featureFlag.repository";
 import { auditLogService } from "@/services/settings/audit.service";
+import { AuthorizationError } from "@/services/supabase/errors";
+
+const permissions = vi.hoisted(() => ({
+  assertAnyPermission: vi.fn(),
+}));
 
 vi.mock("@/services/supabase/tenant", () => ({
   getTenantContext: () => ({
@@ -24,12 +29,15 @@ vi.mock("@/services/settings/audit.service", () => ({
   },
 }));
 
+vi.mock("@/services/supabase/permissions", () => permissions);
+
 const repo = vi.mocked(featureFlagRepository, true);
 const audit = vi.mocked(auditLogService, true);
 
 describe("featureFlagService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    permissions.assertAnyPermission.mockReturnValue(undefined);
   });
 
   it("lists feature flags for the tenant", async () => {
@@ -99,5 +107,24 @@ describe("featureFlagService", () => {
         details: expect.objectContaining({ feature_key: "insurance_module", enabled: true }),
       })
     );
+  });
+
+  it("blocks updates when the caller cannot manage clinic settings", async () => {
+    permissions.assertAnyPermission.mockImplementation(() => {
+      throw new AuthorizationError("Not authorized");
+    });
+
+    await expect(
+      featureFlagService.setFlag({
+        feature_key: "insurance_module",
+        enabled: false,
+      })
+    ).rejects.toMatchObject({
+      name: "AuthorizationError",
+      message: "Not authorized",
+    });
+
+    expect(repo.upsert).not.toHaveBeenCalled();
+    expect(audit.logEvent).not.toHaveBeenCalled();
   });
 });

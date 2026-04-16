@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">93.23% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>123/123</span>
+                <span class='fraction'>124/133</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">87.5% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>7/7</span>
+                <span class='fraction'>7/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">93.23% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>123/123</span>
+                <span class='fraction'>124/133</span>
             </div>
         
             
@@ -219,7 +219,19 @@
 <a name='L154'></a><a href='#L154'>154</a>
 <a name='L155'></a><a href='#L155'>155</a>
 <a name='L156'></a><a href='#L156'>156</a>
-<a name='L157'></a><a href='#L157'>157</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L157'></a><a href='#L157'>157</a>
+<a name='L158'></a><a href='#L158'>158</a>
+<a name='L159'></a><a href='#L159'>159</a>
+<a name='L160'></a><a href='#L160'>160</a>
+<a name='L161'></a><a href='#L161'>161</a>
+<a name='L162'></a><a href='#L162'>162</a>
+<a name='L163'></a><a href='#L163'>163</a>
+<a name='L164'></a><a href='#L164'>164</a>
+<a name='L165'></a><a href='#L165'>165</a>
+<a name='L166'></a><a href='#L166'>166</a>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -241,6 +253,7 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -298,6 +311,17 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
@@ -400,6 +424,7 @@ function escapeSearchTerm(term: string) {
 &nbsp;
 export interface DoctorRepository {
   listPaged(params: DoctorListParams, tenantId: string): Promise&lt;PagedResult&lt;Doctor&gt;&gt;;
+  getById(id: string, tenantId: string): Promise&lt;Doctor&gt;;
   create(input: DoctorCreateInput, tenantId: string): Promise&lt;Doctor&gt;;
   update(id: string, input: DoctorUpdateInput, tenantId: string): Promise&lt;Doctor&gt;;
   archive(id: string, tenantId: string, userId: string): Promise&lt;Doctor&gt;;
@@ -454,6 +479,17 @@ export const doctorRepository: DoctorRepository = {
 &nbsp;
     return { data: (<span class="branch-0 cbranch-no" title="branch not covered" >data ?? [])</span> as Doctor[], count: <span class="branch-0 cbranch-no" title="branch not covered" >count ?? 0 }</span>;
   },
+<span class="fstat-no" title="function not covered" >  async getById(id, tenantId) {</span>
+<span class="cstat-no" title="statement not covered" >    const result = await supabase</span>
+<span class="cstat-no" title="statement not covered" >      .from("doctors")</span>
+<span class="cstat-no" title="statement not covered" >      .select(DOCTOR_COLUMNS)</span>
+<span class="cstat-no" title="statement not covered" >      .eq("id", id)</span>
+<span class="cstat-no" title="statement not covered" >      .eq("tenant_id", tenantId)</span>
+<span class="cstat-no" title="statement not covered" >      .is("deleted_at", null)</span>
+<span class="cstat-no" title="statement not covered" >      .single();</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    return assertOk(result) as Doctor;</span>
+<span class="cstat-no" title="statement not covered" >  },</span>
   async create(input, tenantId) {
     const payload: Record&lt;string, unknown&gt; = {
       tenant_id: tenantId,
@@ -538,7 +574,7 @@ export const doctorRepository: DoctorRepository = {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-14T03:52:36.819Z
+                at 2026-04-16T18:03:26.182Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

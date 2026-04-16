@@ -1,6 +1,7 @@
 import { tenantSchema, tenantUpdateSchema } from "@/domain/settings/tenant.schema";
 import type { TenantUpdateInput } from "@/domain/settings/tenant.types";
 import { toServiceError } from "@/services/supabase/errors";
+import { assertAnyPermission } from "@/services/supabase/permissions";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { tenantRepository } from "./tenant.repository";
 
@@ -16,6 +17,7 @@ export const tenantService = {
   },
   async updateCurrentTenant(input: TenantUpdateInput) {
     try {
+      assertAnyPermission(["manage_clinic", "super_admin"]);
       const parsed = tenantUpdateSchema.parse(input);
       const { tenantId } = getTenantContext();
       const result = await tenantRepository.update(tenantId, parsed);

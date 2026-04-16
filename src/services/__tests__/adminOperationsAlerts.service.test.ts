@@ -12,13 +12,19 @@ const adminRepository = vi.hoisted(() => ({
   updateSubscription: vi.fn(),
 }));
 
+const permissions = vi.hoisted(() => ({
+  assertAnyPermission: vi.fn(),
+}));
+
 vi.mock("@/services/admin/admin.repository", () => ({ adminRepository }));
+vi.mock("@/services/supabase/permissions", () => permissions);
 
 import { adminService } from "@/services/admin/admin.service";
 
 describe("adminService operations alerts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    permissions.assertAnyPermission.mockReturnValue(undefined);
     adminRepository.getRecentJobActivity.mockResolvedValue([]);
     adminRepository.getRecentSystemErrors.mockResolvedValue([]);
     adminRepository.getClientErrorTrend.mockResolvedValue([]);
