@@ -1,94 +1,257 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { billingRepository } from "@/services/billing/billing.repository";
 
 const tenantId = "00000000-0000-0000-0000-000000000111";
 const userId = "00000000-0000-0000-0000-000000000222";
 const patientId = "00000000-0000-0000-0000-000000000333";
 const invoiceId = "00000000-0000-0000-0000-000000000444";
-const now = "2026-03-14T00:00:00.000Z";
+const paymentId = "00000000-0000-0000-0000-000000000555";
 
-const billingRepository = vi.hoisted(() => ({
-  listPaged: vi.fn(),
-  listPagedWithRelations: vi.fn(),
-  getSummary: vi.fn(),
-  countInRange: vi.fn(),
-  listByDateRange: vi.fn(),
-  listByPatient: vi.fn(),
-  create: vi.fn(),
-  update: vi.fn(),
-  archive: vi.fn(),
-  restore: vi.fn(),
-}));
-
-const rateLimitService = vi.hoisted(() => ({ assertAllowed: vi.fn() }));
 const emitDomainEvent = vi.hoisted(() => vi.fn());
 
-vi.mock("@/services/billing/billing.repository", () => ({ billingRepository }));
-vi.mock("@/services/security/rateLimit.service", () => ({ rateLimitService }));
-vi.mock("@/core/events", () => ({ emitDomainEvent }));
-vi.mock("@/services/supabase/tenant", () => ({ getTenantContext: () => ({ tenantId, userId }) }));
+vi.mock("@/services/billing/billing.repository", () => ({
+  billingRepository: {
+    listPaged: vi.fn(),
+    listPagedWithRelations: vi.fn(),
+    getSummary: vi.fn(),
+    countInRange: vi.fn(),
+    listByDateRange: vi.fn(),
+    listByPatient: vi.fn(),
+    getById: vi.fn(),
+    listPayments: vi.fn(),
+    create: vi.fn(),
+    createPayment: vi.fn(),
+    update: vi.fn(),
+    archive: vi.fn(),
+    restore: vi.fn(),
+  },
+}));
 
-import { billingService } from "@/services/billing/billing.service";
+vi.mock("@/core/events", () => ({
+  emitDomainEvent,
+}));
 
-const invoice = {
+vi.mock("@/services/supabase/tenant", () => ({
+  getTenantContext: () => ({
+    tenantId,
+    userId,
+  }),
+}));
+
+vi.mock("@/services/settings/audit.service", () => ({
+  auditLogService: {
+    logEvent: vi.fn(),
+  },
+}));
+
+vi.mock("@/services/security/rateLimit.service", () => ({
+  rateLimitService: {
+    assertAllowed: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+const buildInvoice = (overrides: Record<string, unknown> = {}) => ({
   id: invoiceId,
   tenant_id: tenantId,
   patient_id: patientId,
   invoice_code: "INV-100",
-  service: "Consult",
+  service: "Consultation",
   amount: 120,
-  invoice_date: "2026-03-10",
-  status: "paid",
+  amount_paid: 0,
+  balance_due: 120,
+  invoice_date: "2026-04-16",
+  due_date: "2026-04-20",
+  paid_at: null,
+  voided_at: null,
+  void_reason: null,
+  status: "pending",
   deleted_at: null,
   deleted_by: null,
-  created_at: now,
-  updated_at: now,
-};
+  created_at: "2026-04-16T08:00:00.000Z",
+  updated_at: "2026-04-16T08:00:00.000Z",
+  ...overrides,
+});
 
-describe("billingService coverage", () => {
+describe("billingService permissions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    billingRepository.listPaged.mockResolvedValue({ data: [invoice], count: 1 });
-    billingRepository.listPagedWithRelations.mockResolvedValue({
-      data: [{ ...invoice, patients: { full_name: "Patient One" } }],
-      count: 1,
-    });
-    billingRepository.getSummary.mockResolvedValue({
-      total_count: 1,
-      paid_count: 1,
-      paid_amount: 120,
-      pending_amount: 0,
-    });
-    billingRepository.countInRange.mockResolvedValue(1);
-    billingRepository.listByDateRange.mockResolvedValue([invoice]);
-    billingRepository.listByPatient.mockResolvedValue([invoice]);
-    billingRepository.create.mockResolvedValue(invoice);
-    billingRepository.update.mockResolvedValue(invoice);
-    billingRepository.archive.mockResolvedValue(invoice);
-    billingRepository.restore.mockResolvedValue(invoice);
-    rateLimitService.assertAllowed.mockResolvedValue(undefined);
+    vi.resetModules();
     emitDomainEvent.mockResolvedValue(undefined);
   });
 
-  it("exercises billing service methods", async () => {
-    await billingService.listPaged({ page: 1, pageSize: 10 });
-    await billingService.listPagedWithRelations({ page: 1, pageSize: 10 });
-    await billingService.getSummary();
-    await billingService.countInRange("2026-03-01", "2026-03-31");
-    await billingService.listByDateRange("2026-03-01", "2026-03-31", { limit: 10, offset: 0 });
-    await billingService.listByPatient(patientId, { limit: 5, offset: 0 });
+  it("blocks list when lacking billing permissions", async () => {
+    vi.doMock("@/core/auth/authStore", () => ({
+      useAuth: {
+        getState: () => ({ hasPermission: () => false }),
+      },
+    }));
+    const { billingService } = await import("@/services/billing/billing.service");
+
+    await expect(
+      billingService.listPaged({ page: 1, pageSize: 10 }),
+    ).rejects.toThrow("Not authorized");
+  });
+
+  it("creates a pending invoice with derived balances", async () => {
+    vi.doMock("@/core/auth/authStore", () => ({
+      useAuth: {
+        getState: () => ({ hasPermission: () => true }),
+      },
+    }));
+
+    const repo = vi.mocked(billingRepository, true);
+    repo.create.mockResolvedValue(buildInvoice());
+
+    const { billingService } = await import("@/services/billing/billing.service");
+
     await billingService.create({
       patient_id: patientId,
       invoice_code: "INV-101",
-      service: "Exam",
-      amount: 80,
-      invoice_date: "2026-03-11",
-      status: "pending",
+      service: "ECG",
+      amount: 120,
+      due_date: "2026-04-20",
     });
-    await billingService.update(invoiceId, { status: "paid" });
-    await billingService.archive(invoiceId);
-    await billingService.restore(invoiceId);
 
-    expect(rateLimitService.assertAllowed).toHaveBeenCalled();
-    expect(emitDomainEvent).toHaveBeenCalled();
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 120,
+        amount_paid: 0,
+        balance_due: 120,
+        status: "pending",
+        due_date: "2026-04-20",
+      }),
+      tenantId,
+    );
+    expect(emitDomainEvent).not.toHaveBeenCalled();
+  });
+
+  it("posts a partial payment and keeps the invoice partially paid", async () => {
+    vi.doMock("@/core/auth/authStore", () => ({
+      useAuth: {
+        getState: () => ({ hasPermission: () => true }),
+      },
+    }));
+
+    const repo = vi.mocked(billingRepository, true);
+    repo.getById.mockResolvedValue(buildInvoice());
+    repo.createPayment.mockResolvedValue({
+      id: paymentId,
+      tenant_id: tenantId,
+      invoice_id: invoiceId,
+      patient_id: patientId,
+      amount: 40,
+      payment_method: "cash",
+      paid_at: "2026-04-16T09:00:00.000Z",
+      reference: "RCPT-1",
+      notes: "Front desk collected cash",
+      created_at: "2026-04-16T09:00:00.000Z",
+      created_by: userId,
+    });
+    repo.update.mockResolvedValue(buildInvoice({
+      amount_paid: 40,
+      balance_due: 80,
+      status: "partially_paid",
+      paid_at: null,
+    }));
+
+    const { billingService } = await import("@/services/billing/billing.service");
+    const result = await billingService.postPayment(invoiceId, {
+      amount: 40,
+      payment_method: "cash",
+      paid_at: "2026-04-16T09:00:00.000Z",
+      reference: "RCPT-1",
+    });
+
+    expect(repo.createPayment).toHaveBeenCalledWith(
+      invoiceId,
+      patientId,
+      expect.objectContaining({
+        amount: 40,
+        payment_method: "cash",
+      }),
+      tenantId,
+      userId,
+    );
+    expect(result.invoice.status).toBe("partially_paid");
+    expect(result.invoice.balance_due).toBe(80);
+    expect(emitDomainEvent).not.toHaveBeenCalled();
+  });
+
+  it("emits InvoicePaid when a posted payment settles the invoice", async () => {
+    vi.doMock("@/core/auth/authStore", () => ({
+      useAuth: {
+        getState: () => ({ hasPermission: () => true }),
+      },
+    }));
+
+    const repo = vi.mocked(billingRepository, true);
+    repo.getById.mockResolvedValue(buildInvoice({
+      amount_paid: 30,
+      balance_due: 90,
+      status: "partially_paid",
+    }));
+    repo.createPayment.mockResolvedValue({
+      id: paymentId,
+      tenant_id: tenantId,
+      invoice_id: invoiceId,
+      patient_id: patientId,
+      amount: 90,
+      payment_method: "card",
+      paid_at: "2026-04-16T10:00:00.000Z",
+      reference: "CARD-100",
+      notes: null,
+      created_at: "2026-04-16T10:00:00.000Z",
+      created_by: userId,
+    });
+    repo.update.mockResolvedValue(buildInvoice({
+      amount_paid: 120,
+      balance_due: 0,
+      status: "paid",
+      paid_at: "2026-04-16T10:00:00.000Z",
+    }));
+
+    const { billingService } = await import("@/services/billing/billing.service");
+    const result = await billingService.postPayment(invoiceId, {
+      amount: 90,
+      payment_method: "card",
+      paid_at: "2026-04-16T10:00:00.000Z",
+      reference: "CARD-100",
+    });
+
+    expect(result.invoice.status).toBe("paid");
+    expect(result.invoice.balance_due).toBe(0);
+    expect(emitDomainEvent).toHaveBeenCalledWith(
+      "InvoicePaid",
+      expect.objectContaining({
+        invoiceId,
+        patientId,
+        amount: 90,
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it("blocks voiding an invoice that already has posted payments", async () => {
+    vi.doMock("@/core/auth/authStore", () => ({
+      useAuth: {
+        getState: () => ({ hasPermission: () => true }),
+      },
+    }));
+
+    const repo = vi.mocked(billingRepository, true);
+    repo.getById.mockResolvedValue(buildInvoice({
+      amount_paid: 10,
+      balance_due: 110,
+      status: "partially_paid",
+    }));
+
+    const { billingService } = await import("@/services/billing/billing.service");
+
+    await expect(
+      billingService.update(invoiceId, {
+        status: "void",
+        void_reason: "Entered for the wrong patient",
+      }),
+    ).rejects.toThrow("Invoices with posted payments cannot be voided");
   });
 });

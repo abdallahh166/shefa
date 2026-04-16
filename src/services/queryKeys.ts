@@ -43,6 +43,7 @@ export const queryKeys = {
       [...tenantKey("billing", args?.tenantId), "range", args] as const,
     summary: (tenantId?: string) => [...tenantKey("billing", tenantId), "summary"] as const,
     monthCount: (tenantId?: string, monthKey?: string) => [...tenantKey("billing", tenantId), "monthCount", monthKey] as const,
+    payments: (invoiceId: string, tenantId?: string) => [...tenantKey("billing", tenantId), "payments", invoiceId] as const,
   },
   insurance: {
     root: (tenantId?: string) => tenantKey("insurance", tenantId),

@@ -30,6 +30,7 @@ export const NewInvoiceModal = ({ open, onClose, onSuccess }: NewInvoiceModalPro
     patient_id: "",
     service: "",
     amount: "",
+    due_date: "",
   });
 
   const { data: patientPage } = useQuery({
@@ -66,8 +67,16 @@ export const NewInvoiceModal = ({ open, onClose, onSuccess }: NewInvoiceModalPro
         invoice_code: code,
         service: form.service,
         amount: Number.parseFloat(form.amount),
+        due_date: form.due_date || null,
       } as InvoiceCreateInput);
       toast({ title: t("billing.invoiceCreated") });
+      setForm({
+        patient_id: "",
+        service: "",
+        amount: "",
+        due_date: "",
+      });
+      setPatientSearch("");
       onSuccess();
       onClose();
     } catch (err) {
@@ -124,6 +133,14 @@ export const NewInvoiceModal = ({ open, onClose, onSuccess }: NewInvoiceModalPro
               value={form.amount}
               onChange={(e) => setForm({ ...form, amount: e.target.value })}
               placeholder="350.00"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Due date</Label>
+            <Input
+              type="date"
+              value={form.due_date}
+              onChange={(e) => setForm({ ...form, due_date: e.target.value })}
             />
           </div>
           <DialogFooter className="gap-2 sm:gap-2">

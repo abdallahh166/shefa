@@ -42,7 +42,7 @@ const labStatusVariant: Record<string, "default" | "warning" | "success"> = {
   pending: "default", processing: "warning", completed: "success",
 };
 const invoiceStatusVariant: Record<string, "success" | "warning" | "destructive"> = {
-  paid: "success", pending: "warning", overdue: "destructive",
+  paid: "success", pending: "warning", overdue: "destructive", partially_paid: "warning", void: "destructive",
 };
 const apptStatusVariant: Record<string, "default" | "warning" | "success" | "destructive"> = {
   scheduled: "warning", completed: "success", cancelled: "destructive", in_progress: "default",
@@ -278,7 +278,15 @@ export const PatientDetailPage = () => {
     s === "pending" ? t("billing.pending") : s === "processing" ? t("laboratory.processing") : t("appointments.completed");
 
   const getInvoiceStatusLabel = (s: string) =>
-    s === "paid" ? t("billing.paid") : s === "overdue" ? t("billing.overdue") : t("billing.pending");
+    s === "paid"
+      ? t("billing.paid")
+      : s === "overdue"
+        ? t("billing.overdue")
+        : s === "partially_paid"
+          ? "Partially paid"
+          : s === "void"
+            ? "Void"
+            : t("billing.pending");
 
   if (loadingPatient) {
     return (
@@ -299,8 +307,11 @@ export const PatientDetailPage = () => {
     );
   }
 
-  const totalBilled = invoices.reduce((s: number, i: any) => s + Number(i.amount), 0);
-  const totalPaid = invoices.filter((i: any) => i.status === "paid").reduce((s: number, i: any) => s + Number(i.amount), 0);
+  const totalBilled = invoices.reduce((sum: number, invoice: any) => sum + Number(invoice.amount), 0);
+  const totalPaid = invoices.reduce((sum: number, invoice: any) => sum + Number(invoice.amount_paid ?? 0), 0);
+  const totalOutstanding = invoices
+    .filter((invoice: any) => invoice.status !== "void")
+    .reduce((sum: number, invoice: any) => sum + Number(invoice.balance_due ?? 0), 0);
 
   return (
     <PageContainer className="space-y-6">
@@ -746,7 +757,7 @@ export const PatientDetailPage = () => {
         return (
           <div className="space-y-4">
             {/* summary strip */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               {[
                 { label: t("laboratory.pendingOrders"), count: labOrders.filter((l: any) => l.status === "pending").length, variant: "default" },
                 { label: t("laboratory.processing"), count: labOrders.filter((l: any) => l.status === "processing").length, variant: "warning" },
@@ -782,6 +793,8 @@ export const PatientDetailPage = () => {
           { key: "invoice_code", header: t("billing.invoiceNumber"), render: (inv) => <span className="font-medium">{inv.invoice_code}</span> },
           { key: "service", header: t("common.service"), render: (inv) => inv.service },
           { key: "amount", header: t("common.amount"), render: (inv) => <span className="font-semibold">{formatCurrency(Number(inv.amount), locale)}</span> },
+          { key: "amount_paid", header: "Paid", render: (inv) => <span className="text-success">{formatCurrency(Number(inv.amount_paid ?? 0), locale)}</span> },
+          { key: "balance_due", header: "Balance", render: (inv) => <span>{formatCurrency(Number(inv.balance_due ?? 0), locale)}</span> },
           { key: "invoice_date", header: t("common.date"), render: (inv) => <span className="text-muted-foreground whitespace-nowrap">{formatDate(inv.invoice_date, locale, "date", calendarType)}</span> },
           {
             key: "status",
@@ -808,7 +821,11 @@ export const PatientDetailPage = () => {
               </div>
               <div className="stat-card text-center">
                 <p className="text-2xl font-bold text-success">{formatCurrency(totalPaid, locale)}</p>
-                <p className="text-xs text-muted-foreground mt-1">{t("billing.paid")}</p>
+                <p className="text-xs text-muted-foreground mt-1">Collected</p>
+              </div>
+              <div className="stat-card text-center">
+                <p className="text-2xl font-bold">{formatCurrency(totalOutstanding, locale)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Outstanding</p>
               </div>
             </div>
 
