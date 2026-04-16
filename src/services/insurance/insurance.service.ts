@@ -5,6 +5,7 @@ import {
   insuranceClaimSchema,
   insuranceClaimUpdateSchema,
   insuranceClaimWithPatientSchema,
+  insuranceAssignableOwnerSchema,
   insuranceOperationsSummarySchema,
   insuranceSummarySchema,
 } from "@/domain/insurance/insurance.schema";
@@ -26,7 +27,7 @@ const ALLOWED_STATUS_TRANSITIONS: Record<InsuranceClaim["status"], Array<Insuran
   submitted: ["processing", "denied"],
   processing: ["approved", "denied"],
   approved: ["reimbursed"],
-  denied: [],
+  denied: ["draft"],
   reimbursed: [],
 };
 
@@ -88,6 +89,16 @@ export const insuranceService = {
       throw toServiceError(err, "Failed to load insurance operations summary");
     }
   },
+  async listAssignableOwners() {
+    try {
+      assertAnyPermission(["view_billing", "manage_billing"]);
+      const { tenantId } = getTenantContext();
+      const result = await insuranceRepository.listAssignableOwners(tenantId);
+      return z.array(insuranceAssignableOwnerSchema).parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to load insurance claim owners");
+    }
+  },
   async create(input: InsuranceClaimCreateInput) {
     try {
       assertAnyPermission(["manage_billing"]);
@@ -110,6 +121,12 @@ export const insuranceService = {
         approved_at: null,
         reimbursed_at: null,
         denial_reason: null,
+        assigned_to_user_id: parsed.assigned_to_user_id ?? null,
+        internal_notes: parsed.internal_notes?.trim() || null,
+        payer_notes: parsed.payer_notes?.trim() || null,
+        last_follow_up_at: parsed.last_follow_up_at ?? null,
+        next_follow_up_at: parsed.next_follow_up_at ?? null,
+        resubmission_count: parsed.resubmission_count ?? 0,
       }, tenantId);
       const claim = insuranceClaimSchema.parse(result);
 
@@ -147,9 +164,18 @@ export const insuranceService = {
 
         const now = new Date().toISOString();
 
+        if (updates.status === "draft" && current.status === "denied") {
+          updates.resubmission_count = current.resubmission_count + 1;
+          updates.submitted_at = null;
+          updates.processing_started_at = null;
+          updates.approved_at = null;
+          updates.reimbursed_at = null;
+        }
+
         if (updates.status === "submitted") {
           updates.submitted_at = updates.submitted_at ?? current.submitted_at ?? now;
           updates.denial_reason = null;
+          updates.next_follow_up_at = null;
         }
 
         if (updates.status === "processing") {
@@ -185,6 +211,14 @@ export const insuranceService = {
           updates.reimbursed_at = updates.reimbursed_at ?? current.reimbursed_at ?? now;
           updates.denial_reason = null;
         }
+      }
+
+      if (updates.internal_notes !== undefined) {
+        updates.internal_notes = updates.internal_notes?.trim() || null;
+      }
+
+      if (updates.payer_notes !== undefined) {
+        updates.payer_notes = updates.payer_notes?.trim() || null;
       }
 
       const result = await insuranceRepository.update(parsedId, updates, tenantId);

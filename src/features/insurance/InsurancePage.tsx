@@ -4,7 +4,18 @@ import { StatCard } from "@/shared/components/StatCard";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { StatusFilter } from "@/shared/components/StatusFilter";
 import { DataTable, Column } from "@/shared/components/DataTable";
-import { Shield, Plus, CheckCircle, XCircle, Send, Wallet, TimerReset } from "lucide-react";
+import {
+  CheckCircle,
+  Clock3,
+  Plus,
+  RefreshCcw,
+  Send,
+  Shield,
+  TimerReset,
+  UserRound,
+  Wallet,
+  XCircle,
+} from "lucide-react";
 import { Button } from "@/components/primitives/Button";
 import { Input, Textarea } from "@/components/primitives/Inputs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -13,12 +24,17 @@ import { PageContainer, SectionHeader } from "@/components/layout/AppLayout";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { useAuth } from "@/core/auth/authStore";
 import { NewClaimModal } from "./NewClaimModal";
+import { ClaimFollowUpDialog } from "./ClaimFollowUpDialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { formatDate, formatCurrency } from "@/shared/utils/formatDate";
 import { insuranceService } from "@/services/insurance/insurance.service";
 import { queryKeys } from "@/services/queryKeys";
-import type { InsuranceClaimWithPatient } from "@/domain/insurance/insurance.types";
+import type {
+  InsuranceAssignableOwner,
+  InsuranceClaimWithPatient,
+  InsuranceClaimUpdateInput,
+} from "@/domain/insurance/insurance.types";
 
 const statusVariant: Record<string, "success" | "warning" | "destructive" | "info" | "default"> = {
   draft: "default",
@@ -29,7 +45,8 @@ const statusVariant: Record<string, "success" | "warning" | "destructive" | "inf
   reimbursed: "success",
 };
 
-type ClaimAction = "submitted" | "processing" | "approved" | "denied" | "reimbursed";
+type ClaimAction = "draft" | "submitted" | "processing" | "approved" | "denied" | "reimbursed";
+type QueueFilter = "denied_follow_up" | "aged_open" | "stalled_processing" | "follow_up_due" | "unassigned_open";
 
 const getClaimStatusLabel = (status: string) => {
   if (status === "approved") return "Approved";
@@ -42,6 +59,7 @@ const getClaimStatusLabel = (status: string) => {
 };
 
 const getActionCopy = (action: ClaimAction) => {
+  if (action === "draft") return { title: "Reopen claim for correction", cta: "Reopen claim" };
   if (action === "submitted") return { title: "Submit claim", cta: "Submit claim" };
   if (action === "processing") return { title: "Move to processing", cta: "Mark processing" };
   if (action === "approved") return { title: "Approve claim", cta: "Approve claim" };
@@ -57,15 +75,113 @@ const getClaimAgeDays = (claim: InsuranceClaimWithPatient) => {
   return Math.max(0, Math.floor(diff / 86400000));
 };
 
+const queueMeta: Record<QueueFilter, { title: string; subtitle: string }> = {
+  denied_follow_up: {
+    title: "Denied queue",
+    subtitle: "Claims waiting for correction, appeal, or resubmission.",
+  },
+  aged_open: {
+    title: "15+ day open claims",
+    subtitle: "Claims that are aging beyond the first normal billing window.",
+  },
+  stalled_processing: {
+    title: "Stalled processing",
+    subtitle: "Claims sitting in payer processing for more than 7 days.",
+  },
+  follow_up_due: {
+    title: "Follow-up due",
+    subtitle: "Claims with a scheduled payer touchpoint that is due now.",
+  },
+  unassigned_open: {
+    title: "Unassigned open",
+    subtitle: "Claims with no accountable owner yet.",
+  },
+};
+
+interface WorkQueueCardProps {
+  title: string;
+  subtitle: string;
+  count: number;
+  claims: InsuranceClaimWithPatient[];
+  isLoading?: boolean;
+  onViewQueue: () => void;
+  onOpenFollowUp: (claim: InsuranceClaimWithPatient) => void;
+  onOpenAction: (claim: InsuranceClaimWithPatient, action: ClaimAction) => void;
+}
+
+const WorkQueueCard = ({
+  title,
+  subtitle,
+  count,
+  claims,
+  isLoading = false,
+  onViewQueue,
+  onOpenFollowUp,
+  onOpenAction,
+}: WorkQueueCardProps) => (
+  <section className="rounded-xl border bg-card p-4">
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
+      </div>
+      <StatusBadge variant={count > 0 ? "warning" : "default"}>{count}</StatusBadge>
+    </div>
+    <div className="mt-4 space-y-3">
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading queue...</p>
+      ) : claims.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No claims in this queue.</p>
+      ) : (
+        claims.map((claim) => (
+          <div key={claim.id} className="rounded-lg border border-border/60 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">{claim.patients?.full_name ?? "-"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {claim.provider} - {claim.service}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-medium">{getClaimAgeDays(claim)}d</p>
+                <p className="text-xs text-muted-foreground">
+                  {claim.assigned_profile?.full_name ?? "Unassigned"}
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => onOpenFollowUp(claim)}>
+                Follow up
+              </Button>
+              {claim.status === "denied" ? (
+                <Button variant="ghost" size="sm" onClick={() => onOpenAction(claim, "draft")}>
+                  <RefreshCcw className="h-4 w-4" />
+                  Reopen
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+    <Button variant="ghost" size="sm" className="mt-4" onClick={onViewQueue}>
+      View queue
+    </Button>
+  </section>
+);
+
 export const InsurancePage = () => {
   const { t, locale, calendarType } = useI18n();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [queueFilter, setQueueFilter] = useState<QueueFilter | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [selectedClaim, setSelectedClaim] = useState<InsuranceClaimWithPatient | null>(null);
   const [selectedAction, setSelectedAction] = useState<ClaimAction | null>(null);
+  const [followUpClaim, setFollowUpClaim] = useState<InsuranceClaimWithPatient | null>(null);
   const [actionSaving, setActionSaving] = useState(false);
+  const [followUpSaving, setFollowUpSaving] = useState(false);
   const [actionForm, setActionForm] = useState({
     payer_reference: "",
     denial_reason: "",
@@ -85,9 +201,12 @@ export const InsurancePage = () => {
     page,
     pageSize,
     search: searchTerm.trim() || undefined,
-    filters: statusFilter ? { status: statusFilter } : undefined,
+    filters: {
+      ...(statusFilter ? { status: statusFilter } : {}),
+      ...(queueFilter ? { queue: queueFilter } : {}),
+    },
     sort: { column: sort.column, ascending: sort.direction === "asc" },
-  }), [page, pageSize, searchTerm, sort.column, sort.direction, statusFilter, user?.tenantId]);
+  }), [page, pageSize, queueFilter, searchTerm, sort.column, sort.direction, statusFilter, user?.tenantId]);
 
   const { data: listPage, isLoading } = useQuery({
     queryKey: queryKeys.insurance.list(listArgs),
@@ -95,7 +214,10 @@ export const InsurancePage = () => {
       page,
       pageSize,
       search: searchTerm.trim() || undefined,
-      filters: statusFilter ? { status: statusFilter } : undefined,
+      filters: {
+        ...(statusFilter ? { status: statusFilter } : {}),
+        ...(queueFilter ? { queue: queueFilter } : {}),
+      },
       sort: { column: sort.column, ascending: sort.direction === "asc" },
     }),
     enabled: !!user?.tenantId,
@@ -103,7 +225,7 @@ export const InsurancePage = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, searchTerm]);
+  }, [queueFilter, statusFilter, searchTerm]);
 
   const { data: insuranceSummary = {
     total_count: 0,
@@ -126,16 +248,81 @@ export const InsurancePage = () => {
     aged_8_14_count: 0,
     aged_15_plus_count: 0,
     oldest_open_claim_days: 0,
+    denied_follow_up_count: 0,
+    follow_up_due_count: 0,
+    unassigned_open_count: 0,
+    stalled_processing_count: 0,
   } } = useQuery({
     queryKey: queryKeys.insurance.operations(user?.tenantId),
     enabled: !!user?.tenantId,
     queryFn: async () => insuranceService.getOperationsSummary(),
   });
 
+  const { data: assignableOwners = [] } = useQuery({
+    queryKey: queryKeys.insurance.owners(user?.tenantId),
+    enabled: !!user?.tenantId,
+    queryFn: async () => insuranceService.listAssignableOwners(),
+  });
+
+  const deniedQueueArgs = useMemo(() => ({
+    tenantId: user?.tenantId,
+    page: 1,
+    pageSize: 5,
+    filters: { queue: "denied_follow_up" },
+    sort: { column: "updated_at", ascending: false },
+  }), [user?.tenantId]);
+
+  const agedQueueArgs = useMemo(() => ({
+    tenantId: user?.tenantId,
+    page: 1,
+    pageSize: 5,
+    filters: { queue: "aged_open" },
+    sort: { column: "claim_date", ascending: true },
+  }), [user?.tenantId]);
+
+  const stalledQueueArgs = useMemo(() => ({
+    tenantId: user?.tenantId,
+    page: 1,
+    pageSize: 5,
+    filters: { queue: "stalled_processing" },
+    sort: { column: "processing_started_at", ascending: true },
+  }), [user?.tenantId]);
+
+  const { data: deniedQueue, isLoading: deniedQueueLoading } = useQuery({
+    queryKey: queryKeys.insurance.list(deniedQueueArgs),
+    enabled: !!user?.tenantId,
+    queryFn: async () => insuranceService.listPagedWithRelations({
+      page: 1,
+      pageSize: 5,
+      filters: { queue: "denied_follow_up" },
+      sort: { column: "updated_at", ascending: false },
+    }),
+  });
+
+  const { data: agedQueue, isLoading: agedQueueLoading } = useQuery({
+    queryKey: queryKeys.insurance.list(agedQueueArgs),
+    enabled: !!user?.tenantId,
+    queryFn: async () => insuranceService.listPagedWithRelations({
+      page: 1,
+      pageSize: 5,
+      filters: { queue: "aged_open" },
+      sort: { column: "claim_date", ascending: true },
+    }),
+  });
+
+  const { data: stalledQueue, isLoading: stalledQueueLoading } = useQuery({
+    queryKey: queryKeys.insurance.list(stalledQueueArgs),
+    enabled: !!user?.tenantId,
+    queryFn: async () => insuranceService.listPagedWithRelations({
+      page: 1,
+      pageSize: 5,
+      filters: { queue: "stalled_processing" },
+      sort: { column: "processing_started_at", ascending: true },
+    }),
+  });
+
   const claims: InsuranceClaimWithPatient[] = listPage?.data ?? [];
   const totalClaims = listPage?.count ?? 0;
-  const total = totalClaims;
-  const inFlight = insuranceSummary.submitted_count + insuranceSummary.processing_count;
   const providerCount = insuranceSummary.providers_count;
   const dispositionBase = insuranceSummary.approved_count + insuranceSummary.denied_count;
   const approvalRate = dispositionBase ? Math.round((insuranceSummary.approved_count / dispositionBase) * 100) : 0;
@@ -159,6 +346,11 @@ export const InsurancePage = () => {
     setActionForm({ payer_reference: "", denial_reason: "" });
   };
 
+  const applyQueue = (nextQueue: QueueFilter | null) => {
+    setQueueFilter(nextQueue);
+    setStatusFilter(null);
+  };
+
   const handleConfirmAction = async () => {
     if (!selectedClaim || !selectedAction) return;
 
@@ -180,6 +372,23 @@ export const InsurancePage = () => {
     }
   };
 
+  const handleSaveFollowUp = async (input: InsuranceClaimUpdateInput) => {
+    if (!followUpClaim) return;
+
+    setFollowUpSaving(true);
+    try {
+      await insuranceService.update(followUpClaim.id, input);
+      toast({ title: "Follow-up saved" });
+      setFollowUpClaim(null);
+      invalidateClaims();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("common.error");
+      toast({ title: t("common.error"), description: message, variant: "destructive" });
+    } finally {
+      setFollowUpSaving(false);
+    }
+  };
+
   const columns: Column<InsuranceClaimWithPatient>[] = [
     { key: "patient_name", header: t("appointments.patient"), searchable: true, render: (claim) => claim.patients?.full_name ?? "-" },
     { key: "provider", header: t("common.provider"), searchable: true, render: (claim) => claim.provider },
@@ -194,15 +403,20 @@ export const InsurancePage = () => {
     {
       key: "age_days",
       header: "Age",
-      render: (claim) => {
-        const ageDays = getClaimAgeDays(claim);
-        return <span>{ageDays}d</span>;
-      },
+      render: (claim) => <span>{getClaimAgeDays(claim)}d</span>,
     },
     {
-      key: "payer_reference",
-      header: "Payer Ref",
-      render: (claim) => claim.payer_reference ?? <span className="text-muted-foreground">-</span>,
+      key: "owner",
+      header: "Owner",
+      render: (claim) => claim.assigned_profile?.full_name ?? <span className="text-muted-foreground">Unassigned</span>,
+    },
+    {
+      key: "next_follow_up_at",
+      header: "Next follow-up",
+      sortable: true,
+      render: (claim) => claim.next_follow_up_at
+        ? formatDate(claim.next_follow_up_at, locale, "datetime", calendarType)
+        : <span className="text-muted-foreground">-</span>,
     },
     {
       key: "status",
@@ -216,18 +430,24 @@ export const InsurancePage = () => {
     },
     {
       key: "notes",
-      header: "Outcome",
-      render: (claim) => (
-        claim.denial_reason
-          ? <span className="max-w-xs truncate text-sm text-muted-foreground">{claim.denial_reason}</span>
-          : <span className="text-muted-foreground">-</span>
-      ),
+      header: "Follow-up",
+      render: (claim) => {
+        const summary = claim.denial_reason ?? claim.payer_notes ?? claim.internal_notes;
+        return summary
+          ? <span className="block max-w-xs truncate text-sm text-muted-foreground">{summary}</span>
+          : <span className="text-muted-foreground">-</span>;
+      },
     },
     {
       key: "actions",
       header: t("common.actions"),
       render: (claim) => (
         <div className="flex flex-wrap justify-end gap-2">
+          {claim.status !== "reimbursed" ? (
+            <Button variant="outline" size="sm" onClick={() => setFollowUpClaim(claim)}>
+              Follow up
+            </Button>
+          ) : null}
           {claim.status === "draft" ? (
             <Button variant="outline" size="sm" className="gap-1" onClick={() => openActionDialog(claim, "submitted")}>
               <Send className="h-4 w-4" />
@@ -264,6 +484,12 @@ export const InsurancePage = () => {
               Reimburse
             </Button>
           ) : null}
+          {claim.status === "denied" ? (
+            <Button variant="ghost" size="sm" className="gap-1" onClick={() => openActionDialog(claim, "draft")}>
+              <RefreshCcw className="h-4 w-4" />
+              Reopen
+            </Button>
+          ) : null}
         </div>
       ),
     },
@@ -272,6 +498,14 @@ export const InsurancePage = () => {
   const actionCopy = selectedAction ? getActionCopy(selectedAction) : null;
   const needsPayerReference = selectedAction === "submitted" || selectedAction === "approved" || selectedAction === "reimbursed";
   const needsDenialReason = selectedAction === "denied";
+
+  const queueButtons: Array<{ key: QueueFilter; label: string }> = [
+    { key: "denied_follow_up", label: "Denied queue" },
+    { key: "aged_open", label: "15+ day open" },
+    { key: "stalled_processing", label: "Stalled processing" },
+    { key: "follow_up_due", label: "Follow-up due" },
+    { key: "unassigned_open", label: "Unassigned open" },
+  ];
 
   return (
     <PageContainer className="space-y-6">
@@ -301,7 +535,7 @@ export const InsurancePage = () => {
         />
         <StatCard title="0-7 Days" value={String(operationsSummary.aged_0_7_count)} icon={TimerReset} accent="success" />
         <StatCard title="8-14 Days" value={String(operationsSummary.aged_8_14_count)} icon={TimerReset} accent="warning" />
-        <StatCard title="15+ Days" value={String(operationsSummary.aged_15_plus_count)} icon={TimerReset} accent="destructive" />
+        <StatCard title="15+ Days" value={String(operationsSummary.aged_15_plus_count)} icon={Clock3} accent="destructive" />
         <StatCard
           title="Oldest Open"
           value={`${operationsSummary.oldest_open_claim_days}d`}
@@ -309,6 +543,62 @@ export const InsurancePage = () => {
           accent="destructive"
           subtitle={`Approval rate ${approvalRate}%`}
         />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard title="Denied Follow-up" value={String(operationsSummary.denied_follow_up_count)} icon={XCircle} accent="destructive" />
+        <StatCard title="Follow-up Due" value={String(operationsSummary.follow_up_due_count)} icon={Clock3} accent="warning" />
+        <StatCard title="Unassigned Open" value={String(operationsSummary.unassigned_open_count)} icon={UserRound} accent="info" />
+        <StatCard title="Stalled Processing" value={String(operationsSummary.stalled_processing_count)} icon={TimerReset} accent="warning" />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <WorkQueueCard
+          title={queueMeta.denied_follow_up.title}
+          subtitle={queueMeta.denied_follow_up.subtitle}
+          count={deniedQueue?.count ?? 0}
+          claims={deniedQueue?.data ?? []}
+          isLoading={deniedQueueLoading}
+          onViewQueue={() => applyQueue("denied_follow_up")}
+          onOpenFollowUp={setFollowUpClaim}
+          onOpenAction={openActionDialog}
+        />
+        <WorkQueueCard
+          title={queueMeta.aged_open.title}
+          subtitle={queueMeta.aged_open.subtitle}
+          count={agedQueue?.count ?? 0}
+          claims={agedQueue?.data ?? []}
+          isLoading={agedQueueLoading}
+          onViewQueue={() => applyQueue("aged_open")}
+          onOpenFollowUp={setFollowUpClaim}
+          onOpenAction={openActionDialog}
+        />
+        <WorkQueueCard
+          title={queueMeta.stalled_processing.title}
+          subtitle={queueMeta.stalled_processing.subtitle}
+          count={stalledQueue?.count ?? 0}
+          claims={stalledQueue?.data ?? []}
+          isLoading={stalledQueueLoading}
+          onViewQueue={() => applyQueue("stalled_processing")}
+          onOpenFollowUp={setFollowUpClaim}
+          onOpenAction={openActionDialog}
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button variant={queueFilter === null ? "default" : "outline"} size="sm" onClick={() => applyQueue(null)}>
+          All claims
+        </Button>
+        {queueButtons.map((queue) => (
+          <Button
+            key={queue.key}
+            variant={queueFilter === queue.key ? "default" : "outline"}
+            size="sm"
+            onClick={() => applyQueue(queue.key)}
+          >
+            {queue.label}
+          </Button>
+        ))}
       </div>
 
       <DataTable
@@ -328,7 +618,7 @@ export const InsurancePage = () => {
         }}
         page={page}
         pageSize={pageSize}
-        total={total}
+        total={totalClaims}
         onPageChange={setPage}
         filterSlot={(
           <StatusFilter
@@ -354,12 +644,21 @@ export const InsurancePage = () => {
         }}
       />
 
+      <ClaimFollowUpDialog
+        open={!!followUpClaim}
+        claim={followUpClaim}
+        owners={assignableOwners as InsuranceAssignableOwner[]}
+        saving={followUpSaving}
+        onClose={() => setFollowUpClaim(null)}
+        onSave={handleSaveFollowUp}
+      />
+
       <Dialog open={!!selectedClaim && !!selectedAction} onOpenChange={(next) => !next && closeActionDialog()}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{actionCopy?.title ?? "Update claim"}</DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
-              {selectedClaim ? `${selectedClaim.provider} · ${selectedClaim.patients?.full_name ?? "-"}` : "Update the claim with the payer outcome details."}
+              {selectedClaim ? `${selectedClaim.provider} - ${selectedClaim.patients?.full_name ?? "-"}` : "Update the claim with the payer outcome details."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -383,6 +682,11 @@ export const InsurancePage = () => {
                   placeholder="Missing prior authorization, uncovered service, member eligibility issue, etc."
                 />
               </div>
+            ) : null}
+            {selectedAction === "draft" ? (
+              <p className="text-sm text-muted-foreground">
+                This reopens the denied claim as a corrected draft so billing can update details and resubmit it.
+              </p>
             ) : null}
           </div>
           <DialogFooter className="gap-2 sm:gap-2">

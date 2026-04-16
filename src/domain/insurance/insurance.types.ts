@@ -7,6 +7,7 @@ import {
   insuranceClaimListParamsSchema,
   insuranceSummarySchema,
   insuranceOperationsSummarySchema,
+  insuranceAssignableOwnerSchema,
 } from "./insurance.schema";
 
 export type InsuranceClaim = z.infer<typeof insuranceClaimSchema>;
@@ -16,3 +17,4 @@ export type InsuranceClaimUpdateInput = z.infer<typeof insuranceClaimUpdateSchem
 export type InsuranceClaimListParams = z.infer<typeof insuranceClaimListParamsSchema>;
 export type InsuranceSummary = z.infer<typeof insuranceSummarySchema>;
 export type InsuranceOperationsSummary = z.infer<typeof insuranceOperationsSummarySchema>;
+export type InsuranceAssignableOwner = z.infer<typeof insuranceAssignableOwnerSchema>;

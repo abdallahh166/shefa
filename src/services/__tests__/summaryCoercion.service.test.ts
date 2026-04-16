@@ -107,6 +107,10 @@ describe("summary coercion", () => {
       aged_8_14_count: "2",
       aged_15_plus_count: "1",
       oldest_open_claim_days: "19",
+      denied_follow_up_count: "2",
+      follow_up_due_count: "1",
+      unassigned_open_count: "2",
+      stalled_processing_count: "1",
     } as any);
 
     const result = await insuranceService.getOperationsSummary();
@@ -116,5 +120,9 @@ describe("summary coercion", () => {
     expect(result.aged_8_14_count).toBe(2);
     expect(result.aged_15_plus_count).toBe(1);
     expect(result.oldest_open_claim_days).toBe(19);
+    expect(result.denied_follow_up_count).toBe(2);
+    expect(result.follow_up_due_count).toBe(1);
+    expect(result.unassigned_open_count).toBe(2);
+    expect(result.stalled_processing_count).toBe(1);
   });
 });

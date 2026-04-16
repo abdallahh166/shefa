@@ -1,6 +1,7 @@
 import type {
   InsuranceClaim,
   InsuranceClaimCreateInput,
+  InsuranceAssignableOwner,
   InsuranceClaimListParams,
   InsuranceClaimUpdateInput,
   InsuranceClaimWithPatient,
@@ -13,20 +14,64 @@ import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
 
 const CLAIM_COLUMNS =
-  "id, tenant_id, patient_id, provider, service, amount, claim_date, status, submitted_at, processing_started_at, approved_at, reimbursed_at, payer_reference, denial_reason, deleted_at, deleted_by, created_at, updated_at";
-const CLAIM_WITH_PATIENT_COLUMNS = `${CLAIM_COLUMNS}, patients(full_name)`;
+  "id, tenant_id, patient_id, provider, service, amount, claim_date, status, submitted_at, processing_started_at, approved_at, reimbursed_at, payer_reference, denial_reason, assigned_to_user_id, internal_notes, payer_notes, last_follow_up_at, next_follow_up_at, resubmission_count, deleted_at, deleted_by, created_at, updated_at";
+const CLAIM_WITH_PATIENT_COLUMNS = `${CLAIM_COLUMNS}, patients(full_name), assigned_profile:profiles!insurance_claims_assigned_to_user_id_fkey(full_name)`;
 
-const SEARCH_COLUMNS = ["provider", "service", "status"];
+const SEARCH_COLUMNS = ["provider", "service", "status", "denial_reason", "payer_notes", "internal_notes"];
 const SEARCH_COLUMNS_WITH_RELATIONS = [...SEARCH_COLUMNS, "patients.full_name"];
 const SORTABLE_COLUMNS = new Set([
   "claim_date",
   "created_at",
   "updated_at",
   "status",
+  "submitted_at",
+  "processing_started_at",
+  "next_follow_up_at",
+  "last_follow_up_at",
 ]);
+
+const OPEN_CLAIM_STATUSES = ["submitted", "processing", "approved"];
 
 function escapeSearchTerm(term: string) {
   return term.replace(/[%_]/g, "\\$&").replace(/,/g, "\\,");
+}
+
+function applyQueueFilter(query: any, queue: unknown) {
+  const nowIso = new Date().toISOString();
+  const agedOpenCutoffDate = new Date(Date.now() - (15 * 86400000)).toISOString().slice(0, 10);
+  const stalledProcessingCutoffIso = new Date(Date.now() - (7 * 86400000)).toISOString();
+
+  if (queue === "denied_follow_up") {
+    return query.eq("status", "denied");
+  }
+
+  if (queue === "aged_open") {
+    return query
+      .in("status", OPEN_CLAIM_STATUSES)
+      .or(`submitted_at.lte.${agedOpenCutoffDate},and(submitted_at.is.null,claim_date.lte.${agedOpenCutoffDate})`);
+  }
+
+  if (queue === "stalled_processing") {
+    return query
+      .eq("status", "processing")
+      .not("processing_started_at", "is", null)
+      .lte("processing_started_at", stalledProcessingCutoffIso);
+  }
+
+  if (queue === "follow_up_due") {
+    return query
+      .neq("status", "reimbursed")
+      .not("next_follow_up_at", "is", null)
+      .lte("next_follow_up_at", nowIso);
+  }
+
+  if (queue === "unassigned_open") {
+    return query
+      .in("status", OPEN_CLAIM_STATUSES)
+      .is("assigned_to_user_id", null);
+  }
+
+  return query;
 }
 
 export interface InsuranceRepository {
@@ -34,6 +79,7 @@ export interface InsuranceRepository {
   listPagedWithRelations(params: InsuranceClaimListParams, tenantId: string): Promise<PagedResult<InsuranceClaimWithPatient>>;
   getSummary(tenantId: string): Promise<InsuranceSummary>;
   getOperationsSummary(tenantId: string): Promise<InsuranceOperationsSummary>;
+  listAssignableOwners(tenantId: string): Promise<InsuranceAssignableOwner[]>;
   getById(id: string, tenantId: string): Promise<InsuranceClaim>;
   create(input: InsuranceClaimCreateInput, tenantId: string): Promise<InsuranceClaim>;
   update(id: string, input: InsuranceClaimUpdateInput, tenantId: string): Promise<InsuranceClaim>;
@@ -62,6 +108,10 @@ export const insuranceRepository: InsuranceRepository = {
     if (typeof filters.patient_id === "string" && filters.patient_id.length > 0) {
       query = query.eq("patient_id", filters.patient_id);
     }
+    if (typeof filters.assigned_to_user_id === "string" && filters.assigned_to_user_id.length > 0) {
+      query = query.eq("assigned_to_user_id", filters.assigned_to_user_id);
+    }
+    query = applyQueueFilter(query, filters.queue);
 
     if (searchTerm) {
       const escaped = escapeSearchTerm(searchTerm);
@@ -108,6 +158,10 @@ export const insuranceRepository: InsuranceRepository = {
     if (typeof filters.patient_id === "string" && filters.patient_id.length > 0) {
       query = query.eq("patient_id", filters.patient_id);
     }
+    if (typeof filters.assigned_to_user_id === "string" && filters.assigned_to_user_id.length > 0) {
+      query = query.eq("assigned_to_user_id", filters.assigned_to_user_id);
+    }
+    query = applyQueueFilter(query, filters.queue);
 
     if (searchTerm) {
       const escaped = escapeSearchTerm(searchTerm);
@@ -169,7 +223,59 @@ export const insuranceRepository: InsuranceRepository = {
       aged_8_14_count: 0,
       aged_15_plus_count: 0,
       oldest_open_claim_days: 0,
+      denied_follow_up_count: 0,
+      follow_up_due_count: 0,
+      unassigned_open_count: 0,
+      stalled_processing_count: 0,
     }) as InsuranceOperationsSummary;
+  },
+  async listAssignableOwners(tenantId) {
+    const { data: profiles, error: profilesError } = await supabase
+      .from("profiles")
+      .select("user_id, full_name")
+      .eq("tenant_id", tenantId)
+      .order("full_name", { ascending: true });
+
+    if (profilesError) {
+      throw new ServiceError(profilesError.message ?? "Failed to load insurance claim owners", {
+        code: profilesError.code,
+        details: profilesError,
+      });
+    }
+
+    if (!profiles?.length) return [];
+
+    const { data: roles, error: rolesError } = await supabase
+      .from("user_roles")
+      .select("user_id, role")
+      .in("user_id", profiles.map((profile) => profile.user_id));
+
+    if (rolesError) {
+      throw new ServiceError(rolesError.message ?? "Failed to load insurance claim owner roles", {
+        code: rolesError.code,
+        details: rolesError,
+      });
+    }
+
+    const allowedRoles = new Set(["clinic_admin", "accountant"]);
+    const roleByUserId = new Map<string, string>();
+    for (const role of roles ?? []) {
+      if (allowedRoles.has(role.role)) {
+        roleByUserId.set(role.user_id, role.role);
+      }
+    }
+
+    return profiles
+      .map((profile) => {
+        const role = roleByUserId.get(profile.user_id);
+        if (!role) return null;
+        return {
+          user_id: profile.user_id,
+          full_name: profile.full_name,
+          role,
+        } as InsuranceAssignableOwner;
+      })
+      .filter((profile): profile is InsuranceAssignableOwner => profile !== null);
   },
   async getById(id, tenantId) {
     const result = await supabase
@@ -198,6 +304,12 @@ export const insuranceRepository: InsuranceRepository = {
     if (input.reimbursed_at !== undefined) payload.reimbursed_at = input.reimbursed_at;
     if (input.payer_reference !== undefined) payload.payer_reference = input.payer_reference;
     if (input.denial_reason !== undefined) payload.denial_reason = input.denial_reason;
+    if (input.assigned_to_user_id !== undefined) payload.assigned_to_user_id = input.assigned_to_user_id;
+    if (input.internal_notes !== undefined) payload.internal_notes = input.internal_notes;
+    if (input.payer_notes !== undefined) payload.payer_notes = input.payer_notes;
+    if (input.last_follow_up_at !== undefined) payload.last_follow_up_at = input.last_follow_up_at;
+    if (input.next_follow_up_at !== undefined) payload.next_follow_up_at = input.next_follow_up_at;
+    if (input.resubmission_count !== undefined) payload.resubmission_count = input.resubmission_count;
 
     const result = await supabase
       .from("insurance_claims")
@@ -222,6 +334,12 @@ export const insuranceRepository: InsuranceRepository = {
     if (input.reimbursed_at !== undefined) payload.reimbursed_at = input.reimbursed_at;
     if (input.payer_reference !== undefined) payload.payer_reference = input.payer_reference;
     if (input.denial_reason !== undefined) payload.denial_reason = input.denial_reason;
+    if (input.assigned_to_user_id !== undefined) payload.assigned_to_user_id = input.assigned_to_user_id;
+    if (input.internal_notes !== undefined) payload.internal_notes = input.internal_notes;
+    if (input.payer_notes !== undefined) payload.payer_notes = input.payer_notes;
+    if (input.last_follow_up_at !== undefined) payload.last_follow_up_at = input.last_follow_up_at;
+    if (input.next_follow_up_at !== undefined) payload.next_follow_up_at = input.next_follow_up_at;
+    if (input.resubmission_count !== undefined) payload.resubmission_count = input.resubmission_count;
 
     if (Object.keys(payload).length === 0) {
       const result = await supabase

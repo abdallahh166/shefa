@@ -11,6 +11,8 @@ vi.mock("@/services/insurance/insurance.repository", () => ({
     listPaged: vi.fn(),
     listPagedWithRelations: vi.fn(),
     getSummary: vi.fn(),
+    getOperationsSummary: vi.fn(),
+    listAssignableOwners: vi.fn(),
     getById: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
@@ -47,6 +49,12 @@ const buildClaim = (overrides: Record<string, unknown> = {}) => ({
   reimbursed_at: null,
   payer_reference: null,
   denial_reason: null,
+  assigned_to_user_id: null,
+  internal_notes: null,
+  payer_notes: null,
+  last_follow_up_at: null,
+  next_follow_up_at: null,
+  resubmission_count: 0,
   deleted_at: null,
   deleted_by: null,
   created_at: "2026-04-16T08:00:00.000Z",
@@ -170,6 +178,78 @@ describe("insuranceService workflow", () => {
     await expect(
       insuranceService.update(claimId, { status: "reimbursed" }),
     ).rejects.toThrow("Reimbursed claims require a payer reference");
+  });
+
+  it("reopens denied claims as corrected drafts and increments resubmission count", async () => {
+    vi.doMock("@/core/auth/authStore", () => ({
+      useAuth: {
+        getState: () => ({ hasPermission: () => true }),
+      },
+    }));
+    const repo = vi.mocked(insuranceRepository, true);
+    repo.getById.mockResolvedValue(buildClaim({
+      status: "denied",
+      denial_reason: "Eligibility terminated",
+      submitted_at: "2026-04-10T09:00:00.000Z",
+      resubmission_count: 1,
+    }));
+    repo.update.mockResolvedValue(buildClaim({
+      status: "draft",
+      denial_reason: "Eligibility terminated",
+      resubmission_count: 2,
+    }));
+
+    const { insuranceService } = await import("@/services/insurance/insurance.service");
+
+    await insuranceService.update(claimId, { status: "draft" });
+
+    expect(repo.update).toHaveBeenCalledWith(
+      claimId,
+      expect.objectContaining({
+        status: "draft",
+        submitted_at: null,
+        processing_started_at: null,
+        approved_at: null,
+        reimbursed_at: null,
+        resubmission_count: 2,
+      }),
+      tenantId,
+    );
+  });
+
+  it("trims follow-up notes before saving", async () => {
+    vi.doMock("@/core/auth/authStore", () => ({
+      useAuth: {
+        getState: () => ({ hasPermission: () => true }),
+      },
+    }));
+    const repo = vi.mocked(insuranceRepository, true);
+    repo.getById.mockResolvedValue(buildClaim({
+      status: "processing",
+      submitted_at: "2026-04-10T09:00:00.000Z",
+      processing_started_at: "2026-04-11T09:00:00.000Z",
+    }));
+    repo.update.mockResolvedValue(buildClaim({
+      status: "processing",
+      internal_notes: "Need corrected authorization number",
+      payer_notes: "Payer asked for updated eligibility file",
+    }));
+
+    const { insuranceService } = await import("@/services/insurance/insurance.service");
+
+    await insuranceService.update(claimId, {
+      internal_notes: "  Need corrected authorization number  ",
+      payer_notes: "  Payer asked for updated eligibility file  ",
+    });
+
+    expect(repo.update).toHaveBeenCalledWith(
+      claimId,
+      expect.objectContaining({
+        internal_notes: "Need corrected authorization number",
+        payer_notes: "Payer asked for updated eligibility file",
+      }),
+      tenantId,
+    );
   });
 
   it("blocks skipping straight from submitted to approved", async () => {

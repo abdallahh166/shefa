@@ -51,6 +51,7 @@ export const queryKeys = {
       listKey("insurance", args),
     summary: (tenantId?: string) => [...tenantKey("insurance", tenantId), "summary"] as const,
     operations: (tenantId?: string) => [...tenantKey("insurance", tenantId), "operations"] as const,
+    owners: (tenantId?: string) => [...tenantKey("insurance", tenantId), "owners"] as const,
   },
   laboratory: {
     root: (tenantId?: string) => tenantKey("laboratory", tenantId),

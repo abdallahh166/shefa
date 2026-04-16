@@ -2,6 +2,7 @@
 import { dateStringSchema, dateTimeStringSchema } from "../shared/date.schema";
 import { listParamsSchema } from "../shared/pagination.schema";
 import { uuidSchema } from "../shared/identifiers.schema";
+import { appRoleEnum } from "../settings/roles.schema";
 
 export const insuranceStatusEnum = z.enum([
   "draft",
@@ -27,6 +28,12 @@ export const insuranceClaimSchema = z.object({
   reimbursed_at: dateTimeStringSchema.optional().nullable(),
   payer_reference: z.string().trim().min(1).max(200).optional().nullable(),
   denial_reason: z.string().trim().max(1000).optional().nullable(),
+  assigned_to_user_id: uuidSchema.optional().nullable(),
+  internal_notes: z.string().trim().max(4000).optional().nullable(),
+  payer_notes: z.string().trim().max(4000).optional().nullable(),
+  last_follow_up_at: dateTimeStringSchema.optional().nullable(),
+  next_follow_up_at: dateTimeStringSchema.optional().nullable(),
+  resubmission_count: z.coerce.number().int().min(0).default(0),
   deleted_at: dateTimeStringSchema.optional().nullable(),
   deleted_by: uuidSchema.optional().nullable(),
   created_at: dateTimeStringSchema,
@@ -35,6 +42,7 @@ export const insuranceClaimSchema = z.object({
 
 export const insuranceClaimWithPatientSchema = insuranceClaimSchema.extend({
   patients: z.object({ full_name: z.string().trim().min(1) }).optional().nullable(),
+  assigned_profile: z.object({ full_name: z.string().trim().min(1) }).optional().nullable(),
 });
 
 export const insuranceClaimCreateSchema = insuranceClaimSchema
@@ -70,4 +78,14 @@ export const insuranceOperationsSummarySchema = z.object({
   aged_8_14_count: z.coerce.number().int().min(0),
   aged_15_plus_count: z.coerce.number().int().min(0),
   oldest_open_claim_days: z.coerce.number().int().min(0),
+  denied_follow_up_count: z.coerce.number().int().min(0),
+  follow_up_due_count: z.coerce.number().int().min(0),
+  unassigned_open_count: z.coerce.number().int().min(0),
+  stalled_processing_count: z.coerce.number().int().min(0),
+});
+
+export const insuranceAssignableOwnerSchema = z.object({
+  user_id: uuidSchema,
+  full_name: z.string().trim().min(1).max(200),
+  role: appRoleEnum,
 });
