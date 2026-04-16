@@ -20,17 +20,19 @@ import { cn } from "@/lib/utils";
 import { formatDate, formatCurrency } from "@/shared/utils/formatDate";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PatientDocuments } from "./PatientDocuments";
-import { generatePatientReportPDF, generatePrescriptionsListPDF } from "@/shared/utils/pdfGenerator";
+import { PrescriptionManagementSection } from "./PrescriptionManagementSection";
+import { generatePatientReportPDF } from "@/shared/utils/pdfGenerator";
 import { patientService } from "@/services/patients/patient.service";
 import { medicalRecordsService } from "@/services/patients/medicalRecords.service";
 import { queryKeys } from "@/services/queryKeys";
 import { appointmentService } from "@/services/appointments/appointment.service";
-import { prescriptionService } from "@/services/prescriptions/prescription.service";
 import { labService } from "@/services/laboratory/lab.service";
 import { billingService } from "@/services/billing/billing.service";
+import { prescriptionService } from "@/services/prescriptions/prescription.service";
 import { tenantService } from "@/services/settings/tenant.service";
 import { doctorService } from "@/services/doctors/doctor.service";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
+import { formatPrescriptionSig } from "@/shared/utils/prescription";
 import { toast } from "@/hooks/use-toast";
 
 type Tab = "overview" | "history" | "prescriptions" | "notes" | "lab_orders" | "invoices" | "appointments" | "documents";
@@ -412,7 +414,9 @@ export const PatientDetailPage = () => {
                       <Pill className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                       <div>
                         <p className="text-sm font-medium">{rx.medication}</p>
-                        <p className="text-xs text-muted-foreground">{rx.dosage}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatPrescriptionSig(rx) || rx.dosage}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -634,52 +638,14 @@ export const PatientDetailPage = () => {
       })()}
 
       {/* ── PRESCRIPTIONS ── */}
-      {activeTab === "prescriptions" && (() => {
-        const prescriptionColumns: Column<any>[] = [
-          { key: "medication", header: t("pharmacy.medication"), render: (rx) => <span className="font-medium">{rx.medication}</span> },
-          { key: "dosage", header: t("laboratory.test"), render: (rx) => rx.dosage },
-          { key: "doctor", header: t("appointments.doctor"), render: (rx) => rx.doctors?.full_name ?? "-" },
-          { key: "prescribed_date", header: t("common.date"), render: (rx) => <span className="text-muted-foreground">{formatDate(rx.prescribed_date, locale, "date", calendarType)}</span> },
-          {
-            key: "status",
-            header: t("common.status"),
-            render: (rx) => (
-              <StatusBadge variant={rx.status === "active" ? "success" : "default"}>
-                {rx.status === "active" ? t("patients.active") : t("patients.inactive")}
-              </StatusBadge>
-            ),
-          },
-        ];
-
-        return (
-          <div className="space-y-4">
-            {prescriptions.length > 0 && (
-              <div className="flex justify-end">
-                <Button variant="outline" size="sm" onClick={() => {
-                  generatePrescriptionsListPDF(
-                    prescriptions as any,
-                    { full_name: patient.full_name },
-                    locale === "ar" ? "ar" : "en",
-                  );
-                }}>
-                  <Printer className="h-4 w-4" />
-                  {t("common.print")}
-                </Button>
-              </div>
-            )}
-            {prescriptions.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">{t("patients.noPrescriptionsFound")}</div>
-            ) : (
-              <DataTable
-                columns={prescriptionColumns}
-                data={prescriptions}
-                keyExtractor={(rx) => rx.id}
-                tableLabel={t("patients.prescriptions")}
-              />
-            )}
-          </div>
-        );
-      })()}
+      {activeTab === "prescriptions" && (
+        <PrescriptionManagementSection
+          patientId={patientId ?? ""}
+          patientName={patient.full_name}
+          prescriptions={prescriptions as any}
+          canManageRecords={canManageRecords}
+        />
+      )}
 
       {/* ── CLINICAL NOTES ── */}
       {activeTab === "notes" && (

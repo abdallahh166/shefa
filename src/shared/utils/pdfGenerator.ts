@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import autoTable, { applyPlugin } from "jspdf-autotable";
+import { formatPrescriptionQuantity, formatPrescriptionSig } from "@/shared/utils/prescription";
 
 // Ensure the plugin is attached in browser builds (avoids doc.autoTable undefined in some bundler setups).
 applyPlugin(jsPDF);
@@ -92,6 +93,8 @@ export function generateInvoicePDF(invoice: any, patient: { full_name: string })
 
 export function generatePrescriptionPDF(prescription: any, patient: { full_name: string }, doctor: { full_name: string }) {
   const doc = new jsPDF();
+  const sig = formatPrescriptionSig(prescription) || prescription.dosage;
+  const supply = formatPrescriptionQuantity(prescription);
 
   doc.setFontSize(20);
   doc.setFont("helvetica", "bold");
@@ -113,17 +116,37 @@ export function generatePrescriptionPDF(prescription: any, patient: { full_name:
 
   doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
-  doc.text("Dosage", 14, 87);
+  doc.text("Directions", 14, 87);
 
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  doc.text(prescription.dosage, 14, 95);
+  doc.text(sig || "-", 14, 95);
+
+  if (supply) {
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.text("Supply", 14, 109);
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(supply, 14, 117);
+  }
 
   doc.save(`prescription-${prescription.id}.pdf`);
 }
 
 export function generatePrescriptionsListPDF(
-  prescriptions: Array<{ medication: string; dosage: string; prescribed_date: string; status: string; doctors?: { full_name: string } | null }>,
+  prescriptions: Array<{
+    medication: string;
+    dosage: string;
+    route?: string | null;
+    frequency?: string | null;
+    quantity?: number | null;
+    refills?: number | null;
+    prescribed_date: string;
+    status: string;
+    doctors?: { full_name: string } | null;
+  }>,
   patient: { full_name: string },
   locale: "en" | "ar" = "en",
 ) {
@@ -133,14 +156,16 @@ export function generatePrescriptionsListPDF(
     subtitle: `Generated on ${new Date().toLocaleDateString(dateLocale)}`,
     columns: [
       { header: "Medication", dataKey: "medication" },
-      { header: "Dosage", dataKey: "dosage" },
+      { header: "Directions", dataKey: "sig" },
+      { header: "Supply", dataKey: "supply" },
       { header: "Doctor", dataKey: "doctor" },
       { header: "Date", dataKey: "date" },
       { header: "Status", dataKey: "status" },
     ],
     data: prescriptions.map((rx) => ({
       medication: rx.medication ?? "",
-      dosage: rx.dosage ?? "",
+      sig: formatPrescriptionSig(rx) || rx.dosage || "",
+      supply: formatPrescriptionQuantity(rx) || "",
       doctor: rx.doctors?.full_name ?? "",
       date: rx.prescribed_date
         ? new Date(rx.prescribed_date + "T00:00:00").toLocaleDateString(dateLocale)
@@ -230,7 +255,17 @@ interface PatientReportData {
     status?: string;
   };
   medicalRecords: Array<{ record_date: string; diagnosis?: string | null; record_type: string; notes?: string | null; doctors?: { full_name: string } | null }>;
-  prescriptions: Array<{ medication: string; dosage: string; prescribed_date: string; status: string; doctors?: { full_name: string } | null }>;
+  prescriptions: Array<{
+    medication: string;
+    dosage: string;
+    route?: string | null;
+    frequency?: string | null;
+    quantity?: number | null;
+    refills?: number | null;
+    prescribed_date: string;
+    status: string;
+    doctors?: { full_name: string } | null;
+  }>;
   labOrders: Array<{ test_name: string; order_date: string; status: string; result?: string | null; doctors?: { full_name: string } | null }>;
   invoices: Array<{ invoice_code: string; service: string; amount: number; invoice_date: string; status: string }>;
   clinic?: { name: string; logoUrl?: string | null };
@@ -361,7 +396,9 @@ export async function generatePatientReportPDF(data: PatientReportData) {
       head: [[l.medication, l.dosage, l.date, l.doctor, l.status]],
       body: prescriptions.map((rx) => [
         rx.medication,
-        rx.dosage,
+        [formatPrescriptionSig(rx) || rx.dosage, formatPrescriptionQuantity(rx) || null]
+          .filter(Boolean)
+          .join("\n"),
         new Date(rx.prescribed_date + "T00:00:00").toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US"),
         rx.doctors?.full_name ?? "—",
         rx.status,

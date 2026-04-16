@@ -68,6 +68,7 @@ const statusChipClass: Record<string, string> = {
   in_progress: "bg-info/15 text-info",
   scheduled: "bg-muted text-foreground",
   cancelled: "bg-destructive/10 text-destructive",
+  no_show: "bg-warning/10 text-warning",
 };
 
 export function AppointmentCalendar({ appointments, view, onViewChange, cursor, onCursorChange, rescheduleEnabled, onReschedule }: Props) {
@@ -85,6 +86,8 @@ export function AppointmentCalendar({ appointments, view, onViewChange, cursor, 
         return t("appointments.completed");
       case "cancelled":
         return t("appointments.cancelled");
+      case "no_show":
+        return "No-show";
       default:
         return s;
     }

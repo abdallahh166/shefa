@@ -32,6 +32,8 @@ export const queryKeys = {
     calendar: (args?: { tenantId?: string; start?: string; end?: string }) =>
       [...tenantKey("appointments", args?.tenantId), "calendar", args] as const,
     statusCounts: (tenantId?: string) => [...tenantKey("appointments", tenantId), "statusCounts"] as const,
+    queue: (args?: { tenantId?: string; dayKey?: string }) =>
+      [...tenantKey("appointments", args?.tenantId), "queue", args] as const,
   },
   billing: {
     root: (tenantId?: string) => tenantKey("billing", tenantId),

@@ -3,6 +3,7 @@ import { portalService } from "@/services/portal/portal.service";
 import { usePortalAuth } from "@/core/auth/portalAuthStore";
 import { formatDate, formatCurrency } from "@/shared/utils/formatDate";
 import { useI18n } from "@/core/i18n/i18nStore";
+import { formatPrescriptionQuantity, formatPrescriptionSig } from "@/shared/utils/prescription";
 
 export const PortalAppointmentsPage = () => {
   const { user } = usePortalAuth();
@@ -55,7 +56,10 @@ export const PortalPrescriptionsPage = () => {
             <div key={rx.id} className="p-4 flex flex-wrap justify-between gap-2" data-testid={`portal-prescription-${rx.id}`}>
               <div>
                 <p className="font-medium">{rx.medication}</p>
-                <p className="text-xs text-muted-foreground">{rx.dosage}</p>
+                <p className="text-xs text-muted-foreground">{formatPrescriptionSig(rx) || rx.dosage}</p>
+                {formatPrescriptionQuantity(rx) ? (
+                  <p className="text-xs text-muted-foreground">{formatPrescriptionQuantity(rx)}</p>
+                ) : null}
               </div>
               <div className="text-sm text-muted-foreground">{rx.status}</div>
             </div>

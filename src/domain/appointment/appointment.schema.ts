@@ -15,6 +15,7 @@ export const appointmentStatusEnum = z.enum([
   "in_progress",
   "completed",
   "cancelled",
+  "no_show",
 ]);
 
 export const appointmentSchema = z.object({

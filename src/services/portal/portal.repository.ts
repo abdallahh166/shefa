@@ -65,9 +65,9 @@ export const portalRepository = {
   async listPrescriptions(patientId: string) {
     const { data, error } = await supabase
       .from("prescriptions")
-      .select("id, medication, dosage, status, created_at")
+      .select("id, medication, dosage, route, frequency, quantity, refills, status, prescribed_date, created_at")
       .eq("patient_id", patientId)
-      .order("created_at", { ascending: false });
+      .order("prescribed_date", { ascending: false });
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load prescriptions", { code: error.code, details: error });
     }

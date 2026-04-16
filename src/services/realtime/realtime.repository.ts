@@ -3,6 +3,7 @@ import { supabase } from "@/services/supabase/client";
 export type RealtimeTable =
   | "patients"
   | "appointments"
+  | "appointment_queue"
   | "doctors"
   | "invoices"
   | "medications"

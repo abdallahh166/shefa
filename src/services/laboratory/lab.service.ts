@@ -12,18 +12,38 @@ import type { LabResultCreateInput, LabResultListParams, LabResultUpdateInput } 
 import type { LimitOffsetParams } from "@/domain/shared/pagination.types";
 import { limitOffsetSchema } from "@/domain/shared/pagination.schema";
 import { emitDomainEvent } from "@/core/events";
-import { toServiceError } from "@/services/supabase/errors";
+import { BusinessRuleError, toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { assertAnyPermission } from "@/services/supabase/permissions";
 import { auditLogService } from "@/services/settings/audit.service";
-import { labRepository } from "./lab.repository";
 import { rateLimitService } from "@/services/security/rateLimit.service";
+import { labRepository } from "./lab.repository";
 
 const labStatusCountsSchema = z.object({
   pending: z.number().int().nonnegative(),
   processing: z.number().int().nonnegative(),
   completed: z.number().int().nonnegative(),
 });
+
+function buildResultSummary(order: {
+  result?: string | null;
+  result_value?: string | null;
+  result_unit?: string | null;
+  reference_range?: string | null;
+  abnormal_flag?: string | null;
+}) {
+  const mainValue = [order.result_value?.trim(), order.result_unit?.trim()].filter(Boolean).join(" ");
+  const meta = [order.reference_range?.trim(), order.abnormal_flag?.trim()].filter(Boolean).join(" | ");
+  const structuredSummary = [mainValue, meta].filter(Boolean).join(" | ");
+  if (structuredSummary) return structuredSummary;
+  return order.result?.trim() || null;
+}
+
+function hasStructuredResultValue(order: {
+  result_value?: string | null;
+}) {
+  return Boolean(order.result_value?.trim());
+}
 
 export const labService = {
   async listPaged(params: LabResultListParams) {
@@ -79,7 +99,6 @@ export const labService = {
       assertAnyPermission(["manage_medical_records", "manage_laboratory"]);
       const parsed = labResultCreateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
-      await rateLimitService.assertAllowed("lab_upload", [tenantId, userId]);
       const result = await labRepository.create(parsed, tenantId);
       const labOrder = labResultSchema.parse(result);
       await auditLogService.logEvent({
@@ -96,16 +115,6 @@ export const labService = {
           status: labOrder.status,
         },
       });
-      await emitDomainEvent(
-        "LabResultUploaded",
-        {
-          labOrderId: labOrder.id,
-          patientId: labOrder.patient_id,
-          doctorId: labOrder.doctor_id,
-          status: labOrder.status,
-        },
-        { tenantId, userId },
-      );
       return labOrder;
     } catch (err) {
       throw toServiceError(err, "Failed to create lab order");
@@ -117,11 +126,43 @@ export const labService = {
       const parsedId = uuidSchema.parse(id);
       const parsed = labResultUpdateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
-      const shouldEmit = parsed.result !== undefined || parsed.status === "completed";
-      if (shouldEmit) {
+      const existing = labResultSchema.parse(await labRepository.getById(parsedId, tenantId));
+      const merged = {
+        ...existing,
+        ...parsed,
+      };
+
+      if (parsed.status === "completed" && !hasStructuredResultValue(merged)) {
+        throw new BusinessRuleError("Completed lab results must include a structured result entry", {
+          code: "LAB_RESULT_REQUIRED_FOR_COMPLETION",
+        });
+      }
+
+      const normalizedUpdate: LabResultUpdateInput = {
+        ...parsed,
+      };
+      const computedSummary = buildResultSummary(merged);
+      if (computedSummary) {
+        normalizedUpdate.result = computedSummary;
+      }
+      if (parsed.status === "completed" && existing.status !== "completed" && normalizedUpdate.resulted_at === undefined) {
+        normalizedUpdate.resulted_at = new Date().toISOString();
+      }
+
+      const shouldRateLimit = hasStructuredResultValue(merged) && (
+        parsed.result !== undefined ||
+        parsed.result_value !== undefined ||
+        parsed.result_unit !== undefined ||
+        parsed.reference_range !== undefined ||
+        parsed.abnormal_flag !== undefined ||
+        parsed.result_notes !== undefined ||
+        parsed.status === "completed"
+      );
+      if (shouldRateLimit) {
         await rateLimitService.assertAllowed("lab_upload", [tenantId, userId]);
       }
-      const result = await labRepository.update(parsedId, parsed, tenantId);
+
+      const result = await labRepository.update(parsedId, normalizedUpdate, tenantId);
       const labOrder = labResultSchema.parse(result);
       await auditLogService.logEvent({
         tenant_id: tenantId,
@@ -130,8 +171,14 @@ export const labService = {
         action_type: "lab_order_update",
         entity_type: "lab_order",
         entity_id: labOrder.id,
-        details: parsed as Record<string, unknown>,
+        details: normalizedUpdate as Record<string, unknown>,
       });
+      const hadStructuredResult = hasStructuredResultValue(existing);
+      const hasStructuredResultNow = hasStructuredResultValue(labOrder);
+      const shouldEmit =
+        labOrder.status === "completed" &&
+        hasStructuredResultNow &&
+        (existing.status !== "completed" || !hadStructuredResult);
       if (shouldEmit) {
         await emitDomainEvent(
           "LabResultUploaded",

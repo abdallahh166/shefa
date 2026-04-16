@@ -203,7 +203,7 @@ export const appointmentRepository: AppointmentRepository = {
     return (data ?? []) as AppointmentWithDoctor[];
   },
   async countByStatus(tenantId) {
-    const statuses = ["scheduled", "in_progress", "completed", "cancelled"] as const;
+    const statuses = ["scheduled", "in_progress", "completed", "cancelled", "no_show"] as const;
     const results = await Promise.all(
       statuses.map(async (status) => {
         const { count, error } = await supabase

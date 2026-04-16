@@ -33,6 +33,7 @@ export const NewAppointmentModal = ({ open, onClose, onSuccess }: NewAppointment
     patient_id: "",
     doctor_id: "",
     appointment_date: "",
+    duration_minutes: 30,
     type: "checkup",
     notes: "",
   });
@@ -90,6 +91,7 @@ export const NewAppointmentModal = ({ open, onClose, onSuccess }: NewAppointment
         patient_id: form.patient_id,
         doctor_id: form.doctor_id,
         appointment_date: form.appointment_date,
+        duration_minutes: form.duration_minutes,
         type: form.type as AppointmentCreateInput["type"],
         notes: form.notes || null,
       });
@@ -163,6 +165,17 @@ export const NewAppointmentModal = ({ open, onClose, onSuccess }: NewAppointment
               value={form.appointment_date}
               onChange={(e) => setForm({ ...form, appointment_date: e.target.value })}
               data-testid="appointment-date"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Duration (min) *</Label>
+            <Input
+              type="number"
+              min={5}
+              step={5}
+              value={form.duration_minutes}
+              onChange={(e) => setForm({ ...form, duration_minutes: Number.parseInt(e.target.value, 10) || 30 })}
+              data-testid="appointment-duration"
             />
           </div>
           <div className="space-y-2">

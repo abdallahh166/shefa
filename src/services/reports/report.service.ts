@@ -19,6 +19,7 @@ const statusCountsSchema = z.object({
   in_progress: z.number().int().nonnegative(),
   completed: z.number().int().nonnegative(),
   cancelled: z.number().int().nonnegative(),
+  no_show: z.number().int().nonnegative(),
 });
 
 const monthsSchema = z.coerce.number().int().min(1).max(24);
@@ -205,6 +206,7 @@ export const reportService = {
         in_progress: counts.in_progress ?? 0,
         completed: counts.completed ?? 0,
         cancelled: counts.cancelled ?? 0,
+        no_show: counts.no_show ?? 0,
       });
     } catch (err) {
       return handleReportError(err, "Failed to load appointment status report", {
@@ -212,6 +214,7 @@ export const reportService = {
         in_progress: 0,
         completed: 0,
         cancelled: 0,
+        no_show: 0,
       });
     }
   },

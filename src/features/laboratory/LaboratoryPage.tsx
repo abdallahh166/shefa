@@ -10,6 +10,7 @@ import { FlaskConical, Clock, CheckCircle, Plus } from "lucide-react";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { useAuth } from "@/core/auth/authStore";
 import { NewLabOrderModal } from "./NewLabOrderModal";
+import { CompleteLabResultDialog } from "./CompleteLabResultDialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { formatDate } from "@/shared/utils/formatDate";
@@ -29,6 +30,8 @@ type LabDisplayRow = {
   order_date: string;
   status: "pending" | "processing" | "completed";
   result: string | null;
+  abnormal_flag: string | null;
+  result_notes: string | null;
 };
 
 export const LaboratoryPage = () => {
@@ -37,6 +40,7 @@ export const LaboratoryPage = () => {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [resultDialogOrder, setResultDialogOrder] = useState<LabOrderRow | null>(null);
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [sort, setSort] = useState<{ column: string; direction: "asc" | "desc" }>({
@@ -87,6 +91,8 @@ export const LaboratoryPage = () => {
     order_date: l.order_date,
     status: l.status,
     result: l.result ?? null,
+    abnormal_flag: l.abnormal_flag ?? null,
+    result_notes: l.result_notes ?? null,
   }));
 
   const total = totalLabs;
@@ -121,7 +127,18 @@ export const LaboratoryPage = () => {
     { key: "doctor_name", header: t("laboratory.orderedBy"), searchable: true },
     { key: "order_date", header: t("common.date"), sortable: true, render: (l) => formatDate(l.order_date, locale, "date", calendarType) },
     { key: "status", header: t("common.status"), sortable: true, render: (l) => <StatusBadge variant={statusVariant[l.status] ?? "default"}>{getLabStatusLabel(l.status)}</StatusBadge> },
-    { key: "result", header: t("common.result"), render: (l) => l.result ? <span className="font-medium">{l.result}</span> : <span className="text-muted-foreground">-</span> },
+    {
+      key: "result",
+      header: t("common.result"),
+      render: (l) => l.result ? (
+        <div className="space-y-1">
+          <span className="font-medium">{l.result}</span>
+          {l.result_notes ? (
+            <div className="max-w-xs text-xs text-muted-foreground">{l.result_notes}</div>
+          ) : null}
+        </div>
+      ) : <span className="text-muted-foreground">-</span>,
+    },
     {
       key: "actions",
       header: t("common.actions"),
@@ -143,10 +160,27 @@ export const LaboratoryPage = () => {
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => handleUpdateStatus(l.id, "completed", "Normal")}
+              onClick={() => {
+                const selectedOrder = liveLabs.find((order) => order.id === l.id) ?? null;
+                setResultDialogOrder(selectedOrder);
+              }}
               className="h-7 px-2 text-xs bg-success/10 text-success hover:bg-success/20"
             >
-              {t("common.complete")}
+              Enter result
+            </Button>
+          )}
+          {l.status === "completed" && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const selectedOrder = liveLabs.find((order) => order.id === l.id) ?? null;
+                setResultDialogOrder(selectedOrder);
+              }}
+              className="h-7 px-2 text-xs"
+            >
+              Edit result
             </Button>
           )}
         </div>
@@ -204,6 +238,14 @@ export const LaboratoryPage = () => {
       <NewLabOrderModal
         open={showModal}
         onClose={() => setShowModal(false)}
+        onSuccess={() => {
+          invalidateLabs();
+        }}
+      />
+      <CompleteLabResultDialog
+        open={!!resultDialogOrder}
+        labOrder={resultDialogOrder}
+        onClose={() => setResultDialogOrder(null)}
         onSuccess={() => {
           invalidateLabs();
         }}

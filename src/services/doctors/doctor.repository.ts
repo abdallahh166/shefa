@@ -23,6 +23,7 @@ function escapeSearchTerm(term: string) {
 
 export interface DoctorRepository {
   listPaged(params: DoctorListParams, tenantId: string): Promise<PagedResult<Doctor>>;
+  getById(id: string, tenantId: string): Promise<Doctor>;
   create(input: DoctorCreateInput, tenantId: string): Promise<Doctor>;
   update(id: string, input: DoctorUpdateInput, tenantId: string): Promise<Doctor>;
   archive(id: string, tenantId: string, userId: string): Promise<Doctor>;
@@ -76,6 +77,17 @@ export const doctorRepository: DoctorRepository = {
     }
 
     return { data: (data ?? []) as Doctor[], count: count ?? 0 };
+  },
+  async getById(id, tenantId) {
+    const result = await supabase
+      .from("doctors")
+      .select(DOCTOR_COLUMNS)
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
+      .single();
+
+    return assertOk(result) as Doctor;
   },
   async create(input, tenantId) {
     const payload: Record<string, unknown> = {

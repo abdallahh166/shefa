@@ -11,10 +11,10 @@ import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
 
 const PRESCRIPTION_COLUMNS =
-  "id, tenant_id, patient_id, doctor_id, medication, dosage, status, prescribed_date, deleted_at, deleted_by, created_at";
+  "id, tenant_id, patient_id, doctor_id, medication, dosage, route, frequency, quantity, refills, instructions, status, prescribed_date, end_date, discontinued_reason, deleted_at, deleted_by, created_at";
 const PRESCRIPTION_WITH_DOCTOR_COLUMNS = `${PRESCRIPTION_COLUMNS}, doctors(full_name)`;
 
-const SEARCH_COLUMNS = ["medication", "dosage", "status"];
+const SEARCH_COLUMNS = ["medication", "dosage", "route", "frequency", "instructions", "status"];
 const SORTABLE_COLUMNS = new Set([
   "prescribed_date",
   "created_at",
@@ -28,6 +28,7 @@ function escapeSearchTerm(term: string) {
 export interface PrescriptionRepository {
   listPaged(params: PrescriptionListParams, tenantId: string): Promise<PagedResult<Prescription>>;
   listByPatient(patientId: string, tenantId: string, params?: LimitOffsetParams): Promise<PrescriptionWithDoctor[]>;
+  getById(id: string, tenantId: string): Promise<Prescription>;
   create(input: PrescriptionCreateInput, tenantId: string): Promise<Prescription>;
   update(id: string, input: PrescriptionUpdateInput, tenantId: string): Promise<Prescription>;
   archive(id: string, tenantId: string, userId: string): Promise<Prescription>;
@@ -105,6 +106,17 @@ export const prescriptionRepository: PrescriptionRepository = {
 
     return (data ?? []) as PrescriptionWithDoctor[];
   },
+  async getById(id, tenantId) {
+    const result = await supabase
+      .from("prescriptions")
+      .select(PRESCRIPTION_COLUMNS)
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
+      .single();
+
+    return assertOk(result) as Prescription;
+  },
   async create(input, tenantId) {
     const payload: Record<string, unknown> = {
       tenant_id: tenantId,
@@ -112,10 +124,17 @@ export const prescriptionRepository: PrescriptionRepository = {
       doctor_id: input.doctor_id,
       medication: input.medication,
       dosage: input.dosage,
+      route: input.route,
+      frequency: input.frequency,
+      quantity: input.quantity,
     };
 
     if (input.status !== undefined) payload.status = input.status;
     if (input.prescribed_date !== undefined) payload.prescribed_date = input.prescribed_date;
+    if (input.refills !== undefined) payload.refills = input.refills;
+    if (input.instructions !== undefined) payload.instructions = input.instructions;
+    if (input.end_date !== undefined) payload.end_date = input.end_date;
+    if (input.discontinued_reason !== undefined) payload.discontinued_reason = input.discontinued_reason;
 
     const result = await supabase
       .from("prescriptions")
@@ -132,8 +151,15 @@ export const prescriptionRepository: PrescriptionRepository = {
     if (input.doctor_id !== undefined) payload.doctor_id = input.doctor_id;
     if (input.medication !== undefined) payload.medication = input.medication;
     if (input.dosage !== undefined) payload.dosage = input.dosage;
+    if (input.route !== undefined) payload.route = input.route;
+    if (input.frequency !== undefined) payload.frequency = input.frequency;
+    if (input.quantity !== undefined) payload.quantity = input.quantity;
+    if (input.refills !== undefined) payload.refills = input.refills;
+    if (input.instructions !== undefined) payload.instructions = input.instructions;
     if (input.status !== undefined) payload.status = input.status;
     if (input.prescribed_date !== undefined) payload.prescribed_date = input.prescribed_date;
+    if (input.end_date !== undefined) payload.end_date = input.end_date;
+    if (input.discontinued_reason !== undefined) payload.discontinued_reason = input.discontinued_reason;
 
     if (Object.keys(payload).length === 0) {
       const result = await supabase

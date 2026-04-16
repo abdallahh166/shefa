@@ -31,6 +31,13 @@ const INVALIDATION_MAP: Record<RealtimeTable, Array<(tenantId: string) => readon
     (tenantId) => queryKeys.appointments.list({ tenantId }),
     (tenantId) => queryKeys.appointments.calendar({ tenantId }),
     (tenantId) => queryKeys.appointments.statusCounts(tenantId),
+    (tenantId) => queryKeys.appointments.queue({ tenantId }),
+    ...reportKeyFactories,
+  ],
+  appointment_queue: [
+    (tenantId) => queryKeys.appointments.list({ tenantId }),
+    (tenantId) => queryKeys.appointments.statusCounts(tenantId),
+    (tenantId) => queryKeys.appointments.queue({ tenantId }),
     ...reportKeyFactories,
   ],
   invoices: [

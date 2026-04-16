@@ -4,6 +4,7 @@ import { listParamsSchema } from "../shared/pagination.schema";
 import { uuidSchema } from "../shared/identifiers.schema";
 
 export const labStatusEnum = z.enum(["pending", "processing", "completed"]);
+export const labAbnormalFlagEnum = z.enum(["normal", "abnormal", "high", "low", "critical"]);
 
 export const labResultSchema = z.object({
   id: uuidSchema,
@@ -14,6 +15,12 @@ export const labResultSchema = z.object({
   order_date: dateStringSchema,
   status: labStatusEnum,
   result: z.string().trim().max(2000).optional().nullable(),
+  result_value: z.string().trim().min(1).max(500).optional().nullable(),
+  result_unit: z.string().trim().max(120).optional().nullable(),
+  reference_range: z.string().trim().max(240).optional().nullable(),
+  abnormal_flag: labAbnormalFlagEnum.optional().nullable(),
+  result_notes: z.string().trim().max(2000).optional().nullable(),
+  resulted_at: dateTimeStringSchema.optional().nullable(),
   deleted_at: dateTimeStringSchema.optional().nullable(),
   deleted_by: uuidSchema.optional().nullable(),
   created_at: dateTimeStringSchema,

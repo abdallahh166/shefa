@@ -584,14 +584,20 @@ describe("repositories smoke", () => {
       doctor_id: recordId,
       prescribed_date: "2026-03-10",
       medication: "Test",
-      dosage: "1x",
+      dosage: "500 mg",
+      route: "Oral",
+      frequency: "Daily",
+      quantity: 30,
       status: "active",
     }, tenantId);
     await prescriptionRepository.create({
       patient_id: recordId,
       doctor_id: recordId,
       medication: "Optional",
-      dosage: "2x",
+      dosage: "250 mg",
+      route: "Oral",
+      frequency: "Twice daily",
+      quantity: 14,
       status: "completed",
       prescribed_date: "2026-03-11",
     }, tenantId);
@@ -599,7 +605,10 @@ describe("repositories smoke", () => {
       patient_id: recordId,
       doctor_id: recordId,
       medication: "Minimal",
-      dosage: "1x",
+      dosage: "5 mg",
+      route: "Oral",
+      frequency: "Nightly",
+      quantity: 7,
     }, tenantId);
     await prescriptionRepository.update(recordId, {}, tenantId);
     await prescriptionRepository.update(recordId, { status: "completed" }, tenantId);

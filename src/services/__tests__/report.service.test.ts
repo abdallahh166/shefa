@@ -101,6 +101,7 @@ describe("reportService aggregation", () => {
     repo.getAppointmentStatuses.mockResolvedValue([
       { status: "scheduled", count: "2" },
       { status: "completed", count: "5" },
+      { status: "no_show", count: "1" },
     ] as any);
 
     const result = await reportService.getAppointmentStatusCounts();
@@ -109,5 +110,6 @@ describe("reportService aggregation", () => {
     expect(result.completed).toBe(5);
     expect(result.in_progress).toBe(0);
     expect(result.cancelled).toBe(0);
+    expect(result.no_show).toBe(1);
   });
 });

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { StatCard } from "@/shared/components/StatCard";
 import { StatusBadge } from "@/shared/components/StatusBadge";
-import { Users, CalendarDays, Stethoscope, DollarSign, TrendingUp } from "lucide-react";
+import { Users, CalendarDays, Stethoscope, DollarSign, TrendingUp, XCircle } from "lucide-react";
 import { useAuth } from "@/core/auth/authStore";
 import { formatCurrency } from "@/shared/utils/formatDate";
 import { reportService } from "@/services";
@@ -15,11 +15,12 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 
-const statusVariant: Record<string, "success" | "info" | "default" | "destructive"> = {
+const statusVariant: Record<string, "success" | "info" | "default" | "destructive" | "warning"> = {
   completed: "success",
   in_progress: "info",
   scheduled: "default",
   cancelled: "destructive",
+  no_show: "warning",
 };
 
 export const DashboardPage = () => {
@@ -47,7 +48,7 @@ export const DashboardPage = () => {
     enabled: !!tenantId,
   });
 
-  const { data: statusCounts = { scheduled: 0, in_progress: 0, completed: 0, cancelled: 0 } } = useQuery({
+  const { data: statusCounts = { scheduled: 0, in_progress: 0, completed: 0, cancelled: 0, no_show: 0 } } = useQuery({
     queryKey: queryKeys.reports.appointmentStatuses(tenantId),
     queryFn: () => reportService.getAppointmentStatusCounts(),
     enabled: !!tenantId,
@@ -64,11 +65,13 @@ export const DashboardPage = () => {
       { status: "in_progress", label: t("appointments.inProgress"), count: statusCounts.in_progress },
       { status: "completed", label: t("appointments.completed"), count: statusCounts.completed },
       { status: "cancelled", label: t("appointments.cancelled"), count: statusCounts.cancelled },
+      { status: "no_show", label: "No-show", count: statusCounts.no_show },
     ]),
     [statusCounts, t],
   );
 
   const totalStatusCount = statusRows.reduce((sum, r) => sum + r.count, 0);
+  const noShowRate = totalStatusCount > 0 ? (statusCounts.no_show / totalStatusCount) * 100 : 0;
 
   return (
     <PageContainer className="space-y-6">
@@ -78,11 +81,18 @@ export const DashboardPage = () => {
       />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         <StatCard title={t("dashboard.totalPatients")} value={totalPatients} icon={Users} accent="primary" />
         <StatCard title={t("reports.totalAppointments")} value={String(totalAppointments)} icon={CalendarDays} accent="info" />
         <StatCard title={t("reports.avgDoctorRating")} value={averageRating ? Number(averageRating).toFixed(1) : "0.0"} icon={Stethoscope} accent="success" />
         <StatCard title={t("dashboard.periodRevenue")} value={formatCurrency(Number(totalRevenue), locale)} icon={DollarSign} accent="warning" />
+        <StatCard
+          title="No-shows"
+          value={String(statusCounts.no_show)}
+          icon={XCircle}
+          accent="warning"
+          subtitle={`${noShowRate.toFixed(1)}% of booked appointments`}
+        />
       </div>
 
       {/* Charts Row */}
@@ -175,6 +185,7 @@ export const DashboardPage = () => {
                     width: totalStatusCount > 0 ? `${(row.count / totalStatusCount) * 100}%` : "0%",
                     backgroundColor: row.status === "completed" ? colors.success
                       : row.status === "in_progress" ? colors.info
+                      : row.status === "no_show" ? colors.warning
                       : row.status === "cancelled" ? colors.destructive
                       : colors.border,
                   }}

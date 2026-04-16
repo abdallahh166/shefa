@@ -1,4 +1,5 @@
 export { appointmentService } from "./appointments/appointment.service";
+export { appointmentQueueService } from "./appointments/appointmentQueue.service";
 export { billingService } from "./billing/billing.service";
 export { doctorService } from "./doctors/doctor.service";
 export { doctorScheduleService } from "./doctors/doctorSchedule.service";

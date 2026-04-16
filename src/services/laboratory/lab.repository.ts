@@ -12,11 +12,11 @@ import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
 
 const LAB_COLUMNS =
-  "id, tenant_id, patient_id, doctor_id, test_name, order_date, status, result, deleted_at, deleted_by, created_at, updated_at";
+  "id, tenant_id, patient_id, doctor_id, test_name, order_date, status, result, result_value, result_unit, reference_range, abnormal_flag, result_notes, resulted_at, deleted_at, deleted_by, created_at, updated_at";
 const LAB_WITH_DOCTOR_COLUMNS = `${LAB_COLUMNS}, doctors(full_name)`;
 const LAB_WITH_PATIENT_DOCTOR_COLUMNS = `${LAB_COLUMNS}, patients(full_name), doctors(full_name)`;
 
-const SEARCH_COLUMNS = ["test_name", "status", "result"];
+const SEARCH_COLUMNS = ["test_name", "status", "result", "result_value", "reference_range", "result_notes"];
 const SEARCH_COLUMNS_WITH_RELATIONS = [...SEARCH_COLUMNS, "patients.full_name", "doctors.full_name"];
 const SORTABLE_COLUMNS = new Set([
   "order_date",
@@ -34,6 +34,7 @@ export interface LabRepository {
   listPagedWithRelations(params: LabResultListParams, tenantId: string): Promise<PagedResult<LabOrderWithPatientDoctor>>;
   countByStatus(tenantId: string): Promise<Record<"pending" | "processing" | "completed", number>>;
   listByPatient(patientId: string, tenantId: string, params?: LimitOffsetParams): Promise<LabOrderWithDoctor[]>;
+  getById(id: string, tenantId: string): Promise<LabResult>;
   create(input: LabResultCreateInput, tenantId: string): Promise<LabResult>;
   update(id: string, input: LabResultUpdateInput, tenantId: string): Promise<LabResult>;
   archive(id: string, tenantId: string, userId: string): Promise<LabResult>;
@@ -185,6 +186,17 @@ export const labRepository: LabRepository = {
 
     return (data ?? []) as LabOrderWithDoctor[];
   },
+  async getById(id, tenantId) {
+    const result = await supabase
+      .from("lab_orders")
+      .select(LAB_COLUMNS)
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
+      .single();
+
+    return assertOk(result) as LabResult;
+  },
   async create(input, tenantId) {
     const payload: Record<string, unknown> = {
       tenant_id: tenantId,
@@ -196,6 +208,12 @@ export const labRepository: LabRepository = {
     if (input.order_date !== undefined) payload.order_date = input.order_date;
     if (input.status !== undefined) payload.status = input.status;
     if (input.result !== undefined) payload.result = input.result;
+    if (input.result_value !== undefined) payload.result_value = input.result_value;
+    if (input.result_unit !== undefined) payload.result_unit = input.result_unit;
+    if (input.reference_range !== undefined) payload.reference_range = input.reference_range;
+    if (input.abnormal_flag !== undefined) payload.abnormal_flag = input.abnormal_flag;
+    if (input.result_notes !== undefined) payload.result_notes = input.result_notes;
+    if (input.resulted_at !== undefined) payload.resulted_at = input.resulted_at;
 
     const result = await supabase
       .from("lab_orders")
@@ -214,6 +232,12 @@ export const labRepository: LabRepository = {
     if (input.order_date !== undefined) payload.order_date = input.order_date;
     if (input.status !== undefined) payload.status = input.status;
     if (input.result !== undefined) payload.result = input.result;
+    if (input.result_value !== undefined) payload.result_value = input.result_value;
+    if (input.result_unit !== undefined) payload.result_unit = input.result_unit;
+    if (input.reference_range !== undefined) payload.reference_range = input.reference_range;
+    if (input.abnormal_flag !== undefined) payload.abnormal_flag = input.abnormal_flag;
+    if (input.result_notes !== undefined) payload.result_notes = input.result_notes;
+    if (input.resulted_at !== undefined) payload.resulted_at = input.resulted_at;
 
     if (Object.keys(payload).length === 0) {
       const result = await supabase

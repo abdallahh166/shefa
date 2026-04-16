@@ -4,26 +4,57 @@ import { DataTable, Column } from "@/shared/components/DataTable";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { StatusFilter } from "@/shared/components/StatusFilter";
 import { Button } from "@/components/primitives/Button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PermissionGuard } from "@/core/auth/PermissionGuard";
 import { PageContainer, SectionHeader } from "@/components/layout/AppLayout";
-import { CalendarPlus, CheckCircle, XCircle, Play, CalendarDays, List, Video } from "lucide-react";
+import { CalendarPlus, CheckCircle, CalendarDays, List, Video } from "lucide-react";
 import { formatDate } from "@/shared/utils/formatDate";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { useAuth } from "@/core/auth/authStore";
 import { NewAppointmentModal } from "./NewAppointmentModal";
+import { WaitingRoomPanel } from "./WaitingRoomPanel";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { AppointmentCalendar, AppointmentCalendarItem, AppointmentCalendarView } from "./AppointmentCalendar";
 import { appointmentService } from "@/services/appointments/appointment.service";
+import { appointmentQueueService } from "@/services/appointments/appointmentQueue.service";
 import { queryKeys } from "@/services/queryKeys";
+import type { AppointmentQueueStatus, AppointmentQueueWithRelations } from "@/domain/appointmentQueue/appointmentQueue.types";
 import type { AppointmentWithPatientDoctor } from "@/domain/appointment/appointment.types";
 
 type AppointmentRow = AppointmentWithPatientDoctor;
-
-const statusVariant = { completed: "success", in_progress: "info", scheduled: "default", cancelled: "destructive" } as const;
-
 type ViewMode = "list" | "calendar";
+type WorkflowTab = "schedule" | "waitingRoom";
+
+const statusVariant = {
+  completed: "success",
+  in_progress: "info",
+  scheduled: "default",
+  cancelled: "destructive",
+  no_show: "warning",
+} as const;
+
+function queueStatusLabel(status: AppointmentQueueStatus) {
+  switch (status) {
+    case "waiting":
+      return "Waiting";
+    case "called":
+      return "Called";
+    case "in_service":
+      return "In service";
+    case "done":
+      return "Done";
+    case "no_show":
+      return "No-show";
+    default:
+      return status;
+  }
+}
+
+function localDayKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
 
 function startOfWeek(d: Date) {
   const out = new Date(d);
@@ -59,10 +90,12 @@ export const AppointmentsPage = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const canManage = hasPermission("manage_appointments");
+  const queueDayKey = localDayKey();
 
   const [showModal, setShowModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [workflowTab, setWorkflowTab] = useState<WorkflowTab>("schedule");
   const [calendarView, setCalendarView] = useState<AppointmentCalendarView>("month");
   const [calendarCursor, setCalendarCursor] = useState(() => {
     const now = new Date();
@@ -77,7 +110,7 @@ export const AppointmentsPage = () => {
   });
   const pageSize = 25;
 
-  useRealtimeSubscription(["appointments"]);
+  useRealtimeSubscription(["appointments", "appointment_queue"]);
 
   const { data: listPage, isLoading: loadingList } = useQuery({
     queryKey: queryKeys.appointments.list({
@@ -95,7 +128,7 @@ export const AppointmentsPage = () => {
       filters: statusFilter ? { status: statusFilter } : undefined,
       sort: { column: sort.column, ascending: sort.direction === "asc" },
     }),
-    enabled: viewMode === "list" && !!user?.tenantId,
+    enabled: !!user?.tenantId,
   });
 
   const { start: calendarStart, end: calendarEnd } = getCalendarRange(calendarCursor, calendarView);
@@ -112,7 +145,15 @@ export const AppointmentsPage = () => {
     enabled: viewMode === "calendar" && !!user?.tenantId,
   });
 
-  useEffect(() => { setPage(1); }, [statusFilter, searchTerm, viewMode]);
+  const { data: queueEntries = [], isLoading: loadingQueue } = useQuery({
+    queryKey: queryKeys.appointments.queue({ tenantId: user?.tenantId, dayKey: queueDayKey }),
+    queryFn: async () => appointmentQueueService.listToday(),
+    enabled: !!user?.tenantId,
+  });
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, searchTerm, viewMode]);
 
   const statusLabel = (s: string) => {
     switch (s) {
@@ -120,6 +161,7 @@ export const AppointmentsPage = () => {
       case "in_progress": return t("appointments.inProgress");
       case "completed": return t("appointments.completed");
       case "cancelled": return t("appointments.cancelled");
+      case "no_show": return "No-show";
       default: return s;
     }
   };
@@ -139,8 +181,8 @@ export const AppointmentsPage = () => {
 
   const listDisplayData: AppointmentCalendarItem[] = listAppointments.map((a) => ({
     id: a.id,
-    patient_name: a.patients?.full_name ?? "—",
-    doctor_name: a.doctors?.full_name ?? "—",
+    patient_name: a.patients?.full_name ?? "-",
+    doctor_name: a.doctors?.full_name ?? "-",
     appointment_date: a.appointment_date,
     type: a.type,
     status: a.status,
@@ -148,8 +190,8 @@ export const AppointmentsPage = () => {
 
   const calendarDisplayData: AppointmentCalendarItem[] = calendarAppointments.map((a) => ({
     id: a.id,
-    patient_name: a.patients?.full_name ?? "—",
-    doctor_name: a.doctors?.full_name ?? "—",
+    patient_name: a.patients?.full_name ?? "-",
+    doctor_name: a.doctors?.full_name ?? "-",
     appointment_date: a.appointment_date,
     type: a.type,
     status: a.status,
@@ -160,17 +202,54 @@ export const AppointmentsPage = () => {
     [calendarDisplayData, statusFilter],
   );
 
-  const { data: statusCounts = { scheduled: 0, in_progress: 0, completed: 0, cancelled: 0 } } = useQuery({
+  const { data: statusCounts = { scheduled: 0, in_progress: 0, completed: 0, cancelled: 0, no_show: 0 } } = useQuery({
     queryKey: queryKeys.appointments.statusCounts(user?.tenantId),
     enabled: !!user?.tenantId,
     queryFn: async () => appointmentService.countByStatus(),
   });
 
-  const handleUpdateStatus = async (id: string, newStatus: string) => {
+  const activeQueueByAppointment = useMemo(() => {
+    const map = new Map<string, AppointmentQueueWithRelations>();
+    queueEntries
+      .filter((entry) => entry.status === "waiting" || entry.status === "called" || entry.status === "in_service")
+      .forEach((entry) => {
+        map.set(entry.appointment_id, entry);
+      });
+    return map;
+  }, [queueEntries]);
+
+  const invalidateAppointments = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.appointments.root(user?.tenantId) });
+  };
+
+  const handleUpdateStatus = async (id: string, newStatus: AppointmentRow["status"]) => {
     try {
-      await appointmentService.update(id, { status: newStatus as AppointmentRow["status"] });
+      await appointmentService.update(id, { status: newStatus });
       toast({ title: t("appointments.appointmentStatusUpdated"), description: statusLabel(newStatus) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.appointments.root(user?.tenantId) });
+      invalidateAppointments();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("common.error");
+      toast({ title: t("common.error"), description: message, variant: "destructive" });
+    }
+  };
+
+  const handleCheckIn = async (appointmentId: string) => {
+    try {
+      await appointmentQueueService.checkIn(appointmentId);
+      toast({ title: "Patient checked in", description: "Added to the waiting room queue." });
+      setWorkflowTab("waitingRoom");
+      invalidateAppointments();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("common.error");
+      toast({ title: t("common.error"), description: message, variant: "destructive" });
+    }
+  };
+
+  const handleQueueStatusUpdate = async (queueId: string, nextStatus: AppointmentQueueStatus) => {
+    try {
+      await appointmentQueueService.updateStatus(queueId, nextStatus);
+      toast({ title: "Waiting room updated", description: queueStatusLabel(nextStatus) });
+      invalidateAppointments();
     } catch (err) {
       const message = err instanceof Error ? err.message : t("common.error");
       toast({ title: t("common.error"), description: message, variant: "destructive" });
@@ -181,7 +260,7 @@ export const AppointmentsPage = () => {
     try {
       await appointmentService.update(id, { appointment_date: newAppointmentDate });
       toast({ title: t("appointments.appointmentRescheduled") });
-      queryClient.invalidateQueries({ queryKey: queryKeys.appointments.root(user?.tenantId) });
+      invalidateAppointments();
     } catch (err) {
       const message = err instanceof Error ? err.message : t("common.error");
       toast({ title: t("common.error"), description: message, variant: "destructive" });
@@ -217,7 +296,7 @@ export const AppointmentsPage = () => {
       header: t("common.status"),
       sortable: true,
       render: (a) => (
-        <StatusBadge variant={(statusVariant as any)[a.status] ?? "default"} dot>
+        <StatusBadge variant={(statusVariant as Record<string, "success" | "warning" | "destructive" | "info" | "default">)[a.status] ?? "default"} dot>
           {statusLabel(a.status)}
         </StatusBadge>
       ),
@@ -225,69 +304,86 @@ export const AppointmentsPage = () => {
     {
       key: "actions",
       header: "",
-      render: (a) =>
-        a.status === "scheduled" ? (
-          <div className="flex gap-1">
-            <Button
-              onClick={() => handleJoinCall(a.id)}
-              variant="ghost"
-              size="icon-sm"
-              className="text-primary hover:bg-primary/10"
-              title={t("common.joinCall") ?? "Join Call"}
-              aria-label={t("common.joinCall") ?? "Join Call"}
-              data-testid={`appointment-action-join-${a.id}`}
-            >
-              <Video className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              onClick={() => handleUpdateStatus(a.id, "in_progress")}
-              variant="ghost"
-              size="icon-sm"
-              className="text-info hover:bg-info/10"
-              title={t("common.start")}
-              aria-label={t("common.start")}
-              data-testid={`appointment-action-start-${a.id}`}
-            >
-              <Play className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              onClick={() => handleUpdateStatus(a.id, "cancelled")}
-              variant="ghost"
-              size="icon-sm"
-              className="text-destructive hover:bg-destructive/10"
-              title={t("common.cancel")}
-              aria-label={t("common.cancel")}
-              data-testid={`appointment-action-cancel-${a.id}`}
-            >
-              <XCircle className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        ) : a.status === "in_progress" ? (
-          <div className="flex gap-1">
-            <Button
-              onClick={() => handleJoinCall(a.id)}
-              variant="ghost"
-              size="icon-sm"
-              className="text-primary hover:bg-primary/10"
-              title={t("common.joinCall") ?? "Join Call"}
-              aria-label={t("common.joinCall") ?? "Join Call"}
-              data-testid={`appointment-action-join-${a.id}`}
-            >
-              <Video className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              onClick={() => handleUpdateStatus(a.id, "completed")}
-              variant="ghost"
-              size="icon-sm"
-              className="text-success hover:bg-success/10"
-              title={t("common.complete")}
-              aria-label={t("common.complete")}
-              data-testid={`appointment-action-complete-${a.id}`}
-            >
-              <CheckCircle className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        ) : null,
+      render: (a) => {
+        const queueEntry = activeQueueByAppointment.get(a.id);
+        if (a.status === "scheduled") {
+          return (
+            <div className="flex flex-wrap justify-end gap-1">
+              {queueEntry ? (
+                <>
+                  <StatusBadge variant="info">{queueStatusLabel(queueEntry.status)}</StatusBadge>
+                  <Button
+                    onClick={() => setWorkflowTab("waitingRoom")}
+                    variant="ghost"
+                    size="sm"
+                    data-testid={`appointment-action-open-queue-${a.id}`}
+                  >
+                    Waiting room
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    onClick={() => void handleCheckIn(a.id)}
+                    variant="outline"
+                    size="sm"
+                    data-testid={`appointment-action-check-in-${a.id}`}
+                  >
+                    Check in
+                  </Button>
+                  <Button
+                    onClick={() => void handleUpdateStatus(a.id, "no_show")}
+                    variant="ghost"
+                    size="sm"
+                    data-testid={`appointment-action-no-show-${a.id}`}
+                  >
+                    No-show
+                  </Button>
+                  <Button
+                    onClick={() => void handleUpdateStatus(a.id, "cancelled")}
+                    variant="ghost"
+                    size="sm"
+                    data-testid={`appointment-action-cancel-${a.id}`}
+                  >
+                    {t("common.cancel")}
+                  </Button>
+                </>
+              )}
+            </div>
+          );
+        }
+
+        if (a.status === "in_progress") {
+          return (
+            <div className="flex gap-1 justify-end">
+              <Button
+                onClick={() => handleJoinCall(a.id)}
+                variant="ghost"
+                size="icon-sm"
+                className="text-primary hover:bg-primary/10"
+                title={t("common.joinCall") ?? "Join Call"}
+                aria-label={t("common.joinCall") ?? "Join Call"}
+                data-testid={`appointment-action-join-${a.id}`}
+              >
+                <Video className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                onClick={() => void handleUpdateStatus(a.id, "completed")}
+                variant="ghost"
+                size="icon-sm"
+                className="text-success hover:bg-success/10"
+                title={t("common.complete")}
+                aria-label={t("common.complete")}
+                data-testid={`appointment-action-complete-${a.id}`}
+              >
+                <CheckCircle className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          );
+        }
+
+        return null;
+      },
     },
   ];
 
@@ -296,6 +392,7 @@ export const AppointmentsPage = () => {
     { key: "in_progress" as const, color: "bg-info/10 text-info" },
     { key: "completed" as const, color: "bg-success/10 text-success" },
     { key: "cancelled" as const, color: "bg-destructive/10 text-destructive" },
+    { key: "no_show" as const, color: "bg-warning/10 text-warning" },
   ];
 
   return (
@@ -305,6 +402,40 @@ export const AppointmentsPage = () => {
         subtitle={`${totalAppointments} appointments`}
         actions={(
           <div className="flex items-center gap-2">
+            <PermissionGuard permission="manage_appointments">
+              <Button size="sm" onClick={() => setShowModal(true)} data-testid="appointments-add-button">
+                <CalendarPlus className="h-3.5 w-3.5 mr-1" />
+                {t("appointments.newAppointment")}
+              </Button>
+            </PermissionGuard>
+          </div>
+        )}
+      />
+
+      <Tabs value={workflowTab} onValueChange={(value) => setWorkflowTab(value as WorkflowTab)} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="schedule">Schedule</TabsTrigger>
+          <TabsTrigger value="waitingRoom">Waiting room</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="schedule" className="space-y-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            {statusCards.map(({ key }) => (
+              <Button
+                key={key}
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setStatusFilter(statusFilter === key ? null : key)}
+                className={`stat-card w-full text-center cursor-pointer transition-all flex-col ${statusFilter === key ? "ring-2 ring-primary" : ""}`}
+              >
+                <p className="text-2xl font-semibold tabular-nums">{statusCounts[key] ?? 0}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{statusLabel(key)}</p>
+              </Button>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center bg-muted rounded-lg p-0.5">
               <Button
                 onClick={() => setViewMode("list")}
@@ -329,78 +460,64 @@ export const AppointmentsPage = () => {
                 <CalendarDays className="h-3.5 w-3.5" />
               </Button>
             </div>
-            <PermissionGuard permission="manage_appointments">
-              <Button size="sm" onClick={() => setShowModal(true)} data-testid="appointments-add-button">
-                <CalendarPlus className="h-3.5 w-3.5 mr-1" />
-                {t("appointments.newAppointment")}
-              </Button>
-            </PermissionGuard>
           </div>
-        )}
-      />
 
-      {/* Status summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {statusCards.map(({ key, color }) => (
-          <Button
-            key={key}
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setStatusFilter(statusFilter === key ? null : key)}
-            className={`stat-card w-full text-center cursor-pointer transition-all flex-col ${statusFilter === key ? "ring-2 ring-primary" : ""}`}
-          >
-            <p className="text-2xl font-semibold tabular-nums">{statusCounts[key] ?? 0}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{statusLabel(key)}</p>
-          </Button>
-        ))}
-      </div>
-
-      {viewMode === "list" ? (
-        <DataTable
-          columns={columns}
-          data={listDisplayData}
-          keyExtractor={(a) => a.id}
-          searchable
-          serverSearch
-          searchValue={searchTerm}
-          onSearchChange={setSearchTerm}
-          sortColumn={sort.column}
-          sortDirection={sort.direction}
-          onSortChange={(column, direction) => {
-            setSort({ column, direction });
-            setPage(1);
-          }}
-          isLoading={loadingList}
-          exportFileName="appointments"
-          page={page}
-          pageSize={pageSize}
-          total={totalAppointments}
-          onPageChange={setPage}
-          filterSlot={
-            <StatusFilter
-              options={[
-                { value: "scheduled", label: statusLabel("scheduled") },
-                { value: "in_progress", label: statusLabel("in_progress") },
-                { value: "completed", label: statusLabel("completed") },
-                { value: "cancelled", label: statusLabel("cancelled") },
-              ]}
-              selected={statusFilter}
-              onChange={setStatusFilter}
+          {viewMode === "list" ? (
+            <DataTable
+              columns={columns}
+              data={listDisplayData}
+              keyExtractor={(a) => a.id}
+              searchable
+              serverSearch
+              searchValue={searchTerm}
+              onSearchChange={setSearchTerm}
+              sortColumn={sort.column}
+              sortDirection={sort.direction}
+              onSortChange={(column, direction) => {
+                setSort({ column, direction });
+                setPage(1);
+              }}
+              isLoading={loadingList}
+              exportFileName="appointments"
+              page={page}
+              pageSize={pageSize}
+              total={totalAppointments}
+              onPageChange={setPage}
+              filterSlot={(
+                <StatusFilter
+                  options={[
+                    { value: "scheduled", label: statusLabel("scheduled") },
+                    { value: "in_progress", label: statusLabel("in_progress") },
+                    { value: "completed", label: statusLabel("completed") },
+                    { value: "cancelled", label: statusLabel("cancelled") },
+                    { value: "no_show", label: statusLabel("no_show") },
+                  ]}
+                  selected={statusFilter}
+                  onChange={setStatusFilter}
+                />
+              )}
             />
-          }
-        />
-      ) : (
-        <AppointmentCalendar
-          appointments={calendarFiltered}
-          view={calendarView}
-          onViewChange={setCalendarView}
-          cursor={calendarCursor}
-          onCursorChange={setCalendarCursor}
-          rescheduleEnabled={canManage}
-          onReschedule={handleReschedule}
-        />
-      )}
+          ) : (
+            <AppointmentCalendar
+              appointments={calendarFiltered}
+              view={calendarView}
+              onViewChange={setCalendarView}
+              cursor={calendarCursor}
+              onCursorChange={setCalendarCursor}
+              rescheduleEnabled={canManage}
+              onReschedule={handleReschedule}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="waitingRoom">
+          <WaitingRoomPanel
+            entries={queueEntries}
+            isLoading={loadingQueue}
+            onUpdateStatus={handleQueueStatusUpdate}
+          />
+        </TabsContent>
+      </Tabs>
 
       <NewAppointmentModal
         open={showModal}

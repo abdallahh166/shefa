@@ -3,6 +3,7 @@ import {
   appointmentCreateSchema,
   appointmentListParamsSchema,
   appointmentSchema,
+  appointmentStatusEnum,
   appointmentUpdateSchema,
   appointmentWithDoctorSchema,
   appointmentWithPatientDoctorSchema,
@@ -13,11 +14,22 @@ import type { AppointmentCreateInput, AppointmentListParams, AppointmentUpdateIn
 import type { LimitOffsetParams } from "@/domain/shared/pagination.types";
 import { limitOffsetSchema } from "@/domain/shared/pagination.schema";
 import { emitDomainEvent } from "@/core/events";
-import { ServiceError, toServiceError } from "@/services/supabase/errors";
+import { BusinessRuleError, ServiceError, toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { assertAnyPermission } from "@/services/supabase/permissions";
 import { auditLogService } from "@/services/settings/audit.service";
+import { doctorRepository } from "@/services/doctors/doctor.repository";
+import { doctorScheduleRepository } from "@/services/doctors/doctorSchedule.repository";
 import { appointmentRepository } from "./appointment.repository";
+
+const DEFAULT_APPOINTMENT_DURATION_MINUTES = 30;
+const STATUS_TRANSITIONS: Record<z.infer<typeof appointmentStatusEnum>, Array<z.infer<typeof appointmentStatusEnum>>> = {
+  scheduled: ["in_progress", "cancelled", "no_show"],
+  in_progress: ["completed", "cancelled"],
+  completed: [],
+  cancelled: ["scheduled"],
+  no_show: ["scheduled", "cancelled"],
+};
 
 async function ensureNoConflict(
   doctorId: string,
@@ -28,6 +40,74 @@ async function ensureNoConflict(
   const hasConflict = await appointmentRepository.hasConflict(doctorId, appointmentDate, tenantId, excludeId);
   if (hasConflict) {
     throw new Error("Appointment conflict detected");
+  }
+}
+
+function getLocalDayMinutes(appointmentDate: string) {
+  const parsed = new Date(appointmentDate);
+  return {
+    dayOfWeek: parsed.getDay(),
+    minutes: (parsed.getHours() * 60) + parsed.getMinutes(),
+  };
+}
+
+function timeToMinutes(value: string) {
+  const [hour, minute] = value.split(":").map((part) => Number.parseInt(part, 10));
+  return (hour * 60) + minute;
+}
+
+async function ensureDoctorAvailability(
+  doctorId: string,
+  appointmentDate: string,
+  durationMinutes: number,
+  tenantId: string,
+) {
+  const doctor = await doctorRepository.getById(doctorId, tenantId);
+  if (doctor.status === "on_leave") {
+    throw new BusinessRuleError("Doctor is currently unavailable for booking", {
+      code: "DOCTOR_ON_LEAVE",
+      details: { doctorId },
+    });
+  }
+
+  const schedules = await doctorScheduleRepository.listByDoctor(doctorId, tenantId);
+  if (schedules.length === 0) return;
+
+  const { dayOfWeek, minutes } = getLocalDayMinutes(appointmentDate);
+  const appointmentEndMinutes = minutes + durationMinutes;
+  const activeSchedules = schedules.filter((schedule) => schedule.is_active && schedule.day_of_week === dayOfWeek);
+
+  if (activeSchedules.length === 0) {
+    throw new BusinessRuleError("Doctor is not scheduled to work on the selected day", {
+      code: "DOCTOR_OFF_SCHEDULE",
+      details: { doctorId, appointmentDate },
+    });
+  }
+
+  const fitsWorkingHours = activeSchedules.some((schedule) => {
+    const scheduleStart = timeToMinutes(schedule.start_time);
+    const scheduleEnd = timeToMinutes(schedule.end_time);
+    return minutes >= scheduleStart && appointmentEndMinutes <= scheduleEnd;
+  });
+
+  if (!fitsWorkingHours) {
+    throw new BusinessRuleError("Appointment falls outside the doctor's working hours", {
+      code: "DOCTOR_OUTSIDE_WORKING_HOURS",
+      details: { doctorId, appointmentDate, durationMinutes },
+    });
+  }
+}
+
+function assertStatusTransition(
+  currentStatus: z.infer<typeof appointmentStatusEnum>,
+  nextStatus: z.infer<typeof appointmentStatusEnum>,
+) {
+  if (currentStatus === nextStatus) return;
+  if (!STATUS_TRANSITIONS[currentStatus].includes(nextStatus)) {
+    throw new BusinessRuleError(`Cannot move appointment from ${currentStatus} to ${nextStatus}`, {
+      code: "APPOINTMENT_STATUS_TRANSITION_INVALID",
+      details: { currentStatus, nextStatus },
+    });
   }
 }
 
@@ -109,6 +189,8 @@ export const appointmentService = {
       assertAnyPermission(["manage_appointments"]);
       const parsed = appointmentCreateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
+      const durationMinutes = parsed.duration_minutes ?? DEFAULT_APPOINTMENT_DURATION_MINUTES;
+      await ensureDoctorAvailability(parsed.doctor_id, parsed.appointment_date, durationMinutes, tenantId);
       await ensureNoConflict(parsed.doctor_id, parsed.appointment_date, tenantId);
       const result = await appointmentRepository.create(parsed, tenantId);
       const appointment = appointmentSchema.parse(result);
@@ -153,12 +235,28 @@ export const appointmentService = {
       const parsedId = uuidSchema.parse(id);
       const parsed = appointmentUpdateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
-      if (parsed.doctor_id !== undefined || parsed.appointment_date !== undefined) {
-        const existing = await appointmentRepository.getById(parsedId, tenantId);
-        const doctorId = parsed.doctor_id ?? existing.doctor_id;
-        const appointmentDate = parsed.appointment_date ?? existing.appointment_date;
+      let existing: z.infer<typeof appointmentSchema> | null = null;
+      const loadExisting = async () => {
+        if (!existing) {
+          existing = appointmentSchema.parse(await appointmentRepository.getById(parsedId, tenantId));
+        }
+        return existing;
+      };
+
+      if (parsed.status !== undefined) {
+        const current = await loadExisting();
+        assertStatusTransition(current.status, parsed.status);
+      }
+
+      if (parsed.doctor_id !== undefined || parsed.appointment_date !== undefined || parsed.duration_minutes !== undefined) {
+        const current = await loadExisting();
+        const doctorId = parsed.doctor_id ?? current.doctor_id;
+        const appointmentDate = parsed.appointment_date ?? current.appointment_date;
+        const durationMinutes = parsed.duration_minutes ?? current.duration_minutes;
+        await ensureDoctorAvailability(doctorId, appointmentDate, durationMinutes, tenantId);
         await ensureNoConflict(doctorId, appointmentDate, tenantId, parsedId);
       }
+
       const result = await appointmentRepository.update(parsedId, parsed, tenantId);
       const appointment = appointmentSchema.parse(result);
       await auditLogService.logEvent({
