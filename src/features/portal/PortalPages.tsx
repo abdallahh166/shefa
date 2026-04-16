@@ -15,14 +15,14 @@ export const PortalAppointmentsPage = () => {
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="portal-appointments-page">
       <h2 className="text-lg font-semibold">Appointments</h2>
-      <div className="divide-y rounded-lg border">
+      <div className="divide-y rounded-lg border" data-testid="portal-appointments-list">
         {appointments.length === 0 ? (
-          <p className="p-4 text-sm text-muted-foreground">No appointments yet.</p>
+          <p className="p-4 text-sm text-muted-foreground" data-testid="portal-appointments-empty">No appointments yet.</p>
         ) : (
           appointments.map((appt: any) => (
-            <div key={appt.id} className="p-4 flex flex-wrap justify-between gap-2">
+            <div key={appt.id} className="p-4 flex flex-wrap justify-between gap-2" data-testid={`portal-appointment-${appt.id}`}>
               <div>
                 <p className="font-medium">{appt.doctors?.full_name ?? "Doctor"}</p>
                 <p className="text-xs text-muted-foreground">{formatDate(appt.appointment_date, locale, "datetime", calendarType)}</p>
@@ -45,14 +45,14 @@ export const PortalPrescriptionsPage = () => {
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="portal-prescriptions-page">
       <h2 className="text-lg font-semibold">Prescriptions</h2>
-      <div className="divide-y rounded-lg border">
+      <div className="divide-y rounded-lg border" data-testid="portal-prescriptions-list">
         {prescriptions.length === 0 ? (
-          <p className="p-4 text-sm text-muted-foreground">No prescriptions yet.</p>
+          <p className="p-4 text-sm text-muted-foreground" data-testid="portal-prescriptions-empty">No prescriptions yet.</p>
         ) : (
           prescriptions.map((rx: any) => (
-            <div key={rx.id} className="p-4 flex flex-wrap justify-between gap-2">
+            <div key={rx.id} className="p-4 flex flex-wrap justify-between gap-2" data-testid={`portal-prescription-${rx.id}`}>
               <div>
                 <p className="font-medium">{rx.medication}</p>
                 <p className="text-xs text-muted-foreground">{rx.dosage}</p>
@@ -75,14 +75,14 @@ export const PortalLabResultsPage = () => {
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="portal-labs-page">
       <h2 className="text-lg font-semibold">Lab Results</h2>
-      <div className="divide-y rounded-lg border">
+      <div className="divide-y rounded-lg border" data-testid="portal-labs-list">
         {labOrders.length === 0 ? (
-          <p className="p-4 text-sm text-muted-foreground">No lab results yet.</p>
+          <p className="p-4 text-sm text-muted-foreground" data-testid="portal-labs-empty">No lab results yet.</p>
         ) : (
           labOrders.map((lab: any) => (
-            <div key={lab.id} className="p-4">
+            <div key={lab.id} className="p-4" data-testid={`portal-lab-${lab.id}`}>
               <div className="flex flex-wrap justify-between gap-2">
                 <p className="font-medium">{lab.test_name}</p>
                 <p className="text-sm text-muted-foreground">{lab.status}</p>
@@ -106,14 +106,14 @@ export const PortalDocumentsPage = () => {
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="portal-documents-page">
       <h2 className="text-lg font-semibold">Documents</h2>
-      <div className="divide-y rounded-lg border">
+      <div className="divide-y rounded-lg border" data-testid="portal-documents-list">
         {documents.length === 0 ? (
-          <p className="p-4 text-sm text-muted-foreground">No documents yet.</p>
+          <p className="p-4 text-sm text-muted-foreground" data-testid="portal-documents-empty">No documents yet.</p>
         ) : (
           documents.map((doc: any) => (
-            <div key={doc.id} className="p-4 flex flex-wrap justify-between gap-2">
+            <div key={doc.id} className="p-4 flex flex-wrap justify-between gap-2" data-testid={`portal-document-${doc.id}`}>
               <div>
                 <p className="font-medium">{doc.file_name}</p>
                 <p className="text-xs text-muted-foreground">{doc.file_type}</p>
@@ -137,14 +137,14 @@ export const PortalInvoicesPage = () => {
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="portal-invoices-page">
       <h2 className="text-lg font-semibold">Invoices</h2>
-      <div className="divide-y rounded-lg border">
+      <div className="divide-y rounded-lg border" data-testid="portal-invoices-list">
         {invoices.length === 0 ? (
-          <p className="p-4 text-sm text-muted-foreground">No invoices yet.</p>
+          <p className="p-4 text-sm text-muted-foreground" data-testid="portal-invoices-empty">No invoices yet.</p>
         ) : (
           invoices.map((inv: any) => (
-            <div key={inv.id} className="p-4 flex flex-wrap justify-between gap-2">
+            <div key={inv.id} className="p-4 flex flex-wrap justify-between gap-2" data-testid={`portal-invoice-${inv.id}`}>
               <div>
                 <p className="font-medium">{inv.invoice_code ?? "Invoice"}</p>
                 <p className="text-xs text-muted-foreground">{inv.service}</p>

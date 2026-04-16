@@ -38,7 +38,7 @@ export const PortalLoginPage = () => {
   };
 
   return (
-    <div className="grid min-h-screen place-items-center bg-muted/20">
+    <div className="grid min-h-screen place-items-center bg-muted/20" data-testid="portal-login-page">
       <div className="w-full max-w-md space-y-4 rounded-xl border bg-background p-6">
         <div>
           <h1 className="text-xl font-semibold">Patient Portal</h1>
@@ -46,7 +46,7 @@ export const PortalLoginPage = () => {
         </div>
 
         {sent ? (
-          <div className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
+          <div className="rounded-lg bg-muted p-4 text-sm text-muted-foreground" data-testid="portal-login-success">
             Check your email for a sign-in link. You can close this page after signing in.
           </div>
         ) : (
@@ -57,9 +57,15 @@ export const PortalLoginPage = () => {
               value={email}
               onChange={(e) => setEmail(e.currentTarget.value)}
               placeholder="you@example.com"
+              data-testid="portal-login-email"
             />
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
-            <Button onClick={handleSend} disabled={!email || loading} className="w-full">
+            {error ? <p className="text-sm text-destructive" data-testid="portal-login-error">{error}</p> : null}
+            <Button
+              onClick={handleSend}
+              disabled={!email || loading}
+              className="w-full"
+              data-testid="portal-login-submit"
+            >
               {loading ? "Sending..." : "Send magic link"}
             </Button>
           </>

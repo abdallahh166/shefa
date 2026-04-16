@@ -16,36 +16,37 @@ export const PortalLayout = () => {
   const { user, logout } = usePortalAuth();
 
   return (
-    <div className="min-h-screen bg-muted/20">
-      <header className="border-b bg-background">
+    <div className="min-h-screen bg-muted/20" data-testid="portal-layout">
+      <header className="border-b bg-background" data-testid="portal-header">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div>
             <p className="text-xs text-muted-foreground">Patient Portal</p>
             <h1 className="text-lg font-semibold">{user?.tenantName ?? "Clinic"}</h1>
           </div>
           <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-sm font-medium">{user?.fullName ?? "Patient"}</p>
-              <p className="text-xs text-muted-foreground">{user?.email}</p>
+            <div className="text-right" data-testid="portal-user-summary">
+              <p className="text-sm font-medium" data-testid="portal-user-name">{user?.fullName ?? "Patient"}</p>
+              <p className="text-xs text-muted-foreground" data-testid="portal-user-email">{user?.email}</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => logout()}>Sign out</Button>
+            <Button variant="ghost" size="sm" onClick={() => logout()} data-testid="portal-signout">Sign out</Button>
           </div>
         </div>
       </header>
 
       <div className="max-w-6xl mx-auto px-4 py-6 grid gap-6 md:grid-cols-[200px,1fr]">
-        <nav className="space-y-2">
+        <nav className="space-y-2" data-testid="portal-nav">
           {NAV_ITEMS.map((item) => (
             <Link
               key={item.key}
               to={`/portal/${clinicSlug}/${item.key}`}
+              data-testid={`portal-nav-${item.key}`}
               className="block rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
             >
               {item.label}
             </Link>
           ))}
         </nav>
-        <main className="bg-background border rounded-lg p-5">
+        <main className="bg-background border rounded-lg p-5" data-testid="portal-content">
           <Outlet />
         </main>
       </div>
