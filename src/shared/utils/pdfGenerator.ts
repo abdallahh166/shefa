@@ -70,21 +70,53 @@ export function generatePDF(options: PdfOptions) {
   doc.save(filename);
 }
 
+function formatInvoiceStatus(status?: string) {
+  if (status === "paid") return "Paid";
+  if (status === "pending") return "Pending";
+  if (status === "overdue") return "Overdue";
+  if (status === "partially_paid") return "Partially paid";
+  if (status === "void") return "Void";
+  return status ?? "-";
+}
+
+function formatInvoiceDate(value?: string | null) {
+  if (!value) return "-";
+  const normalized = value.includes("T") ? value : `${value}T00:00:00`;
+  return new Date(normalized).toLocaleDateString();
+}
+
 // Specific helpers
 export function generateInvoicePDF(invoice: any, patient: { full_name: string }) {
+  const subtitleParts = [
+    `Patient: ${patient.full_name}`,
+    `Date: ${formatInvoiceDate(invoice.invoice_date)}`,
+    invoice.due_date ? `Due: ${formatInvoiceDate(invoice.due_date)}` : null,
+    `Status: ${formatInvoiceStatus(invoice.status)}`,
+  ].filter(Boolean);
+
   generatePDF({
     title: `Invoice ${invoice.invoice_code}`,
-    subtitle: `Patient: ${patient.full_name} | Date: ${new Date(invoice.invoice_date).toLocaleDateString()}`,
+    subtitle: subtitleParts.join(" | "),
     columns: [
       { header: "Service", dataKey: "service" },
-      { header: "Amount", dataKey: "amount" },
+      { header: "Total", dataKey: "amount" },
+      { header: "Paid", dataKey: "amount_paid" },
+      { header: "Balance", dataKey: "balance_due" },
       { header: "Status", dataKey: "status" },
+      { header: "Due Date", dataKey: "due_date" },
+      { header: "Paid At", dataKey: "paid_at" },
+      { header: "Void Reason", dataKey: "void_reason" },
     ],
     data: [
       {
         service: invoice.service,
         amount: `$${Number(invoice.amount).toLocaleString()}`,
-        status: invoice.status,
+        amount_paid: `$${Number(invoice.amount_paid ?? 0).toLocaleString()}`,
+        balance_due: `$${Number(invoice.balance_due ?? 0).toLocaleString()}`,
+        status: formatInvoiceStatus(invoice.status),
+        due_date: invoice.due_date ? formatInvoiceDate(invoice.due_date) : "-",
+        paid_at: invoice.paid_at ? formatInvoiceDate(invoice.paid_at) : "-",
+        void_reason: invoice.void_reason ?? "-",
       },
     ],
     filename: `invoice-${invoice.invoice_code}.pdf`,
@@ -207,6 +239,9 @@ const labels: Record<ReportLocale, Record<string, string>> = {
     invoice: "Invoice #",
     service: "Service",
     amount: "Amount",
+    paid: "Paid",
+    balance: "Balance",
+    dueDate: "Due Date",
     page: "Page",
     of: "of",
   },
@@ -238,6 +273,9 @@ const labels: Record<ReportLocale, Record<string, string>> = {
     invoice: "رقم الفاتورة",
     service: "الخدمة",
     amount: "المبلغ",
+    paid: "المدفوع",
+    balance: "المتبقي",
+    dueDate: "تاريخ الاستحقاق",
     page: "صفحة",
     of: "من",
   },
@@ -267,7 +305,16 @@ interface PatientReportData {
     doctors?: { full_name: string } | null;
   }>;
   labOrders: Array<{ test_name: string; order_date: string; status: string; result?: string | null; doctors?: { full_name: string } | null }>;
-  invoices: Array<{ invoice_code: string; service: string; amount: number; invoice_date: string; status: string }>;
+  invoices: Array<{
+    invoice_code: string;
+    service: string;
+    amount: number;
+    amount_paid?: number | null;
+    balance_due?: number | null;
+    invoice_date: string;
+    due_date?: string | null;
+    status: string;
+  }>;
   clinic?: { name: string; logoUrl?: string | null };
   locale?: ReportLocale;
 }
@@ -437,13 +484,17 @@ export async function generatePatientReportPDF(data: PatientReportData) {
     addSectionTitle(l.billing);
     autoTable(doc, {
       startY: y,
-      head: [[l.invoice, l.service, l.amount, l.date, l.status]],
+      head: [[l.invoice, l.service, l.amount, l.paid, l.balance, l.dueDate, l.status]],
       body: invoices.map((inv) => [
         inv.invoice_code,
         inv.service,
         `$${Number(inv.amount).toLocaleString()}`,
-        new Date(inv.invoice_date + "T00:00:00").toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US"),
-        inv.status,
+        `$${Number(inv.amount_paid ?? 0).toLocaleString()}`,
+        `$${Number(inv.balance_due ?? 0).toLocaleString()}`,
+        inv.due_date
+          ? new Date(inv.due_date + "T00:00:00").toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US")
+          : "—",
+        formatInvoiceStatus(inv.status),
       ]),
       theme: "grid",
       headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: "bold" },

@@ -4,6 +4,24 @@ import { usePortalAuth } from "@/core/auth/portalAuthStore";
 import { formatDate, formatCurrency } from "@/shared/utils/formatDate";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { formatPrescriptionQuantity, formatPrescriptionSig } from "@/shared/utils/prescription";
+import { StatusBadge } from "@/shared/components/StatusBadge";
+
+const invoiceStatusVariant = {
+  paid: "success",
+  pending: "warning",
+  overdue: "destructive",
+  partially_paid: "warning",
+  void: "destructive",
+} as const;
+
+const getInvoiceStatusLabel = (status?: string) => {
+  if (status === "paid") return "Paid";
+  if (status === "pending") return "Pending";
+  if (status === "overdue") return "Overdue";
+  if (status === "partially_paid") return "Partially paid";
+  if (status === "void") return "Void";
+  return status ?? "-";
+};
 
 export const PortalAppointmentsPage = () => {
   const { user } = usePortalAuth();
@@ -148,14 +166,34 @@ export const PortalInvoicesPage = () => {
           <p className="p-4 text-sm text-muted-foreground" data-testid="portal-invoices-empty">No invoices yet.</p>
         ) : (
           invoices.map((inv: any) => (
-            <div key={inv.id} className="p-4 flex flex-wrap justify-between gap-2" data-testid={`portal-invoice-${inv.id}`}>
-              <div>
+            <div key={inv.id} className="p-4 flex flex-wrap justify-between gap-4" data-testid={`portal-invoice-${inv.id}`}>
+              <div className="space-y-1">
                 <p className="font-medium">{inv.invoice_code ?? "Invoice"}</p>
                 <p className="text-xs text-muted-foreground">{inv.service}</p>
+                <StatusBadge variant={invoiceStatusVariant[inv.status as keyof typeof invoiceStatusVariant] ?? "default"}>
+                  {getInvoiceStatusLabel(inv.status)}
+                </StatusBadge>
+                {inv.due_date ? (
+                  <p className="text-xs text-muted-foreground">
+                    Due {formatDate(inv.due_date, locale, "date", calendarType)}
+                  </p>
+                ) : null}
+                {inv.status === "void" && inv.void_reason ? (
+                  <p className="max-w-sm text-xs text-muted-foreground">
+                    Void reason: {inv.void_reason}
+                  </p>
+                ) : null}
               </div>
-              <div className="text-right">
-                <p className="text-sm font-medium">{formatCurrency(inv.amount, locale)}</p>
+              <div className="space-y-1 text-right">
+                <p className="text-sm font-medium">Total {formatCurrency(inv.amount, locale)}</p>
+                <p className="text-xs text-success">Paid {formatCurrency(inv.amount_paid ?? 0, locale)}</p>
+                <p className="text-xs text-muted-foreground">Balance {formatCurrency(inv.balance_due ?? 0, locale)}</p>
                 <p className="text-xs text-muted-foreground">{formatDate(inv.invoice_date, locale, "date", calendarType)}</p>
+                {inv.paid_at ? (
+                  <p className="text-xs text-muted-foreground">
+                    Settled {formatDate(inv.paid_at, locale, "datetime", calendarType)}
+                  </p>
+                ) : null}
               </div>
             </div>
           ))

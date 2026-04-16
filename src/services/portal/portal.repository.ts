@@ -98,7 +98,7 @@ export const portalRepository = {
   async listInvoices(patientId: string) {
     const { data, error } = await supabase
       .from("invoices")
-      .select("id, invoice_code, service, amount, status, invoice_date")
+      .select("id, invoice_code, service, amount, amount_paid, balance_due, due_date, paid_at, voided_at, void_reason, status, invoice_date")
       .eq("patient_id", patientId)
       .order("invoice_date", { ascending: false });
     if (error) {

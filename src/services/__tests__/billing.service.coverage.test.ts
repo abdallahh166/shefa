@@ -254,4 +254,44 @@ describe("billingService permissions", () => {
       }),
     ).rejects.toThrow("Invoices with posted payments cannot be voided");
   });
+
+  it("voids an unpaid invoice when a reason is provided", async () => {
+    vi.doMock("@/core/auth/authStore", () => ({
+      useAuth: {
+        getState: () => ({ hasPermission: () => true }),
+      },
+    }));
+
+    const repo = vi.mocked(billingRepository, true);
+    repo.getById.mockResolvedValue(buildInvoice({
+      status: "pending",
+      amount_paid: 0,
+      balance_due: 120,
+    }));
+    repo.update.mockResolvedValue(buildInvoice({
+      status: "void",
+      amount_paid: 0,
+      balance_due: 0,
+      void_reason: "Duplicate invoice created at reception",
+      voided_at: "2026-04-16T11:00:00.000Z",
+    }));
+
+    const { billingService } = await import("@/services/billing/billing.service");
+    const result = await billingService.voidInvoice(
+      invoiceId,
+      "Duplicate invoice created at reception",
+    );
+
+    expect(repo.update).toHaveBeenCalledWith(
+      invoiceId,
+      expect.objectContaining({
+        status: "void",
+        balance_due: 0,
+        void_reason: "Duplicate invoice created at reception",
+      }),
+      tenantId,
+    );
+    expect(result.status).toBe("void");
+    expect(result.balance_due).toBe(0);
+  });
 });
