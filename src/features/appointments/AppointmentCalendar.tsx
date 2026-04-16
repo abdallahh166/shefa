@@ -260,6 +260,7 @@ export function AppointmentCalendar({ appointments, view, onViewChange, cursor, 
                   isToday && "ring-2 ring-inset ring-primary/30",
                   isDragOver && "bg-accent/40",
                 )}
+                data-testid={`appointment-calendar-day-${key}`}
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className={cn("text-xs font-medium", isOutside && "text-muted-foreground")}>{dayNumber(day)}</span>
@@ -287,6 +288,8 @@ export function AppointmentCalendar({ appointments, view, onViewChange, cursor, 
                           statusChipClass[a.status] ?? "bg-muted text-foreground",
                         )}
                         title={`${a.patient_name} â€¢ ${a.doctor_name} â€¢ ${statusLabel(a.status)}`}
+                        data-testid={`appointment-calendar-item-${a.id}`}
+                        data-appointment-patient={a.patient_name}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="truncate">{a.patient_name}</span>

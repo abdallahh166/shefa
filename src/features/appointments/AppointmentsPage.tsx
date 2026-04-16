@@ -235,6 +235,7 @@ export const AppointmentsPage = () => {
               className="text-primary hover:bg-primary/10"
               title={t("common.joinCall") ?? "Join Call"}
               aria-label={t("common.joinCall") ?? "Join Call"}
+              data-testid={`appointment-action-join-${a.id}`}
             >
               <Video className="h-3.5 w-3.5" />
             </Button>
@@ -245,6 +246,7 @@ export const AppointmentsPage = () => {
               className="text-info hover:bg-info/10"
               title={t("common.start")}
               aria-label={t("common.start")}
+              data-testid={`appointment-action-start-${a.id}`}
             >
               <Play className="h-3.5 w-3.5" />
             </Button>
@@ -255,6 +257,7 @@ export const AppointmentsPage = () => {
               className="text-destructive hover:bg-destructive/10"
               title={t("common.cancel")}
               aria-label={t("common.cancel")}
+              data-testid={`appointment-action-cancel-${a.id}`}
             >
               <XCircle className="h-3.5 w-3.5" />
             </Button>
@@ -268,6 +271,7 @@ export const AppointmentsPage = () => {
               className="text-primary hover:bg-primary/10"
               title={t("common.joinCall") ?? "Join Call"}
               aria-label={t("common.joinCall") ?? "Join Call"}
+              data-testid={`appointment-action-join-${a.id}`}
             >
               <Video className="h-3.5 w-3.5" />
             </Button>
@@ -278,6 +282,7 @@ export const AppointmentsPage = () => {
               className="text-success hover:bg-success/10"
               title={t("common.complete")}
               aria-label={t("common.complete")}
+              data-testid={`appointment-action-complete-${a.id}`}
             >
               <CheckCircle className="h-3.5 w-3.5" />
             </Button>
@@ -308,6 +313,7 @@ export const AppointmentsPage = () => {
                 className={`text-xs font-medium transition-colors ${viewMode === "list" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}
                 aria-label={t("common.list")}
                 aria-pressed={viewMode === "list"}
+                data-testid="appointments-view-list"
               >
                 <List className="h-3.5 w-3.5" />
               </Button>
@@ -318,6 +324,7 @@ export const AppointmentsPage = () => {
                 className={`text-xs font-medium transition-colors ${viewMode === "calendar" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}
                 aria-label={t("common.calendar")}
                 aria-pressed={viewMode === "calendar"}
+                data-testid="appointments-view-calendar"
               >
                 <CalendarDays className="h-3.5 w-3.5" />
               </Button>
