@@ -8,6 +8,9 @@ import {
   insuranceSummarySchema,
   insuranceOperationsSummarySchema,
   insuranceAssignableOwnerSchema,
+  insuranceClaimAttachmentSchema,
+  insuranceClaimAttachmentCreateSchema,
+  insuranceClaimAttachmentUploadSchema,
 } from "./insurance.schema";
 
 export type InsuranceClaim = z.infer<typeof insuranceClaimSchema>;
@@ -18,3 +21,6 @@ export type InsuranceClaimListParams = z.infer<typeof insuranceClaimListParamsSc
 export type InsuranceSummary = z.infer<typeof insuranceSummarySchema>;
 export type InsuranceOperationsSummary = z.infer<typeof insuranceOperationsSummarySchema>;
 export type InsuranceAssignableOwner = z.infer<typeof insuranceAssignableOwnerSchema>;
+export type InsuranceClaimAttachment = z.infer<typeof insuranceClaimAttachmentSchema>;
+export type InsuranceClaimAttachmentCreateInput = z.infer<typeof insuranceClaimAttachmentCreateSchema>;
+export type InsuranceClaimAttachmentUploadInput = z.infer<typeof insuranceClaimAttachmentUploadSchema>;

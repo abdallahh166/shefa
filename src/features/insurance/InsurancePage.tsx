@@ -7,6 +7,7 @@ import { DataTable, Column } from "@/shared/components/DataTable";
 import {
   CheckCircle,
   Clock3,
+  Paperclip,
   Plus,
   RefreshCcw,
   Send,
@@ -25,6 +26,7 @@ import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { useAuth } from "@/core/auth/authStore";
 import { NewClaimModal } from "./NewClaimModal";
 import { ClaimFollowUpDialog } from "./ClaimFollowUpDialog";
+import { InsuranceClaimAttachmentsDialog } from "./InsuranceClaimAttachmentsDialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { formatDate, formatCurrency } from "@/shared/utils/formatDate";
@@ -106,6 +108,7 @@ interface WorkQueueCardProps {
   isLoading?: boolean;
   onViewQueue: () => void;
   onOpenFollowUp: (claim: InsuranceClaimWithPatient) => void;
+  onOpenAttachments: (claim: InsuranceClaimWithPatient) => void;
   onOpenAction: (claim: InsuranceClaimWithPatient, action: ClaimAction) => void;
 }
 
@@ -117,6 +120,7 @@ const WorkQueueCard = ({
   isLoading = false,
   onViewQueue,
   onOpenFollowUp,
+  onOpenAttachments,
   onOpenAction,
 }: WorkQueueCardProps) => (
   <section className="rounded-xl border bg-card p-4">
@@ -153,6 +157,10 @@ const WorkQueueCard = ({
               <Button variant="outline" size="sm" onClick={() => onOpenFollowUp(claim)}>
                 Follow up
               </Button>
+              <Button variant="outline" size="sm" onClick={() => onOpenAttachments(claim)}>
+                <Paperclip className="h-4 w-4" />
+                Attachments
+              </Button>
               {claim.status === "denied" ? (
                 <Button variant="ghost" size="sm" onClick={() => onOpenAction(claim, "draft")}>
                   <RefreshCcw className="h-4 w-4" />
@@ -180,6 +188,7 @@ export const InsurancePage = () => {
   const [selectedClaim, setSelectedClaim] = useState<InsuranceClaimWithPatient | null>(null);
   const [selectedAction, setSelectedAction] = useState<ClaimAction | null>(null);
   const [followUpClaim, setFollowUpClaim] = useState<InsuranceClaimWithPatient | null>(null);
+  const [attachmentsClaim, setAttachmentsClaim] = useState<InsuranceClaimWithPatient | null>(null);
   const [actionSaving, setActionSaving] = useState(false);
   const [followUpSaving, setFollowUpSaving] = useState(false);
   const [actionForm, setActionForm] = useState({
@@ -443,6 +452,10 @@ export const InsurancePage = () => {
       header: t("common.actions"),
       render: (claim) => (
         <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={() => setAttachmentsClaim(claim)}>
+            <Paperclip className="h-4 w-4" />
+            Attachments
+          </Button>
           {claim.status !== "reimbursed" ? (
             <Button variant="outline" size="sm" onClick={() => setFollowUpClaim(claim)}>
               Follow up
@@ -561,6 +574,7 @@ export const InsurancePage = () => {
           isLoading={deniedQueueLoading}
           onViewQueue={() => applyQueue("denied_follow_up")}
           onOpenFollowUp={setFollowUpClaim}
+          onOpenAttachments={setAttachmentsClaim}
           onOpenAction={openActionDialog}
         />
         <WorkQueueCard
@@ -571,6 +585,7 @@ export const InsurancePage = () => {
           isLoading={agedQueueLoading}
           onViewQueue={() => applyQueue("aged_open")}
           onOpenFollowUp={setFollowUpClaim}
+          onOpenAttachments={setAttachmentsClaim}
           onOpenAction={openActionDialog}
         />
         <WorkQueueCard
@@ -581,6 +596,7 @@ export const InsurancePage = () => {
           isLoading={stalledQueueLoading}
           onViewQueue={() => applyQueue("stalled_processing")}
           onOpenFollowUp={setFollowUpClaim}
+          onOpenAttachments={setAttachmentsClaim}
           onOpenAction={openActionDialog}
         />
       </div>
@@ -651,6 +667,12 @@ export const InsurancePage = () => {
         saving={followUpSaving}
         onClose={() => setFollowUpClaim(null)}
         onSave={handleSaveFollowUp}
+      />
+
+      <InsuranceClaimAttachmentsDialog
+        open={!!attachmentsClaim}
+        claim={attachmentsClaim}
+        onClose={() => setAttachmentsClaim(null)}
       />
 
       <Dialog open={!!selectedClaim && !!selectedAction} onOpenChange={(next) => !next && closeActionDialog()}>

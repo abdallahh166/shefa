@@ -13,6 +13,21 @@ export const insuranceStatusEnum = z.enum([
   "reimbursed",
 ]);
 
+export const insuranceClaimAttachmentTypeEnum = z.enum([
+  "eob",
+  "corrected_claim",
+  "prior_authorization",
+  "eligibility",
+  "referral",
+  "payer_letter",
+  "other",
+]);
+
+const fileSchema = z.custom<File>((value) => {
+  if (typeof File === "undefined") return false;
+  return value instanceof File;
+});
+
 export const insuranceClaimSchema = z.object({
   id: uuidSchema,
   tenant_id: uuidSchema,
@@ -88,4 +103,33 @@ export const insuranceAssignableOwnerSchema = z.object({
   user_id: uuidSchema,
   full_name: z.string().trim().min(1).max(200),
   role: appRoleEnum,
+});
+
+export const insuranceClaimAttachmentSchema = z.object({
+  id: uuidSchema,
+  claim_id: uuidSchema,
+  tenant_id: uuidSchema,
+  file_name: z.string().trim().min(1).max(255),
+  file_path: z.string().trim().min(1),
+  file_size: z.number().int().min(0),
+  file_type: z.string().trim().min(1).max(120),
+  attachment_type: insuranceClaimAttachmentTypeEnum,
+  uploaded_by: uuidSchema,
+  notes: z.string().trim().max(500).optional().nullable(),
+  deleted_at: dateTimeStringSchema.optional().nullable(),
+  deleted_by: uuidSchema.optional().nullable(),
+  created_at: dateTimeStringSchema,
+});
+
+export const insuranceClaimAttachmentCreateSchema = insuranceClaimAttachmentSchema.omit({
+  id: true,
+  tenant_id: true,
+  created_at: true,
+});
+
+export const insuranceClaimAttachmentUploadSchema = z.object({
+  claim_id: uuidSchema,
+  attachment_type: insuranceClaimAttachmentTypeEnum,
+  file: fileSchema,
+  notes: z.string().trim().max(500).optional().nullable(),
 });

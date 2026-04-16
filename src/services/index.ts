@@ -4,6 +4,7 @@ export { billingService } from "./billing/billing.service";
 export { doctorService } from "./doctors/doctor.service";
 export { doctorScheduleService } from "./doctors/doctorSchedule.service";
 export { insuranceService } from "./insurance/insurance.service";
+export { insuranceAttachmentsService } from "./insurance/insuranceAttachments.service";
 export { labService } from "./laboratory/lab.service";
 export { patientService } from "./patients/patient.service";
 export { patientDocumentsService } from "./patients/patientDocuments.service";
