@@ -1,7 +1,7 @@
 ﻿import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
 
-const ACCOUNT_COLUMNS = "id, tenant_id, patient_id, status, auth_user_id, patients(full_name), tenants:tenant_id(name, slug)";
+const ACCOUNT_COLUMNS = "id, tenant_id, patient_id, status, auth_user_id, patients(full_name), tenants:tenant_id(name, slug, status, status_reason)";
 
 export const portalRepository = {
   async getLoginMetadata(clinicSlug: string, email: string) {

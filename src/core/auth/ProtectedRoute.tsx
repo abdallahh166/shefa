@@ -41,7 +41,7 @@ const LoadingSkeleton = () => (
 );
 
 export const ProtectedRoute = ({ children, requiredPermission, requiredFeature }: ProtectedRouteProps) => {
-  const { isAuthenticated, isLoading, hasPermission } = useAuth();
+  const { isAuthenticated, isLoading, hasPermission, user } = useAuth();
   const { hasFeature, requiredPlan, isLoading: featureLoading } = useFeatureAccess();
 
   if (isLoading || (requiredFeature && featureLoading)) {
@@ -49,6 +49,23 @@ export const ProtectedRoute = ({ children, requiredPermission, requiredFeature }
   }
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (user?.role !== "super_admin" && user?.tenantStatus !== "active") {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-6">
+        <div className="max-w-md rounded-2xl border bg-card p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-semibold mb-2">Clinic Access Blocked</h1>
+          <p className="text-muted-foreground mb-3">
+            This clinic is currently {user?.tenantStatus}. Staff access has been restricted by the platform administrator.
+          </p>
+          {user?.tenantStatusReason ? (
+            <p className="text-sm text-muted-foreground">
+              Reason: <span className="text-foreground">{user.tenantStatusReason}</span>
+            </p>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
   if (requiredPermission && !hasPermission(requiredPermission)) {
     return (
       <div className="flex items-center justify-center min-h-screen">

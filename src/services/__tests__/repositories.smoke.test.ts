@@ -152,6 +152,20 @@ describe("repositories smoke", () => {
 
   it("executes repository methods without throwing", async () => {
     await adminRepository.listTenantsPaged({ limit: 10, offset: 0, search: "clinic", plan: "pro" });
+    await adminRepository.createTenant({
+      name: "Clinic Demo",
+      slug: "clinic-demo",
+      email: "ops@example.com",
+      phone: "+201000000000",
+      address: "Main st",
+      pending_owner_email: "owner@example.com",
+    });
+    await adminRepository.updateTenant(recordId, {
+      name: "Clinic Demo Updated",
+      slug: "clinic-demo-updated",
+      email: "updated@example.com",
+    });
+    await adminRepository.updateTenantStatus(recordId, { status: "suspended", status_reason: "Compliance review" });
     await adminRepository.listProfilesWithRolesPaged({ limit: 10, offset: 0, search: "john" });
     await adminRepository.listSubscriptionsPaged({ limit: 10, offset: 0, search: "clinic", plan: "starter", status: "active" });
     await adminRepository.listPricingPlans();

@@ -12,7 +12,10 @@ import {
   adminSubscriptionSchema,
   adminSubscriptionUpdateSchema,
   adminSubscriptionStatsSchema,
+  adminTenantCreateSchema,
   adminTenantSchema,
+  adminTenantStatusUpdateSchema,
+  adminTenantUpdateSchema,
   operationsAlertSeverityEnum,
   subscriptionPlanEnum,
   subscriptionStatusEnum,
@@ -23,7 +26,10 @@ import type {
   AdminOperationsAlertSummary,
   AdminPricingPlanCreateInput,
   AdminPricingPlanUpdateInput,
+  AdminTenantCreateInput,
+  AdminTenantStatusUpdateInput,
   AdminSubscriptionUpdateInput,
+  AdminTenantUpdateInput,
   AdminRecentJobActivity,
   AdminRecentSystemError,
 } from "@/domain/admin/admin.types";
@@ -227,6 +233,81 @@ export const adminService = {
       return { data: z.array(profileWithRolesSchema).parse(data), total: count };
     } catch (err) {
       throw toServiceError(err, "Failed to load profiles");
+    }
+  },
+  async createTenant(input: AdminTenantCreateInput) {
+    try {
+      assertSuperAdminAccess();
+      recentAuthService.assertRecentAuth({ action: "tenant_lifecycle_update" });
+      const parsed = adminTenantCreateSchema.parse(input);
+      const result = await adminRepository.createTenant(parsed);
+      const currentUser = useAuth.getState().user;
+      if (currentUser?.tenantId) {
+        await auditLogService.logEvent({
+          tenant_id: currentUser.tenantId,
+          user_id: currentUser.id,
+          action: "admin_tenant_created",
+          action_type: "tenant_create",
+          entity_type: "tenant",
+          entity_id: result.id,
+          details: { slug: result.slug, tenant_status: result.tenant_status, actor_role: currentUser.role },
+        });
+      }
+      return adminTenantSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to create tenant");
+    }
+  },
+  async updateTenant(id: string, input: AdminTenantUpdateInput) {
+    try {
+      assertSuperAdminAccess();
+      recentAuthService.assertRecentAuth({ action: "tenant_lifecycle_update" });
+      const parsedId = uuidSchema.parse(id);
+      const parsed = adminTenantUpdateSchema.parse(input);
+      const result = await adminRepository.updateTenant(parsedId, parsed);
+      const currentUser = useAuth.getState().user;
+      if (currentUser?.tenantId) {
+        await auditLogService.logEvent({
+          tenant_id: currentUser.tenantId,
+          user_id: currentUser.id,
+          action: "admin_tenant_updated",
+          action_type: "tenant_update",
+          entity_type: "tenant",
+          entity_id: result.id,
+          details: { changes: parsed, actor_role: currentUser.role },
+        });
+      }
+      return adminTenantSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to update tenant");
+    }
+  },
+  async updateTenantStatus(id: string, input: AdminTenantStatusUpdateInput) {
+    try {
+      assertSuperAdminAccess();
+      recentAuthService.assertRecentAuth({ action: "tenant_lifecycle_update" });
+      const parsedId = uuidSchema.parse(id);
+      const parsed = adminTenantStatusUpdateSchema.parse(input);
+      const result = await adminRepository.updateTenantStatus(parsedId, parsed);
+      const currentUser = useAuth.getState().user;
+      if (currentUser?.tenantId) {
+        await auditLogService.logEvent({
+          tenant_id: currentUser.tenantId,
+          user_id: currentUser.id,
+          action: "admin_tenant_status_updated",
+          action_type: "tenant_status_update",
+          entity_type: "tenant",
+          entity_id: result.id,
+          details: {
+            tenant_status: result.tenant_status,
+            status_reason: result.status_reason,
+            actor_role: currentUser.role,
+          },
+        });
+      }
+      return adminTenantSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to update tenant status");
     }
   },
   async listSubscriptionsPaged(input?: {

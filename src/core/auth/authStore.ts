@@ -4,6 +4,7 @@ import { profileStorage } from "@/services/settings/profile.storage";
 import { authService } from "@/services/auth/auth.service";
 
 export type Role = "super_admin" | "clinic_admin" | "doctor" | "receptionist" | "nurse" | "accountant";
+export type TenantStatus = "active" | "suspended" | "deactivated";
 
 type SupaUser = {
   id: string;
@@ -61,6 +62,8 @@ export interface AppUser {
   tenantId: string;
   tenantSlug: string;
   tenantName: string;
+  tenantStatus: TenantStatus;
+  tenantStatusReason?: string | null;
   avatar?: string;
 }
 
@@ -245,6 +248,8 @@ async function loadUserProfile(
         tenantId: profile.tenant_id,
         tenantSlug: tenant?.slug ?? "default",
         tenantName: tenant?.name ?? "Clinic",
+        tenantStatus: tenant?.status ?? "active",
+        tenantStatusReason: tenant?.status_reason ?? null,
         avatar: avatarUrl,
       },
       supabaseUser: supaUser,

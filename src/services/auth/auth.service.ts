@@ -23,6 +23,13 @@ export const authService = {
         await Promise.resolve(authRepository.signOut()).catch(() => undefined);
         throw new AuthorizationError("Please verify your email before logging in.");
       }
+      if (user) {
+        const { profile, role } = await authService.loadUserProfile(user.id);
+        if (!profile || !role) {
+          await Promise.resolve(authRepository.signOut()).catch(() => undefined);
+          throw new AuthorizationError("This clinic is suspended or deactivated.");
+        }
+      }
     } catch (err) {
       throw toServiceError(err, "Login failed");
     }

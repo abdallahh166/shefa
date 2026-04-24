@@ -10,13 +10,19 @@ import {
   adminPricingPlanUpdateSchema,
   adminRecentJobActivitySchema,
   adminRecentSystemErrorSchema,
+  adminTenantCreateSchema,
   adminSubscriptionSchema,
+  adminTenantStatusUpdateSchema,
   adminSubscriptionUpdateSchema,
   adminSubscriptionStatsSchema,
   adminTenantSchema,
+  adminTenantUpdateSchema,
 } from "./admin.schema";
 
 export type AdminTenant = z.infer<typeof adminTenantSchema>;
+export type AdminTenantCreateInput = z.infer<typeof adminTenantCreateSchema>;
+export type AdminTenantUpdateInput = z.infer<typeof adminTenantUpdateSchema>;
+export type AdminTenantStatusUpdateInput = z.infer<typeof adminTenantStatusUpdateSchema>;
 export type AdminSubscription = z.infer<typeof adminSubscriptionSchema>;
 export type AdminSubscriptionUpdateInput = z.infer<typeof adminSubscriptionUpdateSchema>;
 export type AdminSubscriptionStats = z.infer<typeof adminSubscriptionStatsSchema>;

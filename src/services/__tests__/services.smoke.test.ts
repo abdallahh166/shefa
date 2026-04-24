@@ -7,6 +7,9 @@ const recordId = "00000000-0000-0000-0000-000000000333";
 
 const adminRepository = vi.hoisted(() => ({
   listTenantsPaged: vi.fn(),
+  createTenant: vi.fn(),
+  updateTenant: vi.fn(),
+  updateTenantStatus: vi.fn(),
   listProfilesWithRolesPaged: vi.fn(),
   listSubscriptionsPaged: vi.fn(),
   listPricingPlans: vi.fn(),
@@ -115,6 +118,51 @@ describe("services smoke", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     adminRepository.listTenantsPaged.mockResolvedValue({ data: [], count: 0 });
+    adminRepository.createTenant.mockResolvedValue({
+      id: recordId,
+      name: "Clinic Demo",
+      slug: "clinic-demo",
+      email: "ops@example.com",
+      phone: null,
+      address: null,
+      pending_owner_email: "owner@example.com",
+      created_at: now,
+      tenant_status: "active",
+      status_reason: null,
+      status_changed_at: now,
+      plan: "free",
+      status: "active",
+    });
+    adminRepository.updateTenant.mockResolvedValue({
+      id: recordId,
+      name: "Clinic Demo Updated",
+      slug: "clinic-demo",
+      email: "ops@example.com",
+      phone: null,
+      address: "Main st",
+      pending_owner_email: "owner@example.com",
+      created_at: now,
+      tenant_status: "active",
+      status_reason: null,
+      status_changed_at: now,
+      plan: "free",
+      status: "active",
+    });
+    adminRepository.updateTenantStatus.mockResolvedValue({
+      id: recordId,
+      name: "Clinic Demo Updated",
+      slug: "clinic-demo",
+      email: "ops@example.com",
+      phone: null,
+      address: "Main st",
+      pending_owner_email: "owner@example.com",
+      created_at: now,
+      tenant_status: "suspended",
+      status_reason: "Compliance review",
+      status_changed_at: now,
+      plan: "free",
+      status: "active",
+    });
     adminRepository.listProfilesWithRolesPaged.mockResolvedValue({ data: [], count: 0 });
     adminRepository.listSubscriptionsPaged.mockResolvedValue({ data: [], count: 0 });
     adminRepository.listPricingPlans.mockResolvedValue([]);
@@ -213,6 +261,10 @@ describe("services smoke", () => {
       email: "clinic@example.com",
       address: "Street 1",
       logo_url: null,
+      pending_owner_email: null,
+      status: "active",
+      status_reason: null,
+      status_changed_at: now,
       created_at: now,
       updated_at: now,
     });
@@ -224,6 +276,10 @@ describe("services smoke", () => {
       email: "clinic@example.com",
       address: "Street 1",
       logo_url: null,
+      pending_owner_email: null,
+      status: "active",
+      status_reason: null,
+      status_changed_at: now,
       created_at: now,
       updated_at: now,
     });
@@ -286,6 +342,9 @@ describe("services smoke", () => {
 
   it("executes key service flows", async () => {
     await adminService.listTenantsPaged({ page: 1, pageSize: 10, search: "clinic", plan: "pro" });
+    await adminService.createTenant({ name: "Clinic Demo", slug: "clinic-demo", pending_owner_email: "owner@example.com" });
+    await adminService.updateTenant(recordId, { address: "Main st" });
+    await adminService.updateTenantStatus(recordId, { status: "suspended", status_reason: "Compliance review" });
     await adminService.listProfilesWithRolesPaged({ page: 1, pageSize: 10, search: "john" });
     await adminService.listSubscriptionsPaged({ page: 1, pageSize: 10, search: "clinic", plan: "pro", status: "active" });
     await adminService.listPricingPlans();

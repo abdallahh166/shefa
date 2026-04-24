@@ -3,7 +3,8 @@ import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
 import { assertOk } from "@/services/supabase/query";
 
-const TENANT_COLUMNS = "id, slug, name, phone, email, address, logo_url, created_at, updated_at";
+const TENANT_COLUMNS =
+  "id, slug, name, phone, email, address, logo_url, pending_owner_email, status, status_reason, status_changed_at, created_at, updated_at";
 
 export interface TenantRepository {
   getById(tenantId: string): Promise<Tenant>;
@@ -24,10 +25,12 @@ export const tenantRepository: TenantRepository = {
     const payload: Record<string, unknown> = {};
 
     if (input.name !== undefined) payload.name = input.name;
+    if (input.slug !== undefined) payload.slug = input.slug;
     if (input.phone !== undefined) payload.phone = input.phone;
     if (input.email !== undefined) payload.email = input.email;
     if (input.address !== undefined) payload.address = input.address;
     if (input.logo_url !== undefined) payload.logo_url = input.logo_url;
+    if (input.pending_owner_email !== undefined) payload.pending_owner_email = input.pending_owner_email;
 
     if (Object.keys(payload).length === 0) {
       const result = await supabase

@@ -33,7 +33,7 @@ describe("authService.login", () => {
 
   it("rejects login when email is not verified", async () => {
     repo.signInWithPassword.mockResolvedValue({
-      id: "user-1",
+      id: "00000000-0000-0000-0000-000000000111",
       email: "user@example.com",
       email_confirmed_at: null,
     } as any);
@@ -46,10 +46,18 @@ describe("authService.login", () => {
 
   it("allows login when email is verified", async () => {
     repo.signInWithPassword.mockResolvedValue({
-      id: "user-1",
+      id: "00000000-0000-0000-0000-000000000111",
       email: "user@example.com",
       email_confirmed_at: new Date().toISOString(),
     } as any);
+    repo.getProfileByUserId.mockResolvedValue({
+      id: "00000000-0000-0000-0000-000000000222",
+      user_id: "00000000-0000-0000-0000-000000000111",
+      tenant_id: "00000000-0000-0000-0000-000000000333",
+      full_name: "Demo User",
+      tenants: { name: "Clinic", slug: "clinic", status: "active", status_reason: null },
+    } as any);
+    repo.getRoleByUserId.mockResolvedValue("clinic_admin");
 
     await expect(authService.login("user@example.com", "password")).resolves.toBeUndefined();
     expect(repo.signOut).not.toHaveBeenCalled();

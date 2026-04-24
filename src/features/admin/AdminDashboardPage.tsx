@@ -10,10 +10,12 @@ import { StatusFilter } from "@/shared/components/StatusFilter";
 import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PricingPlanDialog } from "@/features/admin/PricingPlanDialog";
+import { TenantFormDialog } from "@/features/admin/TenantFormDialog";
+import { TenantStatusDialog } from "@/features/admin/TenantStatusDialog";
 import {
   Building2, Users, CreditCard, TrendingUp,
   BarChart3, LogOut, Eye, ChevronRight, Crown, HeartPulse,
-  Activity, AlertTriangle, Server, Plus, Pencil, Trash2,
+  Activity, AlertTriangle, Server, Plus, Pencil, Trash2, PauseCircle, PlayCircle, OctagonX,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -31,6 +33,7 @@ import type {
   AdminPricingPlan,
   AdminRecentJobActivity,
   AdminRecentSystemError,
+  AdminTenant,
 } from "@/domain/admin/admin.types";
 
 type AdminTab = "overview" | "operations" | "clinics" | "users" | "subscriptions" | "pricing";
@@ -94,6 +97,15 @@ export const AdminDashboardPage = () => {
   const [pricingDialogOpen, setPricingDialogOpen] = useState(false);
   const [pricingSaveLoading, setPricingSaveLoading] = useState(false);
   const [pricingDeleteLoading, setPricingDeleteLoading] = useState(false);
+  const [tenantDialogMode, setTenantDialogMode] = useState<"create" | "edit">("create");
+  const [editingTenant, setEditingTenant] = useState<AdminTenant | null>(null);
+  const [tenantDialogOpen, setTenantDialogOpen] = useState(false);
+  const [tenantSaveLoading, setTenantSaveLoading] = useState(false);
+  const [tenantStatusTarget, setTenantStatusTarget] = useState<{
+    tenant: AdminTenant;
+    status: "active" | "suspended" | "deactivated";
+  } | null>(null);
+  const [tenantStatusLoading, setTenantStatusLoading] = useState(false);
   const pageSize = 20;
 
   useEffect(() => {
@@ -280,6 +292,112 @@ export const AdminDashboardPage = () => {
     }
   };
 
+  const openCreateTenant = () => {
+    setTenantDialogMode("create");
+    setEditingTenant(null);
+    setTenantDialogOpen(true);
+  };
+
+  const openEditTenant = (tenant: AdminTenant) => {
+    setTenantDialogMode("edit");
+    setEditingTenant(tenant);
+    setTenantDialogOpen(true);
+  };
+
+  const handleTenantSubmit = async (input: any) => {
+    setTenantSaveLoading(true);
+    try {
+      if (tenantDialogMode === "create") {
+        await adminService.createTenant(input);
+        toast({ title: "Tenant created", description: "The clinic has been added to the platform." });
+      } else if (editingTenant) {
+        await adminService.updateTenant(editingTenant.id, input);
+        toast({ title: "Tenant updated", description: `${editingTenant.name} details were updated.` });
+      }
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "tenants"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] }),
+      ]);
+
+      setTenantDialogOpen(false);
+      setEditingTenant(null);
+    } catch (err: any) {
+      if (isFreshAuthRequiredError(err)) {
+        try {
+          await requestFreshAuth();
+          if (tenantDialogMode === "create") {
+            await adminService.createTenant(input);
+          } else if (editingTenant) {
+            await adminService.updateTenant(editingTenant.id, input);
+          }
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["admin", "tenants"] }),
+            queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] }),
+          ]);
+          toast({ title: "Tenant saved", description: "The tenant changes were applied successfully." });
+          setTenantDialogOpen(false);
+          setEditingTenant(null);
+        } catch {
+          return;
+        }
+        return;
+      }
+
+      toast({
+        title: "Unable to save tenant",
+        description: err?.message || "The tenant record could not be saved.",
+        variant: "destructive",
+      });
+    } finally {
+      setTenantSaveLoading(false);
+    }
+  };
+
+  const handleTenantStatusSubmit = async (input: { status: "active" | "suspended" | "deactivated"; status_reason: string | null }) => {
+    if (!tenantStatusTarget) return;
+    setTenantStatusLoading(true);
+    try {
+      await adminService.updateTenantStatus(tenantStatusTarget.tenant.id, input);
+      toast({
+        title: "Tenant status updated",
+        description: `${tenantStatusTarget.tenant.name} is now ${input.status}.`,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "tenants"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] }),
+      ]);
+      setTenantStatusTarget(null);
+    } catch (err: any) {
+      if (isFreshAuthRequiredError(err)) {
+        try {
+          await requestFreshAuth();
+          await adminService.updateTenantStatus(tenantStatusTarget.tenant.id, input);
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["admin", "tenants"] }),
+            queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] }),
+          ]);
+          toast({
+            title: "Tenant status updated",
+            description: `${tenantStatusTarget.tenant.name} is now ${input.status}.`,
+          });
+          setTenantStatusTarget(null);
+        } catch {
+          return;
+        }
+        return;
+      }
+
+      toast({
+        title: "Unable to update tenant status",
+        description: err?.message || "The tenant lifecycle change failed.",
+        variant: "destructive",
+      });
+    } finally {
+      setTenantStatusLoading(false);
+    }
+  };
+
   const availablePlanCodes = PLAN_OPTIONS.filter(
     (planCode) => !pricingPlans.some((plan) => plan.plan_code === planCode),
   );
@@ -430,8 +548,35 @@ export const AdminDashboardPage = () => {
         return <StatusBadge variant={variant as any}>{plan}</StatusBadge>;
       },
     },
+    {
+      key: "tenant_status",
+      header: "Lifecycle",
+      render: (c) => (
+        <StatusBadge
+          variant={
+            c.tenant_status === "active"
+              ? "success"
+              : c.tenant_status === "suspended"
+                ? "warning"
+                : "destructive"
+          }
+        >
+          {c.tenant_status}
+        </StatusBadge>
+      ),
+    },
     { key: "created_at", header: "Created", sortable: true, render: (c) => formatDate(c.created_at, locale, "date") },
     { key: "actions", header: "", render: (c) => (
+      <div className="flex items-center justify-end gap-1">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Edit clinic"
+          title="Edit clinic"
+          onClick={() => openEditTenant(c)}
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
         <Button
           variant="ghost"
           size="icon-sm"
@@ -442,6 +587,39 @@ export const AdminDashboardPage = () => {
         >
           <Eye className="h-4 w-4" />
         </Button>
+        {c.tenant_status === "active" ? (
+          <>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Suspend clinic"
+              title="Suspend clinic"
+              onClick={() => setTenantStatusTarget({ tenant: c, status: "suspended" })}
+            >
+              <PauseCircle className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Deactivate clinic"
+              title="Deactivate clinic"
+              onClick={() => setTenantStatusTarget({ tenant: c, status: "deactivated" })}
+            >
+              <OctagonX className="h-4 w-4" />
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Reactivate clinic"
+            title="Reactivate clinic"
+            onClick={() => setTenantStatusTarget({ tenant: c, status: "active" })}
+          >
+            <PlayCircle className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
     )},
   ];
 
@@ -467,6 +645,23 @@ export const AdminDashboardPage = () => {
         const variant = plan === "pro" ? "success" : plan === "enterprise" ? "info" : "default";
         return <StatusBadge variant={variant as any}>{plan}</StatusBadge>;
       },
+    },
+    {
+      key: "tenant_status",
+      header: "Lifecycle",
+      render: (t) => (
+        <StatusBadge
+          variant={
+            t.tenant_status === "active"
+              ? "success"
+              : t.tenant_status === "suspended"
+                ? "warning"
+                : "destructive"
+          }
+        >
+          {t.tenant_status}
+        </StatusBadge>
+      ),
     },
     {
       key: "created_at",
@@ -959,7 +1154,19 @@ export const AdminDashboardPage = () => {
 
         {/* Clinics Tab */}
         {activeTab === "clinics" && (
-          <div className="animate-fade-in">
+          <div className="space-y-4 animate-fade-in">
+            <div className="flex flex-col gap-3 rounded-2xl border bg-card p-5 md:flex-row md:items-start md:justify-between">
+              <div className="space-y-1">
+                <h3 className="font-semibold">Tenant Lifecycle</h3>
+                <p className="text-sm text-muted-foreground">
+                  Create clinics, update tenant identity details, and suspend, deactivate, or reactivate access.
+                </p>
+              </div>
+              <Button onClick={openCreateTenant} className="shrink-0">
+                <Plus className="h-4 w-4" />
+                Create tenant
+              </Button>
+            </div>
             <DataTable
               columns={clinicColumns}
               data={tenants}
@@ -1197,6 +1404,27 @@ export const AdminDashboardPage = () => {
           setEditingPricingPlan(null);
         }}
         onSubmit={handlePricingPlanSubmit}
+      />
+
+      <TenantFormDialog
+        open={tenantDialogOpen}
+        mode={tenantDialogMode}
+        tenant={editingTenant}
+        saving={tenantSaveLoading}
+        onClose={() => {
+          setTenantDialogOpen(false);
+          setEditingTenant(null);
+        }}
+        onSubmit={handleTenantSubmit}
+      />
+
+      <TenantStatusDialog
+        open={!!tenantStatusTarget}
+        tenant={tenantStatusTarget?.tenant ?? null}
+        targetStatus={tenantStatusTarget?.status ?? null}
+        saving={tenantStatusLoading}
+        onClose={() => setTenantStatusTarget(null)}
+        onSubmit={handleTenantStatusSubmit}
       />
 
       <ConfirmDialog

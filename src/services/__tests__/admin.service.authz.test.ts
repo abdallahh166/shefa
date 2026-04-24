@@ -3,6 +3,9 @@ import { AuthorizationError } from "@/services/supabase/errors";
 
 const adminRepository = vi.hoisted(() => ({
   listTenantsPaged: vi.fn(),
+  createTenant: vi.fn(),
+  updateTenant: vi.fn(),
+  updateTenantStatus: vi.fn(),
   listProfilesWithRolesPaged: vi.fn(),
   listSubscriptionsPaged: vi.fn(),
   listPricingPlans: vi.fn(),
@@ -112,5 +115,21 @@ describe("adminService authorization", () => {
     });
 
     expect(adminRepository.createPricingPlan).not.toHaveBeenCalled();
+  });
+
+  it("blocks tenant lifecycle changes for non-super-admin callers", async () => {
+    permissions.assertAnyPermission.mockImplementation(() => {
+      throw new AuthorizationError("Only super admins can access admin operations");
+    });
+
+    await expect(adminService.updateTenantStatus(
+      "00000000-0000-0000-0000-000000000444",
+      { status: "suspended", status_reason: "Compliance review" },
+    )).rejects.toMatchObject({
+      name: "AuthorizationError",
+      message: "Only super admins can access admin operations",
+    });
+
+    expect(adminRepository.updateTenantStatus).not.toHaveBeenCalled();
   });
 });

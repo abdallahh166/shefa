@@ -2,6 +2,7 @@ import { z } from "zod";
 import { dateTimeStringSchema } from "../shared/date.schema";
 import { uuidSchema } from "../shared/identifiers.schema";
 import { pricingBillingCycleEnum, pricingPlanSchema } from "../pricing/pricing.schema";
+import { tenantStatusEnum } from "../settings/tenant.schema";
 
 export const subscriptionPlanEnum = z.enum(["free", "starter", "pro", "enterprise"]);
 export const subscriptionStatusEnum = z.enum(["active", "trialing", "expired", "canceled"]);
@@ -12,9 +13,30 @@ export const adminTenantSchema = z.object({
   slug: z.string().trim().min(1).max(120),
   email: z.string().trim().email().optional().nullable(),
   phone: z.string().trim().max(40).optional().nullable(),
+  address: z.string().trim().max(300).optional().nullable(),
+  pending_owner_email: z.string().trim().email().optional().nullable(),
   created_at: dateTimeStringSchema,
+  tenant_status: tenantStatusEnum,
+  status_reason: z.string().trim().max(500).optional().nullable(),
+  status_changed_at: dateTimeStringSchema.optional().nullable(),
   plan: subscriptionPlanEnum.optional().nullable(),
   status: subscriptionStatusEnum.optional().nullable(),
+});
+
+export const adminTenantCreateSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  slug: z.string().trim().min(1).max(120),
+  email: z.string().trim().email().optional().nullable(),
+  phone: z.string().trim().min(3).max(40).optional().nullable(),
+  address: z.string().trim().min(1).max(300).optional().nullable(),
+  pending_owner_email: z.string().trim().email().optional().nullable(),
+});
+
+export const adminTenantUpdateSchema = adminTenantCreateSchema.partial();
+
+export const adminTenantStatusUpdateSchema = z.object({
+  status: tenantStatusEnum,
+  status_reason: z.string().trim().max(500).optional().nullable(),
 });
 
 export const adminSubscriptionSchema = z.object({

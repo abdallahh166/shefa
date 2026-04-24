@@ -2,7 +2,7 @@ import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
 
-const PROFILE_COLUMNS = "id, user_id, tenant_id, full_name, avatar_url, tenants:tenant_id(name, slug)";
+const PROFILE_COLUMNS = "id, user_id, tenant_id, full_name, avatar_url, tenants:tenant_id(name, slug, status, status_reason)";
 
 export interface AuthRepository {
   signInWithPassword(email: string, password: string): Promise<SupabaseUser | null>;
@@ -62,7 +62,7 @@ export const authRepository: AuthRepository = {
       .from("profiles")
       .select(PROFILE_COLUMNS)
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load profile", { code: error.code, details: error });
     }

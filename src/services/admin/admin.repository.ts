@@ -6,13 +6,17 @@ import type {
   AdminRecentSystemError,
   AdminSubscription,
   AdminTenant,
+  AdminTenantCreateInput,
+  AdminTenantStatusUpdateInput,
+  AdminTenantUpdateInput,
   AdminSubscriptionStats,
 } from "@/domain/admin/admin.types";
 import type { ProfileWithRoles } from "@/domain/settings/profile.types";
 import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
 
-const TENANT_COLUMNS = "id, name, slug, email, phone, created_at, subscriptions(plan, status)";
+const TENANT_COLUMNS =
+  "id, name, slug, email, phone, address, pending_owner_email, status, status_reason, status_changed_at, created_at, subscriptions(plan, status)";
 const SUBSCRIPTION_COLUMNS =
   "id, tenant_id, plan, status, amount, currency, billing_cycle, expires_at, created_at, tenants(name, slug)";
 const PROFILE_COLUMNS = "id, user_id, tenant_id, full_name, avatar_url, created_at, updated_at, tenants(name, slug)";
@@ -23,6 +27,18 @@ type TenantSort = { column: "name" | "created_at"; ascending?: boolean };
 type ProfileSort = { column: "full_name" | "created_at"; ascending?: boolean };
 type SubscriptionSort = { column: "plan" | "status" | "amount" | "expires_at" | "created_at"; ascending?: boolean };
 
+function mapTenantRow(row: any): AdminTenant {
+  const subscription = Array.isArray(row?.subscriptions) ? row.subscriptions[0] : row?.subscriptions;
+  return {
+    ...row,
+    plan: subscription?.plan ?? row?.plan ?? null,
+    status: subscription?.status ?? row?.status ?? null,
+    tenant_status: row?.tenant_status ?? row?.status ?? "active",
+    status_reason: row?.status_reason ?? null,
+    status_changed_at: row?.status_changed_at ?? null,
+  } as AdminTenant;
+}
+
 export interface AdminRepository {
   listTenantsPaged(params: {
     limit: number;
@@ -31,6 +47,9 @@ export interface AdminRepository {
     plan?: AdminSubscription["plan"];
     sort?: TenantSort;
   }): Promise<{ data: AdminTenant[]; count: number }>;
+  createTenant(input: AdminTenantCreateInput): Promise<AdminTenant>;
+  updateTenant(id: string, input: AdminTenantUpdateInput): Promise<AdminTenant>;
+  updateTenantStatus(id: string, input: AdminTenantStatusUpdateInput): Promise<AdminTenant>;
   listProfilesWithRolesPaged(params: {
     limit: number;
     offset: number;
@@ -72,7 +91,7 @@ export const adminRepository: AdminRepository = {
     if (plan) {
       let planQuery = supabase
         .from("subscriptions")
-        .select("plan, status, tenants(id, name, slug, email, phone, created_at)", { count: "exact" })
+        .select("plan, status, tenants(id, name, slug, email, phone, address, pending_owner_email, status, status_reason, status_changed_at, created_at)", { count: "exact" })
         .eq("plan", plan)
         .range(offset, to);
 
@@ -97,11 +116,12 @@ export const adminRepository: AdminRepository = {
       const mapped = (data ?? [])
         .map((row: any) => {
           if (!row?.tenants) return null;
-          return {
+          return mapTenantRow({
             ...row.tenants,
             plan: row.plan ?? null,
             status: row.status ?? null,
-          };
+            tenant_status: row.tenants.status ?? "active",
+          });
         })
         .filter(Boolean) as AdminTenant[];
 
@@ -129,16 +149,87 @@ export const adminRepository: AdminRepository = {
       });
     }
 
-    const mapped = (data ?? []).map((row: any) => {
-      const subscription = Array.isArray(row.subscriptions) ? row.subscriptions[0] : row.subscriptions;
-      return {
-        ...row,
-        plan: subscription?.plan ?? null,
-        status: subscription?.status ?? null,
-      } as AdminTenant;
-    });
+    const mapped = (data ?? []).map((row: any) => mapTenantRow({ ...row, tenant_status: row.status ?? "active" }));
 
     return { data: mapped, count: count ?? 0 };
+  },
+  async createTenant(input) {
+    const { data, error } = await supabase
+      .from("tenants")
+      .insert({
+        name: input.name,
+        slug: input.slug,
+        email: input.email ?? null,
+        phone: input.phone ?? null,
+        address: input.address ?? null,
+        pending_owner_email: input.pending_owner_email ?? null,
+        status: "active",
+        status_reason: null,
+        status_changed_at: new Date().toISOString(),
+      })
+      .select(TENANT_COLUMNS)
+      .single();
+
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to create tenant", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return mapTenantRow({ ...(data as any), tenant_status: (data as any).status ?? "active" });
+  },
+  async updateTenant(id, input) {
+    const payload: Record<string, unknown> = {};
+
+    if (input.name !== undefined) payload.name = input.name;
+    if (input.slug !== undefined) payload.slug = input.slug;
+    if (input.email !== undefined) payload.email = input.email;
+    if (input.phone !== undefined) payload.phone = input.phone;
+    if (input.address !== undefined) payload.address = input.address;
+    if (input.pending_owner_email !== undefined) payload.pending_owner_email = input.pending_owner_email;
+
+    const query = supabase.from("tenants");
+    const { data, error } = Object.keys(payload).length === 0
+      ? await query
+          .select(TENANT_COLUMNS)
+          .eq("id", id)
+          .single()
+      : await query
+          .update(payload)
+          .eq("id", id)
+          .select(TENANT_COLUMNS)
+          .single();
+
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to update tenant", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return mapTenantRow({ ...(data as any), tenant_status: (data as any).status ?? "active" });
+  },
+  async updateTenantStatus(id, input) {
+    const { data, error } = await supabase
+      .from("tenants")
+      .update({
+        status: input.status,
+        status_reason: input.status_reason ?? null,
+        status_changed_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select(TENANT_COLUMNS)
+      .single();
+
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to update tenant status", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return mapTenantRow({ ...(data as any), tenant_status: (data as any).status ?? "active" });
   },
   async listProfilesWithRolesPaged({ limit, offset, search, sort }) {
     const to = Math.max(0, offset + limit - 1);

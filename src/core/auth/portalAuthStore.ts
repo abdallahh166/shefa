@@ -9,6 +9,8 @@ export type PortalUser = {
   tenantId: string;
   tenantSlug: string;
   tenantName: string;
+  tenantStatus: "active" | "suspended" | "deactivated";
+  tenantStatusReason?: string | null;
   fullName: string;
 };
 
@@ -57,6 +59,11 @@ export const usePortalAuth = create<PortalAuthState>((set) => ({
       const tenant = (account as any).tenants ?? null;
       const patient = (account as any).patients ?? null;
 
+      if (tenant?.status && tenant.status !== "active") {
+        set({ user: null, supabaseUser: supaUser, isAuthenticated: false, isLoading: false });
+        return;
+      }
+
       set({
         user: {
           id: supaUser.id,
@@ -65,6 +72,8 @@ export const usePortalAuth = create<PortalAuthState>((set) => ({
           tenantId: account.tenant_id,
           tenantSlug: tenant?.slug ?? "portal",
           tenantName: tenant?.name ?? "Clinic",
+          tenantStatus: tenant?.status ?? "active",
+          tenantStatusReason: tenant?.status_reason ?? null,
           fullName: patient?.full_name ?? supaUser.email ?? "Patient",
         },
         supabaseUser: supaUser,
