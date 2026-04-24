@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useRef } from "react";
 import { useAuth } from "@/core/auth/authStore";
+import type { SubscriptionSummary } from "@/domain/subscription/subscription.types";
 import { subscriptionService } from "@/services/subscription/subscription.service";
 
 export type PlanType = "free" | "starter" | "pro" | "enterprise";
@@ -33,6 +34,31 @@ const defaultState: SubscriptionState = {
 const SubscriptionContext = createContext<SubscriptionState>(defaultState);
 
 export const useSubscription = () => useContext(SubscriptionContext);
+
+export function deriveSubscriptionState(
+  data: SubscriptionSummary,
+  now = new Date(),
+): Omit<SubscriptionState, "isLoading"> {
+  const expiresAtDate = data.expires_at ? new Date(data.expires_at) : null;
+  const isTrialing = data.status === "trialing";
+  const isActiveLike = data.status === "active" || isTrialing;
+  const isExpired = !isActiveLike || (expiresAtDate ? expiresAtDate < now : false);
+  const daysRemaining = expiresAtDate
+    ? Math.max(0, Math.ceil((expiresAtDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+    : 0;
+
+  return {
+    plan: (data.plan as PlanType) || "free",
+    status: data.status,
+    amount: data.amount ?? 0,
+    currency: data.currency ?? "EGP",
+    billingCycle: data.billing_cycle ?? "monthly",
+    isExpired,
+    daysRemaining,
+    isTrialing,
+    expiresAt: data.expires_at ?? null,
+  };
+}
 
 export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const { user, isAuthenticated, isLoading: authLoading, tenantOverride } = useAuth();
@@ -86,24 +112,8 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        const now = new Date();
-        const expiresAt = data.expires_at ? new Date(data.expires_at) : null;
-        const isExpired = data.status !== "active" || (expiresAt ? expiresAt < now : false);
-        const daysRemaining = expiresAt
-          ? Math.max(0, Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
-          : 0;
-        const isTrialing = data.status === "trialing";
-
         setState({
-          plan: (data.plan as PlanType) || "free",
-          status: data.status,
-          amount: data.amount ?? 0,
-          currency: data.currency ?? "EGP",
-          billingCycle: data.billing_cycle ?? "monthly",
-          isExpired,
-          daysRemaining,
-          isTrialing,
-          expiresAt: data.expires_at ?? null,
+          ...deriveSubscriptionState(data),
           isLoading: false,
         });
       } catch (err: any) {
