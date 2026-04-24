@@ -15,6 +15,7 @@ import { emitDomainEvent } from "@/core/events";
 import { BusinessRuleError, toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { assertAnyPermission } from "@/services/supabase/permissions";
+import { featureAccessService } from "@/services/subscription/featureAccess.service";
 import { auditLogService } from "@/services/settings/audit.service";
 import { rateLimitService } from "@/services/security/rateLimit.service";
 import { labRepository } from "./lab.repository";
@@ -49,6 +50,7 @@ export const labService = {
   async listPaged(params: LabResultListParams) {
     try {
       assertAnyPermission(["view_medical_records", "manage_medical_records", "manage_laboratory"]);
+      await featureAccessService.assertFeatureAccess("laboratory");
       const parsed = labResultListParamsSchema.parse(params);
       const { tenantId } = getTenantContext();
       const result = await labRepository.listPaged(parsed, tenantId);
@@ -62,6 +64,7 @@ export const labService = {
   async listPagedWithRelations(params: LabResultListParams) {
     try {
       assertAnyPermission(["view_medical_records", "manage_medical_records", "manage_laboratory"]);
+      await featureAccessService.assertFeatureAccess("laboratory");
       const parsed = labResultListParamsSchema.parse(params);
       const { tenantId } = getTenantContext();
       const result = await labRepository.listPagedWithRelations(parsed, tenantId);
@@ -75,6 +78,7 @@ export const labService = {
   async countByStatus() {
     try {
       assertAnyPermission(["view_medical_records", "manage_medical_records", "manage_laboratory"]);
+      await featureAccessService.assertFeatureAccess("laboratory");
       const { tenantId } = getTenantContext();
       const result = await labRepository.countByStatus(tenantId);
       return labStatusCountsSchema.parse(result);
@@ -85,6 +89,7 @@ export const labService = {
   async listByPatient(patientId: string, params?: LimitOffsetParams) {
     try {
       assertAnyPermission(["view_medical_records", "manage_medical_records", "manage_laboratory"]);
+      await featureAccessService.assertFeatureAccess("laboratory");
       const parsedId = uuidSchema.parse(patientId);
       const paging = limitOffsetSchema.parse(params ?? {});
       const { tenantId } = getTenantContext();
@@ -97,6 +102,7 @@ export const labService = {
   async create(input: LabResultCreateInput) {
     try {
       assertAnyPermission(["manage_medical_records", "manage_laboratory"]);
+      await featureAccessService.assertFeatureAccess("laboratory");
       const parsed = labResultCreateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
       const result = await labRepository.create(parsed, tenantId);
@@ -123,6 +129,7 @@ export const labService = {
   async update(id: string, input: LabResultUpdateInput) {
     try {
       assertAnyPermission(["manage_medical_records", "manage_laboratory"]);
+      await featureAccessService.assertFeatureAccess("laboratory");
       const parsedId = uuidSchema.parse(id);
       const parsed = labResultUpdateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
@@ -199,6 +206,7 @@ export const labService = {
   async archive(id: string) {
     try {
       assertAnyPermission(["manage_medical_records", "manage_laboratory"]);
+      await featureAccessService.assertFeatureAccess("laboratory");
       const parsedId = uuidSchema.parse(id);
       const { tenantId, userId } = getTenantContext();
       const result = await labRepository.archive(parsedId, tenantId, userId);
@@ -219,6 +227,7 @@ export const labService = {
   async restore(id: string) {
     try {
       assertAnyPermission(["manage_medical_records", "manage_laboratory"]);
+      await featureAccessService.assertFeatureAccess("laboratory");
       const parsedId = uuidSchema.parse(id);
       const { tenantId, userId } = getTenantContext();
       const result = await labRepository.restore(parsedId, tenantId);

@@ -12,6 +12,8 @@ import type {
   MedicationListParams,
   MedicationUpdateInput,
 } from "@/domain/pharmacy/medication.types";
+import { assertAnyPermission } from "@/services/supabase/permissions";
+import { featureAccessService } from "@/services/subscription/featureAccess.service";
 import { toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { pharmacyRepository } from "./pharmacy.repository";
@@ -19,6 +21,8 @@ import { pharmacyRepository } from "./pharmacy.repository";
 export const pharmacyService = {
   async listPaged(params: MedicationListParams) {
     try {
+      assertAnyPermission(["manage_pharmacy"]);
+      await featureAccessService.assertFeatureAccess("pharmacy");
       const parsed = medicationListParamsSchema.parse(params);
       const { tenantId } = getTenantContext();
       const result = await pharmacyRepository.listPaged(parsed, tenantId);
@@ -31,6 +35,8 @@ export const pharmacyService = {
   },
   async getSummary() {
     try {
+      assertAnyPermission(["manage_pharmacy"]);
+      await featureAccessService.assertFeatureAccess("pharmacy");
       const { tenantId } = getTenantContext();
       const result = await pharmacyRepository.getSummary(tenantId);
       return medicationSummarySchema.parse(result);
@@ -40,6 +46,8 @@ export const pharmacyService = {
   },
   async create(input: MedicationCreateInput) {
     try {
+      assertAnyPermission(["manage_pharmacy"]);
+      await featureAccessService.assertFeatureAccess("pharmacy");
       const parsed = medicationCreateSchema.parse(input);
       const { tenantId } = getTenantContext();
       const result = await pharmacyRepository.create(parsed, tenantId);
@@ -50,6 +58,8 @@ export const pharmacyService = {
   },
   async update(id: string, input: MedicationUpdateInput) {
     try {
+      assertAnyPermission(["manage_pharmacy"]);
+      await featureAccessService.assertFeatureAccess("pharmacy");
       const parsedId = uuidSchema.parse(id);
       const parsed = medicationUpdateSchema.parse(input);
       const { tenantId } = getTenantContext();
@@ -61,6 +71,8 @@ export const pharmacyService = {
   },
   async remove(id: string) {
     try {
+      assertAnyPermission(["manage_pharmacy"]);
+      await featureAccessService.assertFeatureAccess("pharmacy");
       const parsedId = uuidSchema.parse(id);
       const { tenantId } = getTenantContext();
       await pharmacyRepository.remove(parsedId, tenantId);

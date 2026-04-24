@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { billingRepository } from "@/services/billing/billing.repository";
+import { featureAccessService } from "@/services/subscription/featureAccess.service";
 
 const tenantId = "00000000-0000-0000-0000-000000000111";
 const userId = "00000000-0000-0000-0000-000000000222";
 const patientId = "00000000-0000-0000-0000-000000000333";
 const invoiceId = "00000000-0000-0000-0000-000000000444";
 const paymentId = "00000000-0000-0000-0000-000000000555";
+const futureDueDate = "2099-04-20";
 
 const emitDomainEvent = vi.hoisted(() => vi.fn());
 
@@ -50,6 +52,12 @@ vi.mock("@/services/security/rateLimit.service", () => ({
   },
 }));
 
+vi.mock("@/services/subscription/featureAccess.service", () => ({
+  featureAccessService: {
+    assertFeatureAccess: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 const buildInvoice = (overrides: Record<string, unknown> = {}) => ({
   id: invoiceId,
   tenant_id: tenantId,
@@ -77,6 +85,7 @@ describe("billingService permissions", () => {
     vi.clearAllMocks();
     vi.resetModules();
     emitDomainEvent.mockResolvedValue(undefined);
+    vi.mocked(featureAccessService, true).assertFeatureAccess.mockResolvedValue(undefined);
   });
 
   it("blocks list when lacking billing permissions", async () => {
@@ -90,6 +99,25 @@ describe("billingService permissions", () => {
     await expect(
       billingService.listPaged({ page: 1, pageSize: 10 }),
     ).rejects.toThrow("Not authorized");
+  });
+
+  it("blocks billing access when the subscription does not include billing", async () => {
+    vi.doMock("@/core/auth/authStore", () => ({
+      useAuth: {
+        getState: () => ({ hasPermission: () => true }),
+      },
+    }));
+    vi.mocked(featureAccessService, true).assertFeatureAccess.mockRejectedValue(
+      new Error("Billing is not available on the current subscription."),
+    );
+
+    const { billingService } = await import("@/services/billing/billing.service");
+
+    await expect(
+      billingService.listPaged({ page: 1, pageSize: 10 }),
+    ).rejects.toThrow("Billing is not available on the current subscription.");
+
+    expect(vi.mocked(billingRepository, true).listPaged).not.toHaveBeenCalled();
   });
 
   it("creates a pending invoice with derived balances", async () => {
@@ -109,7 +137,7 @@ describe("billingService permissions", () => {
       invoice_code: "INV-101",
       service: "ECG",
       amount: 120,
-      due_date: "2026-04-20",
+      due_date: futureDueDate,
     });
 
     expect(repo.create).toHaveBeenCalledWith(
@@ -118,7 +146,7 @@ describe("billingService permissions", () => {
         amount_paid: 0,
         balance_due: 120,
         status: "pending",
-        due_date: "2026-04-20",
+        due_date: futureDueDate,
       }),
       tenantId,
     );

@@ -17,6 +17,7 @@ import type {
   InsuranceClaimUpdateInput,
 } from "@/domain/insurance/insurance.types";
 import { assertAnyPermission } from "@/services/supabase/permissions";
+import { featureAccessService } from "@/services/subscription/featureAccess.service";
 import { BusinessRuleError, toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { auditLogService } from "@/services/settings/audit.service";
@@ -46,6 +47,7 @@ export const insuranceService = {
   async listPaged(params: InsuranceClaimListParams) {
     try {
       assertAnyPermission(["view_billing", "manage_billing"]);
+      await featureAccessService.assertFeatureAccess("insurance");
       const parsed = insuranceClaimListParamsSchema.parse(params);
       const { tenantId } = getTenantContext();
       const result = await insuranceRepository.listPaged(parsed, tenantId);
@@ -59,6 +61,7 @@ export const insuranceService = {
   async listPagedWithRelations(params: InsuranceClaimListParams) {
     try {
       assertAnyPermission(["view_billing", "manage_billing"]);
+      await featureAccessService.assertFeatureAccess("insurance");
       const parsed = insuranceClaimListParamsSchema.parse(params);
       const { tenantId } = getTenantContext();
       const result = await insuranceRepository.listPagedWithRelations(parsed, tenantId);
@@ -72,6 +75,7 @@ export const insuranceService = {
   async getSummary() {
     try {
       assertAnyPermission(["view_billing", "manage_billing"]);
+      await featureAccessService.assertFeatureAccess("insurance");
       const { tenantId } = getTenantContext();
       const result = await insuranceRepository.getSummary(tenantId);
       return insuranceSummarySchema.parse(result);
@@ -82,6 +86,7 @@ export const insuranceService = {
   async getOperationsSummary() {
     try {
       assertAnyPermission(["view_billing", "manage_billing"]);
+      await featureAccessService.assertFeatureAccess("insurance");
       const { tenantId } = getTenantContext();
       const result = await insuranceRepository.getOperationsSummary(tenantId);
       return insuranceOperationsSummarySchema.parse(result);
@@ -92,6 +97,7 @@ export const insuranceService = {
   async listAssignableOwners() {
     try {
       assertAnyPermission(["view_billing", "manage_billing"]);
+      await featureAccessService.assertFeatureAccess("insurance");
       const { tenantId } = getTenantContext();
       const result = await insuranceRepository.listAssignableOwners(tenantId);
       return z.array(insuranceAssignableOwnerSchema).parse(result);
@@ -102,6 +108,7 @@ export const insuranceService = {
   async create(input: InsuranceClaimCreateInput) {
     try {
       assertAnyPermission(["manage_billing"]);
+      await featureAccessService.assertFeatureAccess("insurance");
       const parsed = insuranceClaimCreateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
       const now = new Date().toISOString();
@@ -153,6 +160,7 @@ export const insuranceService = {
   async update(id: string, input: InsuranceClaimUpdateInput) {
     try {
       assertAnyPermission(["manage_billing"]);
+      await featureAccessService.assertFeatureAccess("insurance");
       const parsedId = uuidSchema.parse(id);
       const parsed = insuranceClaimUpdateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
@@ -242,6 +250,7 @@ export const insuranceService = {
   async archive(id: string) {
     try {
       assertAnyPermission(["manage_billing"]);
+      await featureAccessService.assertFeatureAccess("insurance");
       const parsedId = uuidSchema.parse(id);
       const { tenantId, userId } = getTenantContext();
       const result = await insuranceRepository.archive(parsedId, tenantId, userId);
@@ -262,6 +271,7 @@ export const insuranceService = {
   async restore(id: string) {
     try {
       assertAnyPermission(["manage_billing"]);
+      await featureAccessService.assertFeatureAccess("insurance");
       const parsedId = uuidSchema.parse(id);
       const { tenantId, userId } = getTenantContext();
       const result = await insuranceRepository.restore(parsedId, tenantId);

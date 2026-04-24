@@ -10,6 +10,7 @@ import {
   revenueByMonthRowSchema,
   revenueByServiceRowSchema,
 } from "@/domain/reports/reports.schema";
+import { featureAccessService } from "@/services/subscription/featureAccess.service";
 import { AuthorizationError, ServiceError, toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { reportRepository } from "./report.repository";
@@ -78,6 +79,7 @@ const minutesSince = (value?: string | null) => {
 export const reportService = {
   async canViewReports() {
     try {
+      await featureAccessService.assertFeatureAccess("reports");
       const { tenantId } = getTenantContext();
       await reportRepository.assertAccess(tenantId);
       return true;
@@ -89,6 +91,7 @@ export const reportService = {
   },
   async getRefreshStatus() {
     try {
+      await featureAccessService.assertFeatureAccess("reports");
       const { tenantId } = getTenantContext();
       const raw = await reportRepository.getRefreshStatus(tenantId);
       if (!raw) {
@@ -138,6 +141,7 @@ export const reportService = {
   },
   async getOverview() {
     try {
+      await featureAccessService.assertFeatureAccess("reports");
       const { tenantId } = getTenantContext();
       const result = await reportRepository.getOverview(tenantId);
       return reportOverviewSchema.parse(result);
@@ -152,6 +156,7 @@ export const reportService = {
   },
   async getRevenueByMonth(months = 6) {
     try {
+      await featureAccessService.assertFeatureAccess("reports");
       const { tenantId } = getTenantContext();
       const safeMonths = monthsSchema.parse(months);
       const result = await reportRepository.getRevenueByMonth(tenantId, safeMonths);
@@ -167,6 +172,7 @@ export const reportService = {
   },
   async getPatientGrowth(months = 6) {
     try {
+      await featureAccessService.assertFeatureAccess("reports");
       const { tenantId } = getTenantContext();
       const safeMonths = monthsSchema.parse(months);
       const result = await reportRepository.getPatientGrowth(tenantId, safeMonths);
@@ -181,6 +187,7 @@ export const reportService = {
   },
   async getAppointmentTypes() {
     try {
+      await featureAccessService.assertFeatureAccess("reports");
       const { tenantId } = getTenantContext();
       const result = await reportRepository.getAppointmentTypes(tenantId);
       const rows = z.array(appointmentTypeRowSchema).parse(result);
@@ -194,6 +201,7 @@ export const reportService = {
   },
   async getAppointmentStatusCounts() {
     try {
+      await featureAccessService.assertFeatureAccess("reports");
       const { tenantId } = getTenantContext();
       const result = await reportRepository.getAppointmentStatuses(tenantId);
       const rows = z.array(appointmentStatusRowSchema).parse(result);
@@ -220,6 +228,7 @@ export const reportService = {
   },
   async getRevenueByService(limit = 6) {
     try {
+      await featureAccessService.assertFeatureAccess("reports");
       const { tenantId } = getTenantContext();
       const safeLimit = limitSchema.parse(limit);
       const result = await reportRepository.getRevenueByService(tenantId, safeLimit);
@@ -234,6 +243,7 @@ export const reportService = {
   },
   async getDoctorPerformance() {
     try {
+      await featureAccessService.assertFeatureAccess("reports");
       const { tenantId } = getTenantContext();
       const result = await reportRepository.getDoctorPerformance(tenantId);
       const rows = z.array(doctorPerformanceRowSchema).parse(result);

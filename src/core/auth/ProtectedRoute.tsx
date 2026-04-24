@@ -1,11 +1,14 @@
 import { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth, Permission } from "./authStore";
+import { useFeatureAccess, type Feature } from "@/core/subscription/useFeatureAccess";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/primitives/Button";
 
 interface ProtectedRouteProps {
   children: ReactNode;
   requiredPermission?: Permission;
+  requiredFeature?: Feature;
 }
 
 const LoadingSkeleton = () => (
@@ -37,10 +40,11 @@ const LoadingSkeleton = () => (
   </div>
 );
 
-export const ProtectedRoute = ({ children, requiredPermission }: ProtectedRouteProps) => {
+export const ProtectedRoute = ({ children, requiredPermission, requiredFeature }: ProtectedRouteProps) => {
   const { isAuthenticated, isLoading, hasPermission } = useAuth();
+  const { hasFeature, requiredPlan, isLoading: featureLoading } = useFeatureAccess();
 
-  if (isLoading) {
+  if (isLoading || (requiredFeature && featureLoading)) {
     return <LoadingSkeleton />;
   }
 
@@ -51,6 +55,28 @@ export const ProtectedRoute = ({ children, requiredPermission }: ProtectedRouteP
         <div className="text-center">
           <h1 className="text-2xl font-semibold mb-2">Access Denied</h1>
           <p className="text-muted-foreground">You don't have permission to view this page.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (requiredFeature && !hasFeature(requiredFeature)) {
+    const planRequired = requiredPlan(requiredFeature);
+    return (
+      <div className="flex min-h-screen items-center justify-center px-6">
+        <div className="max-w-md rounded-2xl border bg-card p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-semibold mb-2">Feature Unavailable</h1>
+          <p className="text-muted-foreground mb-5">
+            This module is not enabled for the current clinic subscription.
+          </p>
+          {planRequired ? (
+            <p className="text-sm text-muted-foreground mb-5">
+              Required plan: <span className="font-medium capitalize text-foreground">{planRequired}</span>
+            </p>
+          ) : null}
+          <Button type="button" onClick={() => window.location.assign("/pricing")}>
+            View Plans
+          </Button>
         </div>
       </div>
     );

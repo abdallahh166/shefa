@@ -1,6 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { reportService } from "@/services/reports/report.service";
 import { reportRepository } from "@/services/reports/report.repository";
+import { featureAccessService } from "@/services/subscription/featureAccess.service";
+import { AuthorizationError } from "@/services/supabase/errors";
 
 vi.mock("@/services/supabase/tenant", () => ({
   getTenantContext: () => ({ tenantId: "00000000-0000-0000-0000-000000000111", userId: "00000000-0000-0000-0000-000000000222" }),
@@ -16,6 +18,7 @@ vi.mock("@/core/auth/authStore", () => ({
 
 vi.mock("@/services/reports/report.repository", () => ({
   reportRepository: {
+    assertAccess: vi.fn(),
     getRefreshStatus: vi.fn(),
     getOverview: vi.fn(),
     getRevenueByMonth: vi.fn(),
@@ -27,11 +30,24 @@ vi.mock("@/services/reports/report.repository", () => ({
   },
 }));
 
+vi.mock("@/services/subscription/featureAccess.service", () => ({
+  featureAccessService: {
+    assertFeatureAccess: vi.fn(),
+  },
+}));
+
 const repo = vi.mocked(reportRepository, true);
+const featureAccess = vi.mocked(featureAccessService, true);
 
 describe("reportService aggregation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    featureAccess.assertFeatureAccess.mockResolvedValue({
+      plan: "starter",
+      status: "active",
+      isExpired: false,
+      flags: [],
+    } as any);
   });
 
   it("coerces overview numeric values", async () => {
@@ -111,5 +127,16 @@ describe("reportService aggregation", () => {
     expect(result.in_progress).toBe(0);
     expect(result.cancelled).toBe(0);
     expect(result.no_show).toBe(1);
+  });
+
+  it("returns false when reports are not included in the current subscription", async () => {
+    featureAccess.assertFeatureAccess.mockRejectedValue(
+      new AuthorizationError("Reports are not available on the current subscription."),
+    );
+
+    const result = await reportService.canViewReports();
+
+    expect(result).toBe(false);
+    expect(repo.assertAccess).not.toHaveBeenCalled();
   });
 });

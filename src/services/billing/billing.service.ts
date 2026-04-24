@@ -22,6 +22,7 @@ import type { LimitOffsetParams } from "@/domain/shared/pagination.types";
 import { limitOffsetSchema } from "@/domain/shared/pagination.schema";
 import { emitDomainEvent } from "@/core/events";
 import { assertAnyPermission } from "@/services/supabase/permissions";
+import { featureAccessService } from "@/services/subscription/featureAccess.service";
 import { BusinessRuleError, toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 import { auditLogService } from "@/services/settings/audit.service";
@@ -92,6 +93,7 @@ export const billingService = {
   async listPaged(params: InvoiceListParams) {
     try {
       assertAnyPermission(["view_billing", "manage_billing"]);
+      await featureAccessService.assertFeatureAccess("billing");
       const parsed = invoiceListParamsSchema.parse(params);
       const { tenantId } = getTenantContext();
       const result = await billingRepository.listPaged(parsed, tenantId);
@@ -105,6 +107,7 @@ export const billingService = {
   async listPagedWithRelations(params: InvoiceListParams) {
     try {
       assertAnyPermission(["view_billing", "manage_billing"]);
+      await featureAccessService.assertFeatureAccess("billing");
       const parsed = invoiceListParamsSchema.parse(params);
       const { tenantId } = getTenantContext();
       const result = await billingRepository.listPagedWithRelations(parsed, tenantId);
@@ -118,6 +121,7 @@ export const billingService = {
   async getSummary() {
     try {
       assertAnyPermission(["view_billing", "manage_billing"]);
+      await featureAccessService.assertFeatureAccess("billing");
       const { tenantId } = getTenantContext();
       const result = await billingRepository.getSummary(tenantId);
       return invoiceSummarySchema.parse(result);
@@ -128,6 +132,7 @@ export const billingService = {
   async countInRange(start: string, end: string) {
     try {
       assertAnyPermission(["view_billing", "manage_billing"]);
+      await featureAccessService.assertFeatureAccess("billing");
       const { tenantId } = getTenantContext();
       const result = await billingRepository.countInRange(start, end, tenantId);
       return z.number().int().nonnegative().parse(result);
@@ -138,6 +143,7 @@ export const billingService = {
   async listByDateRange(start: string, end: string, params?: LimitOffsetParams) {
     try {
       assertAnyPermission(["view_billing", "manage_billing"]);
+      await featureAccessService.assertFeatureAccess("billing");
       const parsedStart = dateStringSchema.parse(start);
       const parsedEnd = dateStringSchema.parse(end);
       const paging = limitOffsetSchema.parse(params ?? {});
@@ -151,6 +157,7 @@ export const billingService = {
   async listByPatient(patientId: string, params?: LimitOffsetParams) {
     try {
       assertAnyPermission(["view_billing", "manage_billing"]);
+      await featureAccessService.assertFeatureAccess("billing");
       const parsedId = uuidSchema.parse(patientId);
       const paging = limitOffsetSchema.parse(params ?? {});
       const { tenantId } = getTenantContext();
@@ -163,6 +170,7 @@ export const billingService = {
   async listPayments(invoiceId: string) {
     try {
       assertAnyPermission(["view_billing", "manage_billing"]);
+      await featureAccessService.assertFeatureAccess("billing");
       const parsedId = uuidSchema.parse(invoiceId);
       const { tenantId } = getTenantContext();
       const result = await billingRepository.listPayments(parsedId, tenantId);
@@ -174,6 +182,7 @@ export const billingService = {
   async create(input: InvoiceCreateInput) {
     try {
       assertAnyPermission(["manage_billing"]);
+      await featureAccessService.assertFeatureAccess("billing");
       const parsed = invoiceCreateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
       await rateLimitService.assertAllowed("invoice_create", [tenantId, userId]);
@@ -230,6 +239,7 @@ export const billingService = {
   async update(id: string, input: InvoiceUpdateInput) {
     try {
       assertAnyPermission(["manage_billing"]);
+      await featureAccessService.assertFeatureAccess("billing");
       const parsedId = uuidSchema.parse(id);
       const parsed = invoiceUpdateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
@@ -303,6 +313,7 @@ export const billingService = {
   async postPayment(invoiceId: string, input: InvoicePaymentCreateInput) {
     try {
       assertAnyPermission(["manage_billing"]);
+      await featureAccessService.assertFeatureAccess("billing");
       const parsedId = uuidSchema.parse(invoiceId);
       const parsed = invoicePaymentCreateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
@@ -385,6 +396,7 @@ export const billingService = {
   async voidInvoice(id: string, reason: string) {
     try {
       assertAnyPermission(["manage_billing"]);
+      await featureAccessService.assertFeatureAccess("billing");
       const parsedId = uuidSchema.parse(id);
       const safeReason = z.string().trim().min(3).max(500).parse(reason);
       const { tenantId } = getTenantContext();
@@ -400,6 +412,7 @@ export const billingService = {
   async archive(id: string) {
     try {
       assertAnyPermission(["manage_billing"]);
+      await featureAccessService.assertFeatureAccess("billing");
       const parsedId = uuidSchema.parse(id);
       const { tenantId, userId } = getTenantContext();
       const result = await billingRepository.archive(parsedId, tenantId, userId);
@@ -420,6 +433,7 @@ export const billingService = {
   async restore(id: string) {
     try {
       assertAnyPermission(["manage_billing"]);
+      await featureAccessService.assertFeatureAccess("billing");
       const parsedId = uuidSchema.parse(id);
       const { tenantId, userId } = getTenantContext();
       const result = await billingRepository.restore(parsedId, tenantId);

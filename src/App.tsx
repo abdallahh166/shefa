@@ -85,18 +85,18 @@ const App = () => (
                   }
                 >
                   <Route index element={<Navigate to="dashboard" replace />} />
-                  <Route path="dashboard" element={<DashboardPage />} />
-                  <Route path="patients" element={<PatientsPage />} />
-                  <Route path="patients/:patientId" element={<PatientDetailPage />} />
-                  <Route path="appointments" element={<AppointmentsPage />} />
-                  <Route path="appointments/:appointmentId/video" element={<TelemedicineCallPage />} />
-                  <Route path="doctors" element={<DoctorsPage />} />
-                  <Route path="billing" element={<BillingPage />} />
-                  <Route path="pharmacy" element={<PharmacyPage />} />
-                  <Route path="laboratory" element={<LaboratoryPage />} />
-                  <Route path="insurance" element={<InsurancePage />} />
-                  <Route path="reports" element={<ReportsPage />} />
-                  <Route path="settings" element={<SettingsPage />} />
+                  <Route path="dashboard" element={<ProtectedRoute requiredPermission="view_dashboard"><DashboardPage /></ProtectedRoute>} />
+                  <Route path="patients" element={<ProtectedRoute requiredPermission="view_patients"><PatientsPage /></ProtectedRoute>} />
+                  <Route path="patients/:patientId" element={<ProtectedRoute requiredPermission="view_patients"><PatientDetailPage /></ProtectedRoute>} />
+                  <Route path="appointments" element={<ProtectedRoute requiredPermission="view_appointments" requiredFeature="appointments"><AppointmentsPage /></ProtectedRoute>} />
+                  <Route path="appointments/:appointmentId/video" element={<ProtectedRoute requiredPermission="view_appointments" requiredFeature="appointments"><TelemedicineCallPage /></ProtectedRoute>} />
+                  <Route path="doctors" element={<ProtectedRoute requiredPermission="view_dashboard"><DoctorsPage /></ProtectedRoute>} />
+                  <Route path="billing" element={<ProtectedRoute requiredPermission="view_billing" requiredFeature="billing"><BillingPage /></ProtectedRoute>} />
+                  <Route path="pharmacy" element={<ProtectedRoute requiredPermission="manage_pharmacy" requiredFeature="pharmacy"><PharmacyPage /></ProtectedRoute>} />
+                  <Route path="laboratory" element={<ProtectedRoute requiredPermission="manage_laboratory" requiredFeature="laboratory"><LaboratoryPage /></ProtectedRoute>} />
+                  <Route path="insurance" element={<ProtectedRoute requiredPermission="view_billing" requiredFeature="insurance"><InsurancePage /></ProtectedRoute>} />
+                  <Route path="reports" element={<ProtectedRoute requiredPermission="view_reports" requiredFeature="reports"><ReportsPage /></ProtectedRoute>} />
+                  <Route path="settings" element={<ProtectedRoute requiredPermission="manage_clinic"><SettingsPage /></ProtectedRoute>} />
                 </Route>
 
                 <Route
