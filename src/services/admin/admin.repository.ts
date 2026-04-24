@@ -1,6 +1,7 @@
 import type {
   AdminClientErrorTrendPoint,
   AdminOperationsAlertSummary,
+  AdminPricingPlan,
   AdminRecentJobActivity,
   AdminRecentSystemError,
   AdminSubscription,
@@ -15,6 +16,8 @@ const TENANT_COLUMNS = "id, name, slug, email, phone, created_at, subscriptions(
 const SUBSCRIPTION_COLUMNS =
   "id, tenant_id, plan, status, amount, currency, billing_cycle, expires_at, created_at, tenants(name, slug)";
 const PROFILE_COLUMNS = "id, user_id, tenant_id, full_name, avatar_url, created_at, updated_at, tenants(name, slug)";
+const PRICING_PLAN_COLUMNS =
+  "id, plan_code, name, description, doctor_limit_label, features, monthly_price, annual_price, currency, default_billing_cycle, is_popular, is_public, is_enterprise_contact, display_order, created_at, updated_at, deleted_at";
 
 type TenantSort = { column: "name" | "created_at"; ascending?: boolean };
 type ProfileSort = { column: "full_name" | "created_at"; ascending?: boolean };
@@ -42,7 +45,17 @@ export interface AdminRepository {
     status?: AdminSubscription["status"];
     sort?: SubscriptionSort;
   }): Promise<{ data: AdminSubscription[]; count: number }>;
-  updateSubscription(id: string, input: Partial<Pick<AdminSubscription, "plan" | "status">>): Promise<AdminSubscription>;
+  listPricingPlans(): Promise<AdminPricingPlan[]>;
+  createPricingPlan(input: Omit<AdminPricingPlan, "id" | "created_at" | "updated_at" | "deleted_at">): Promise<AdminPricingPlan>;
+  updatePricingPlan(
+    id: string,
+    input: Partial<Omit<AdminPricingPlan, "id" | "created_at" | "updated_at" | "deleted_at">>,
+  ): Promise<AdminPricingPlan>;
+  deletePricingPlan(id: string): Promise<void>;
+  updateSubscription(
+    id: string,
+    input: Partial<Pick<AdminSubscription, "plan" | "status" | "billing_cycle">>,
+  ): Promise<AdminSubscription>;
   getSubscriptionStats(): Promise<AdminSubscriptionStats>;
   getOperationsAlertSummary(): Promise<AdminOperationsAlertSummary>;
   getRecentJobActivity(limit?: number): Promise<AdminRecentJobActivity[]>;
@@ -216,6 +229,86 @@ export const adminRepository: AdminRepository = {
 
     return { data: (data ?? []) as AdminSubscription[], count: count ?? 0 };
   },
+  async listPricingPlans() {
+    const { data, error } = await supabase
+      .from("pricing_plans")
+      .select(PRICING_PLAN_COLUMNS)
+      .is("deleted_at", null)
+      .order("display_order", { ascending: true })
+      .order("plan_code", { ascending: true });
+
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to load pricing plans", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return (data ?? []) as AdminPricingPlan[];
+  },
+  async createPricingPlan(input) {
+    const { data, error } = await supabase
+      .from("pricing_plans")
+      .insert(input as never)
+      .select(PRICING_PLAN_COLUMNS)
+      .single();
+
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to create pricing plan", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return data as AdminPricingPlan;
+  },
+  async updatePricingPlan(id, input) {
+    if (Object.keys(input).length === 0) {
+      const { data, error } = await supabase
+        .from("pricing_plans")
+        .select(PRICING_PLAN_COLUMNS)
+        .eq("id", id)
+        .single();
+
+      if (error) {
+        throw new ServiceError(error.message ?? "Failed to load pricing plan", {
+          code: error.code,
+          details: error,
+        });
+      }
+
+      return data as AdminPricingPlan;
+    }
+
+    const { data, error } = await supabase
+      .from("pricing_plans")
+      .update(input)
+      .eq("id", id)
+      .select(PRICING_PLAN_COLUMNS)
+      .single();
+
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to update pricing plan", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return data as AdminPricingPlan;
+  },
+  async deletePricingPlan(id) {
+    const { error } = await supabase
+      .from("pricing_plans")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to delete pricing plan", {
+        code: error.code,
+        details: error,
+      });
+    }
+  },
   async getSubscriptionStats() {
     const { data, error } = await supabase.rpc("admin_subscription_stats");
     if (error) {
@@ -282,6 +375,7 @@ export const adminRepository: AdminRepository = {
     const payload: Record<string, unknown> = {};
     if (input.plan !== undefined) payload.plan = input.plan;
     if (input.status !== undefined) payload.status = input.status;
+    if (input.billing_cycle !== undefined) payload.billing_cycle = input.billing_cycle;
 
     if (Object.keys(payload).length === 0) {
       const { data, error } = await supabase

@@ -4,6 +4,9 @@ import {
   adminOperationsDashboardResponseSchema,
   adminOperationsAlertsResponseSchema,
   adminOperationsAlertSummarySchema,
+  adminPricingPlanCreateSchema,
+  adminPricingPlanSchema,
+  adminPricingPlanUpdateSchema,
   adminRecentJobActivitySchema,
   adminRecentSystemErrorSchema,
   adminSubscriptionSchema,
@@ -18,6 +21,8 @@ import type {
   AdminClientErrorTrendPoint,
   AdminOperationsAlert,
   AdminOperationsAlertSummary,
+  AdminPricingPlanCreateInput,
+  AdminPricingPlanUpdateInput,
   AdminSubscriptionUpdateInput,
   AdminRecentJobActivity,
   AdminRecentSystemError,
@@ -318,6 +323,84 @@ export const adminService = {
       return adminSubscriptionSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to update subscription");
+    }
+  },
+  async listPricingPlans() {
+    try {
+      assertSuperAdminAccess();
+      const result = await adminRepository.listPricingPlans();
+      return z.array(adminPricingPlanSchema).parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to load pricing plans");
+    }
+  },
+  async createPricingPlan(input: AdminPricingPlanCreateInput) {
+    try {
+      assertSuperAdminAccess();
+      recentAuthService.assertRecentAuth({ action: "pricing_plan_update" });
+      const parsed = adminPricingPlanCreateSchema.parse(input);
+      const result = await adminRepository.createPricingPlan(parsed);
+      const currentUser = useAuth.getState().user;
+      if (currentUser?.tenantId) {
+        await auditLogService.logEvent({
+          tenant_id: currentUser.tenantId,
+          user_id: currentUser.id,
+          action: "admin_pricing_plan_created",
+          action_type: "pricing_plan_create",
+          entity_type: "pricing_plan",
+          entity_id: result.id,
+          details: { plan_code: result.plan_code, actor_role: currentUser.role },
+        });
+      }
+      return adminPricingPlanSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to create pricing plan");
+    }
+  },
+  async updatePricingPlan(id: string, input: AdminPricingPlanUpdateInput) {
+    try {
+      assertSuperAdminAccess();
+      recentAuthService.assertRecentAuth({ action: "pricing_plan_update" });
+      const parsedId = uuidSchema.parse(id);
+      const parsed = adminPricingPlanUpdateSchema.parse(input);
+      const result = await adminRepository.updatePricingPlan(parsedId, parsed);
+      const currentUser = useAuth.getState().user;
+      if (currentUser?.tenantId) {
+        await auditLogService.logEvent({
+          tenant_id: currentUser.tenantId,
+          user_id: currentUser.id,
+          action: "admin_pricing_plan_updated",
+          action_type: "pricing_plan_update",
+          entity_type: "pricing_plan",
+          entity_id: result.id,
+          details: { changes: parsed, actor_role: currentUser.role },
+        });
+      }
+      return adminPricingPlanSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to update pricing plan");
+    }
+  },
+  async deletePricingPlan(id: string) {
+    try {
+      assertSuperAdminAccess();
+      recentAuthService.assertRecentAuth({ action: "pricing_plan_update" });
+      const parsedId = uuidSchema.parse(id);
+      await adminRepository.deletePricingPlan(parsedId);
+      const currentUser = useAuth.getState().user;
+      if (currentUser?.tenantId) {
+        await auditLogService.logEvent({
+          tenant_id: currentUser.tenantId,
+          user_id: currentUser.id,
+          action: "admin_pricing_plan_deleted",
+          action_type: "pricing_plan_delete",
+          entity_type: "pricing_plan",
+          entity_id: parsedId,
+          details: { actor_role: currentUser.role },
+        });
+      }
+    } catch (err) {
+      throw toServiceError(err, "Failed to delete pricing plan");
     }
   },
 };

@@ -5,6 +5,9 @@ import {
   adminOperationsAlertsResponseSchema,
   adminOperationsAlertSchema,
   adminOperationsAlertSummarySchema,
+  adminPricingPlanCreateSchema,
+  adminPricingPlanSchema,
+  adminPricingPlanUpdateSchema,
   adminRecentJobActivitySchema,
   adminRecentSystemErrorSchema,
   adminSubscriptionSchema,
@@ -20,6 +23,9 @@ export type AdminSubscriptionStats = z.infer<typeof adminSubscriptionStatsSchema
 export type AdminOperationsAlertSummary = z.infer<typeof adminOperationsAlertSummarySchema>;
 export type AdminOperationsAlert = z.infer<typeof adminOperationsAlertSchema>;
 export type AdminOperationsAlertsResponse = z.infer<typeof adminOperationsAlertsResponseSchema>;
+export type AdminPricingPlan = z.infer<typeof adminPricingPlanSchema>;
+export type AdminPricingPlanCreateInput = z.infer<typeof adminPricingPlanCreateSchema>;
+export type AdminPricingPlanUpdateInput = z.infer<typeof adminPricingPlanUpdateSchema>;
 export type AdminRecentJobActivity = z.infer<typeof adminRecentJobActivitySchema>;
 export type AdminRecentSystemError = z.infer<typeof adminRecentSystemErrorSchema>;
 export type AdminClientErrorTrendPoint = z.infer<typeof adminClientErrorTrendPointSchema>;

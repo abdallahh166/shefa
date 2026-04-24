@@ -5,6 +5,10 @@ const adminRepository = vi.hoisted(() => ({
   listTenantsPaged: vi.fn(),
   listProfilesWithRolesPaged: vi.fn(),
   listSubscriptionsPaged: vi.fn(),
+  listPricingPlans: vi.fn(),
+  createPricingPlan: vi.fn(),
+  updatePricingPlan: vi.fn(),
+  deletePricingPlan: vi.fn(),
   getSubscriptionStats: vi.fn(),
   getOperationsAlertSummary: vi.fn(),
   getRecentJobActivity: vi.fn(),
@@ -70,5 +74,43 @@ describe("adminService authorization", () => {
     });
 
     expect(adminRepository.getSubscriptionStats).not.toHaveBeenCalled();
+  });
+
+  it("checks for super admin access before listing pricing plans", async () => {
+    adminRepository.listPricingPlans.mockResolvedValue([]);
+
+    await adminService.listPricingPlans();
+
+    expect(permissions.assertAnyPermission).toHaveBeenCalledWith(
+      ["super_admin"],
+      "Only super admins can access admin operations",
+    );
+  });
+
+  it("blocks pricing plan creation for non-super-admin callers", async () => {
+    permissions.assertAnyPermission.mockImplementation(() => {
+      throw new AuthorizationError("Only super admins can access admin operations");
+    });
+
+    await expect(adminService.createPricingPlan({
+      plan_code: "pro",
+      name: "Professional",
+      description: "Advanced clinics",
+      doctor_limit_label: "Unlimited doctors",
+      features: ["Reports", "Insurance"],
+      monthly_price: 799,
+      annual_price: 7990,
+      currency: "EGP",
+      default_billing_cycle: "monthly",
+      is_popular: true,
+      is_public: true,
+      is_enterprise_contact: false,
+      display_order: 2,
+    })).rejects.toMatchObject({
+      name: "AuthorizationError",
+      message: "Only super admins can access admin operations",
+    });
+
+    expect(adminRepository.createPricingPlan).not.toHaveBeenCalled();
   });
 });

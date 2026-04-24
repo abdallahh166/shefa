@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { dateTimeStringSchema } from "../shared/date.schema";
 import { uuidSchema } from "../shared/identifiers.schema";
+import { pricingBillingCycleEnum, pricingPlanSchema } from "../pricing/pricing.schema";
 
 export const subscriptionPlanEnum = z.enum(["free", "starter", "pro", "enterprise"]);
 export const subscriptionStatusEnum = z.enum(["active", "trialing", "expired", "canceled"]);
@@ -23,7 +24,7 @@ export const adminSubscriptionSchema = z.object({
   status: subscriptionStatusEnum,
   amount: z.coerce.number().min(0),
   currency: z.string().trim().min(1).max(10),
-  billing_cycle: z.string().trim().min(1).max(30),
+  billing_cycle: pricingBillingCycleEnum,
   expires_at: dateTimeStringSchema.optional().nullable(),
   created_at: dateTimeStringSchema,
   tenants: z
@@ -38,7 +39,18 @@ export const adminSubscriptionSchema = z.object({
 export const adminSubscriptionUpdateSchema = z.object({
   plan: subscriptionPlanEnum.optional(),
   status: subscriptionStatusEnum.optional(),
+  billing_cycle: pricingBillingCycleEnum.optional(),
 });
+
+export const adminPricingPlanSchema = pricingPlanSchema;
+export const adminPricingPlanCreateSchema = pricingPlanSchema
+  .omit({
+    id: true,
+    created_at: true,
+    updated_at: true,
+    deleted_at: true,
+  });
+export const adminPricingPlanUpdateSchema = adminPricingPlanCreateSchema.partial();
 
 export const adminSubscriptionStatsSchema = z.object({
   active_count: z.coerce.number().int().nonnegative(),

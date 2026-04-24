@@ -7,6 +7,9 @@ export type PlanType = "free" | "starter" | "pro" | "enterprise";
 interface SubscriptionState {
   plan: PlanType;
   status: string;
+  amount: number;
+  currency: string;
+  billingCycle: string;
   isExpired: boolean;
   daysRemaining: number;
   isTrialing: boolean;
@@ -17,6 +20,9 @@ interface SubscriptionState {
 const defaultState: SubscriptionState = {
   plan: "free",
   status: "active",
+  amount: 0,
+  currency: "EGP",
+  billingCycle: "monthly",
   isExpired: false,
   daysRemaining: 0,
   isTrialing: false,
@@ -49,6 +55,9 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       setState({
         plan: "enterprise",
         status: "active",
+        amount: 0,
+        currency: "EGP",
+        billingCycle: "monthly",
         isExpired: false,
         daysRemaining: 999,
         isTrialing: false,
@@ -88,6 +97,9 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         setState({
           plan: (data.plan as PlanType) || "free",
           status: data.status,
+          amount: data.amount ?? 0,
+          currency: data.currency ?? "EGP",
+          billingCycle: data.billing_cycle ?? "monthly",
           isExpired,
           daysRemaining,
           isTrialing,

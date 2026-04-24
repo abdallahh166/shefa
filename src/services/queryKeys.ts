@@ -102,9 +102,13 @@ export const queryKeys = {
       sort?: { column: string; direction?: "asc" | "desc" };
     }) =>
       ["admin", "subscriptions", args] as const,
+    pricingPlans: () => ["admin", "pricingPlans"] as const,
     subscriptionStats: () => ["admin", "subscriptionStats"] as const,
     operationsAlerts: () => ["admin", "operationsAlerts"] as const,
     operationsDashboard: () => ["admin", "operationsDashboard"] as const,
+  },
+  pricing: {
+    public: () => ["pricing", "public"] as const,
   },
   reports: {
     root: (tenantId?: string) => tenantKey("reports", tenantId),

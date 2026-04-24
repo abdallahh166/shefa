@@ -9,10 +9,11 @@ import { DataTable, Column } from "@/shared/components/DataTable";
 import { StatusFilter } from "@/shared/components/StatusFilter";
 import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
+import { PricingPlanDialog } from "@/features/admin/PricingPlanDialog";
 import {
   Building2, Users, CreditCard, TrendingUp,
   BarChart3, LogOut, Eye, ChevronRight, Crown, HeartPulse,
-  Activity, AlertTriangle, Server,
+  Activity, AlertTriangle, Server, Plus, Pencil, Trash2,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -27,19 +28,25 @@ import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { requestReauthentication } from "@/features/auth/reauthPrompt";
 import type {
   AdminClientErrorTrendPoint,
+  AdminPricingPlan,
   AdminRecentJobActivity,
   AdminRecentSystemError,
 } from "@/domain/admin/admin.types";
 
-type AdminTab = "overview" | "operations" | "clinics" | "users" | "subscriptions";
+type AdminTab = "overview" | "operations" | "clinics" | "users" | "subscriptions" | "pricing";
 
 const PLAN_OPTIONS = ["free", "starter", "pro", "enterprise"] as const;
 const STATUS_OPTIONS = ["active", "trialing", "expired", "canceled"] as const;
+const BILLING_CYCLE_OPTIONS = ["monthly", "annual"] as const;
 
-function updatePayloadFromAction(action: { field: "plan" | "status"; value: string }) {
-  return action.field === "plan"
-    ? { plan: action.value as "enterprise" | "free" | "pro" | "starter" }
-    : { status: action.value as "active" | "canceled" | "expired" | "trialing" };
+function updatePayloadFromAction(action: { field: "plan" | "status" | "billing_cycle"; value: string }) {
+  if (action.field === "plan") {
+    return { plan: action.value as "enterprise" | "free" | "pro" | "starter" };
+  }
+  if (action.field === "billing_cycle") {
+    return { billing_cycle: action.value as "monthly" | "annual" };
+  }
+  return { status: action.value as "active" | "canceled" | "expired" | "trialing" };
 }
 
 function formatTrendBucketLabel(bucketStart: string, locale: "en" | "ar") {
@@ -79,8 +86,14 @@ export const AdminDashboardPage = () => {
   const debouncedClinicSearch = useDebouncedValue(clinicSearch, 300);
   const debouncedUserSearch = useDebouncedValue(userSearch, 300);
   const debouncedSubSearch = useDebouncedValue(subSearch, 300);
-  const [confirmAction, setConfirmAction] = useState<{ id: string; field: "plan" | "status"; value: string } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ id: string; field: "plan" | "status" | "billing_cycle"; value: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [pricingDialogMode, setPricingDialogMode] = useState<"create" | "edit">("create");
+  const [editingPricingPlan, setEditingPricingPlan] = useState<AdminPricingPlan | null>(null);
+  const [pricingDeletePlan, setPricingDeletePlan] = useState<AdminPricingPlan | null>(null);
+  const [pricingDialogOpen, setPricingDialogOpen] = useState(false);
+  const [pricingSaveLoading, setPricingSaveLoading] = useState(false);
+  const [pricingDeleteLoading, setPricingDeleteLoading] = useState(false);
   const pageSize = 20;
 
   useEffect(() => {
@@ -159,6 +172,12 @@ export const AdminDashboardPage = () => {
     queryKey: queryKeys.admin.operationsDashboard(),
     queryFn: () => adminService.getOperationsDashboard(),
     enabled: activeTab === "overview" || activeTab === "operations",
+  });
+
+  const { data: pricingPlans = [], isLoading: loadingPricingPlans } = useQuery({
+    queryKey: queryKeys.admin.pricingPlans(),
+    queryFn: () => adminService.listPricingPlans(),
+    enabled: activeTab === "pricing",
   });
 
   const { data: recentTenantsResponse } = useQuery({
@@ -261,12 +280,133 @@ export const AdminDashboardPage = () => {
     }
   };
 
+  const availablePlanCodes = PLAN_OPTIONS.filter(
+    (planCode) => !pricingPlans.some((plan) => plan.plan_code === planCode),
+  );
+
+  const openCreatePricingPlan = () => {
+    setPricingDialogMode("create");
+    setEditingPricingPlan(null);
+    setPricingDialogOpen(true);
+  };
+
+  const openEditPricingPlan = (plan: AdminPricingPlan) => {
+    setPricingDialogMode("edit");
+    setEditingPricingPlan(plan);
+    setPricingDialogOpen(true);
+  };
+
+  const handlePricingPlanSubmit = async (input: any) => {
+    setPricingSaveLoading(true);
+    try {
+      if (pricingDialogMode === "create") {
+        await adminService.createPricingPlan(input);
+        toast({ title: "Pricing plan created", description: "The new plan is now available to the platform." });
+      } else if (editingPricingPlan) {
+        await adminService.updatePricingPlan(editingPricingPlan.id, input);
+        toast({
+          title: "Pricing updated",
+          description: "Tenant-facing pricing and billing defaults have been refreshed.",
+        });
+      }
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.pricingPlans() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.pricing.public() }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.subscriptionStats() }),
+      ]);
+
+      setPricingDialogOpen(false);
+      setEditingPricingPlan(null);
+    } catch (err: any) {
+      if (isFreshAuthRequiredError(err)) {
+        try {
+          await requestFreshAuth();
+          if (pricingDialogMode === "create") {
+            await adminService.createPricingPlan(input);
+          } else if (editingPricingPlan) {
+            await adminService.updatePricingPlan(editingPricingPlan.id, input);
+          }
+
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: queryKeys.admin.pricingPlans() }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.pricing.public() }),
+            queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.admin.subscriptionStats() }),
+          ]);
+
+          toast({ title: "Pricing updated", description: "The pricing catalog changes were saved successfully." });
+          setPricingDialogOpen(false);
+          setEditingPricingPlan(null);
+        } catch {
+          return;
+        }
+        return;
+      }
+
+      toast({
+        title: "Unable to save pricing plan",
+        description: err?.message || "The pricing plan could not be saved.",
+        variant: "destructive",
+      });
+    } finally {
+      setPricingSaveLoading(false);
+    }
+  };
+
+  const handleDeletePricingPlan = async () => {
+    if (!pricingDeletePlan) return;
+
+    setPricingDeleteLoading(true);
+    try {
+      await adminService.deletePricingPlan(pricingDeletePlan.id);
+      toast({
+        title: "Pricing plan deleted",
+        description: `${pricingDeletePlan.name} was removed from the catalog.`,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.pricingPlans() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.pricing.public() }),
+      ]);
+      setPricingDeletePlan(null);
+    } catch (err: any) {
+      if (isFreshAuthRequiredError(err)) {
+        try {
+          await requestFreshAuth();
+          await adminService.deletePricingPlan(pricingDeletePlan.id);
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: queryKeys.admin.pricingPlans() }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.pricing.public() }),
+          ]);
+          toast({
+            title: "Pricing plan deleted",
+            description: `${pricingDeletePlan.name} was removed from the catalog.`,
+          });
+          setPricingDeletePlan(null);
+        } catch {
+          return;
+        }
+        return;
+      }
+
+      toast({
+        title: "Unable to delete pricing plan",
+        description: err?.message || "This plan may still be assigned to active tenants.",
+        variant: "destructive",
+      });
+    } finally {
+      setPricingDeleteLoading(false);
+    }
+  };
+
   const tabs: { key: AdminTab; icon: any; label: string }[] = [
     { key: "overview", icon: BarChart3, label: "Overview" },
     { key: "operations", icon: Server, label: "Operations" },
     { key: "clinics", icon: Building2, label: "Clinics" },
     { key: "users", icon: Users, label: "Users" },
     { key: "subscriptions", icon: CreditCard, label: "Subscriptions" },
+    { key: "pricing", icon: TrendingUp, label: "Pricing" },
   ];
 
   const clinicColumns: Column<any>[] = [
@@ -379,7 +519,21 @@ export const AdminDashboardPage = () => {
       </Select>
     )},
     { key: "amount", header: "Amount", sortable: true, render: (s) => s.amount > 0 ? `${s.currency} ${Number(s.amount).toLocaleString()}` : "Free" },
-    { key: "billing_cycle", header: "Cycle", render: (s) => s.billing_cycle },
+    { key: "billing_cycle", header: "Cycle", render: (s) => (
+      <Select
+        value={s.billing_cycle}
+        onValueChange={(val) => setConfirmAction({ id: s.id, field: "billing_cycle", value: val })}
+      >
+        <SelectTrigger size="sm" className="w-28">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {BILLING_CYCLE_OPTIONS.map((cycle) => (
+            <SelectItem key={cycle} value={cycle}>{cycle.charAt(0).toUpperCase() + cycle.slice(1)}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    )},
     { key: "status", header: "Status", sortable: true, render: (s) => (
       <Select
         value={s.status}
@@ -888,6 +1042,135 @@ export const AdminDashboardPage = () => {
             />
           </div>
         )}
+
+        {activeTab === "pricing" && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex flex-col gap-3 rounded-2xl border bg-card p-5 md:flex-row md:items-start md:justify-between">
+              <div className="space-y-1">
+                <h3 className="font-semibold">Pricing Catalog</h3>
+                <p className="text-sm text-muted-foreground">
+                  Manage the public SaaS plans, billing defaults, and the catalog that subscriptions map to.
+                </p>
+              </div>
+              <Button
+                onClick={openCreatePricingPlan}
+                disabled={availablePlanCodes.length === 0}
+                className="shrink-0"
+              >
+                <Plus className="h-4 w-4" />
+                Create plan
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <StatCard
+                title="Catalog Plans"
+                value={String(pricingPlans.length)}
+                icon={CreditCard}
+                accent="info"
+                subtitle={`${pricingPlans.filter((plan) => plan.is_public).length} public`}
+              />
+              <StatCard
+                title="Popular Plans"
+                value={String(pricingPlans.filter((plan) => plan.is_popular).length)}
+                icon={TrendingUp}
+                accent="warning"
+                subtitle="Highlighted in public pricing"
+              />
+              <StatCard
+                title="Enterprise CTA"
+                value={String(pricingPlans.filter((plan) => plan.is_enterprise_contact).length)}
+                icon={Crown}
+                accent="success"
+                subtitle="Contact-sales plan cards"
+              />
+              <StatCard
+                title="Missing Slots"
+                value={String(availablePlanCodes.length)}
+                icon={AlertTriangle}
+                accent={availablePlanCodes.length > 0 ? "warning" : "success"}
+                subtitle={availablePlanCodes.length > 0 ? "Canonical plan code available" : "Catalog complete"}
+              />
+            </div>
+
+            {loadingPricingPlans ? (
+              <div className="rounded-2xl border border-dashed bg-card p-6 text-sm text-muted-foreground">
+                Loading pricing catalog...
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                {pricingPlans.map((plan) => (
+                  <div key={plan.id} className="rounded-2xl border bg-card p-5 space-y-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold">{plan.name}</h3>
+                          <StatusBadge variant="default">{plan.plan_code}</StatusBadge>
+                          {plan.is_popular ? <StatusBadge variant="warning">popular</StatusBadge> : null}
+                          {!plan.is_public ? <StatusBadge variant="destructive">hidden</StatusBadge> : null}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {plan.description || "No description configured for the public pricing page yet."}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => openEditPricingPlan(plan)}>
+                          <Pencil className="h-4 w-4" />
+                          Edit
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setPricingDeletePlan(plan)}>
+                          <Trash2 className="h-4 w-4" />
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 rounded-xl border bg-muted/20 p-4 sm:grid-cols-2">
+                      <div>
+                        <div className="text-xs text-muted-foreground">Monthly</div>
+                        <div className="font-medium">{plan.currency} {Number(plan.monthly_price).toLocaleString()}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Annual</div>
+                        <div className="font-medium">{plan.currency} {Number(plan.annual_price).toLocaleString()}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Default cycle</div>
+                        <div className="font-medium capitalize">{plan.default_billing_cycle}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Doctor limit label</div>
+                        <div className="font-medium">{plan.doctor_limit_label}</div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-medium">Features</h4>
+                        <span className="text-xs text-muted-foreground">
+                          order {plan.display_order} • {plan.features.length} items
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {plan.features.map((feature) => (
+                          <span key={feature} className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                            {feature}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {pricingPlans.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed bg-card p-6 text-sm text-muted-foreground">
+                    No pricing plans are configured yet.
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Confirm dialog for subscription changes */}
@@ -901,6 +1184,31 @@ export const AdminDashboardPage = () => {
         loading={actionLoading}
         onConfirm={handleSubUpdate}
         onCancel={() => setConfirmAction(null)}
+      />
+
+      <PricingPlanDialog
+        open={pricingDialogOpen}
+        mode={pricingDialogMode}
+        plan={editingPricingPlan}
+        availablePlanCodes={availablePlanCodes}
+        saving={pricingSaveLoading}
+        onClose={() => {
+          setPricingDialogOpen(false);
+          setEditingPricingPlan(null);
+        }}
+        onSubmit={handlePricingPlanSubmit}
+      />
+
+      <ConfirmDialog
+        open={!!pricingDeletePlan}
+        title="Delete Pricing Plan"
+        message={`Delete "${pricingDeletePlan?.name}" from the catalog? This will fail if tenants still depend on the plan.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        loading={pricingDeleteLoading}
+        onConfirm={handleDeletePricingPlan}
+        onCancel={() => setPricingDeletePlan(null)}
       />
     </div>
   );

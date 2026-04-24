@@ -17,5 +17,8 @@ export const subscriptionSchema = z.object({
 export const subscriptionSummarySchema = subscriptionSchema.pick({
   plan: true,
   status: true,
+  amount: true,
+  currency: true,
+  billing_cycle: true,
   expires_at: true,
 });

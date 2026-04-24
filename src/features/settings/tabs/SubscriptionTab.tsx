@@ -21,8 +21,13 @@ const statusLabels: Record<string, { label: string; variant: "default" | "second
   canceled: { label: "ملغي", variant: "outline" },
 };
 
+const billingCycleLabels: Record<string, string> = {
+  monthly: "شهري",
+  annual: "سنوي",
+};
+
 export const SubscriptionTab = () => {
-  const { plan, status, isExpired, daysRemaining, isTrialing, expiresAt, isLoading } = useSubscription();
+  const { plan, status, amount, currency, billingCycle, isExpired, daysRemaining, isTrialing, expiresAt, isLoading } = useSubscription();
   const navigate = useNavigate();
 
   if (isLoading) {
@@ -34,6 +39,15 @@ export const SubscriptionTab = () => {
   }
 
   const statusInfo = statusLabels[status] || statusLabels.active;
+  const billingCycleLabel = billingCycleLabels[billingCycle] || billingCycle;
+  const priceLabel = plan === "enterprise"
+    ? "تواصل معنا"
+    : new Intl.NumberFormat("ar-EG", {
+      style: "currency",
+      currency: currency || "EGP",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(amount ?? 0);
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -58,7 +72,7 @@ export const SubscriptionTab = () => {
             <div>
               <p className="text-2xl font-bold text-foreground">خطة {planLabels[plan] || plan}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                {plan === "free" ? "0 جنيه/شهر" : plan === "starter" ? "299 جنيه/شهر" : plan === "pro" ? "799 جنيه/شهر" : "تواصل معنا"}
+                {plan === "enterprise" ? priceLabel : `${priceLabel}/${billingCycleLabel}`}
               </p>
             </div>
             {plan !== "enterprise" && (
@@ -92,6 +106,12 @@ export const SubscriptionTab = () => {
                 <span className="text-primary font-medium">أنت في فترة تجريبية</span>
               </div>
             )}
+
+            <div className="flex items-center gap-3 text-sm">
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">دورة الفوترة:</span>
+              <span className="font-medium">{billingCycleLabel}</span>
+            </div>
           </div>
         </CardContent>
       </Card>

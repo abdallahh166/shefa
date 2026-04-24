@@ -9,6 +9,10 @@ const adminRepository = vi.hoisted(() => ({
   listTenantsPaged: vi.fn(),
   listProfilesWithRolesPaged: vi.fn(),
   listSubscriptionsPaged: vi.fn(),
+  listPricingPlans: vi.fn(),
+  createPricingPlan: vi.fn(),
+  updatePricingPlan: vi.fn(),
+  deletePricingPlan: vi.fn(),
   getSubscriptionStats: vi.fn(),
   getOperationsAlertSummary: vi.fn(),
   getRecentJobActivity: vi.fn(),
@@ -113,6 +117,10 @@ describe("services smoke", () => {
     adminRepository.listTenantsPaged.mockResolvedValue({ data: [], count: 0 });
     adminRepository.listProfilesWithRolesPaged.mockResolvedValue({ data: [], count: 0 });
     adminRepository.listSubscriptionsPaged.mockResolvedValue({ data: [], count: 0 });
+    adminRepository.listPricingPlans.mockResolvedValue([]);
+    adminRepository.createPricingPlan.mockResolvedValue({});
+    adminRepository.updatePricingPlan.mockResolvedValue({});
+    adminRepository.deletePricingPlan.mockResolvedValue(undefined);
     adminRepository.getSubscriptionStats.mockResolvedValue({
       active_count: 0,
       total_revenue: 0,
@@ -280,6 +288,7 @@ describe("services smoke", () => {
     await adminService.listTenantsPaged({ page: 1, pageSize: 10, search: "clinic", plan: "pro" });
     await adminService.listProfilesWithRolesPaged({ page: 1, pageSize: 10, search: "john" });
     await adminService.listSubscriptionsPaged({ page: 1, pageSize: 10, search: "clinic", plan: "pro", status: "active" });
+    await adminService.listPricingPlans();
     await adminService.getSubscriptionStats();
     await adminService.getOperationsAlerts();
     await adminService.getOperationsDashboard();
@@ -357,6 +366,7 @@ describe("services smoke", () => {
     expect(queryKeys.patients.root(tenantId)).toEqual(["patients", tenantId]);
     expect(queryKeys.admin.operationsAlerts()).toEqual(["admin", "operationsAlerts"]);
     expect(queryKeys.admin.operationsDashboard()).toEqual(["admin", "operationsDashboard"]);
+    expect(queryKeys.admin.pricingPlans()).toEqual(["admin", "pricingPlans"]);
     expect(servicesIndex.authService).toBeDefined();
   });
 });

@@ -154,6 +154,24 @@ describe("repositories smoke", () => {
     await adminRepository.listTenantsPaged({ limit: 10, offset: 0, search: "clinic", plan: "pro" });
     await adminRepository.listProfilesWithRolesPaged({ limit: 10, offset: 0, search: "john" });
     await adminRepository.listSubscriptionsPaged({ limit: 10, offset: 0, search: "clinic", plan: "starter", status: "active" });
+    await adminRepository.listPricingPlans();
+    await adminRepository.createPricingPlan({
+      plan_code: "pro",
+      name: "Professional",
+      description: "Advanced operations",
+      doctor_limit_label: "Up to 20 doctors",
+      features: ["Reports", "Insurance"],
+      monthly_price: 799,
+      annual_price: 7990,
+      currency: "EGP",
+      default_billing_cycle: "monthly",
+      is_popular: true,
+      is_public: true,
+      is_enterprise_contact: false,
+      display_order: 2,
+    });
+    await adminRepository.updatePricingPlan(recordId, { monthly_price: 899, annual_price: 8990 });
+    await adminRepository.deletePricingPlan(recordId);
     await adminRepository.getSubscriptionStats();
     await adminRepository.getOperationsAlertSummary();
     await adminRepository.getRecentJobActivity();
