@@ -3,9 +3,11 @@ import { useParams } from "react-router-dom";
 import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Inputs";
 import { portalService } from "@/services/portal/portal.service";
+import { useI18n } from "@/core/i18n/i18nStore";
 
 export const PortalLoginPage = () => {
   const { clinicSlug } = useParams();
+  const { t } = useI18n(["portal"]);
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -16,11 +18,11 @@ export const PortalLoginPage = () => {
     setLoading(true);
     try {
       if (!clinicSlug) {
-        throw new Error("Invalid clinic link");
+        throw new Error(t("portal.layout.invalidClinicLink"));
       }
       const normalizedEmail = email.trim().toLowerCase();
       if (!normalizedEmail) {
-        throw new Error("Email is required");
+        throw new Error(t("portal.layout.emailRequired"));
       }
 
       await portalService.sendMagicLink({
@@ -30,7 +32,7 @@ export const PortalLoginPage = () => {
       });
       setSent(true);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to send magic link";
+      const message = err instanceof Error ? err.message : t("portal.layout.magicLinkFailed");
       setError(message);
     } finally {
       setLoading(false);
@@ -41,22 +43,22 @@ export const PortalLoginPage = () => {
     <div className="grid min-h-screen place-items-center bg-muted/20" data-testid="portal-login-page">
       <div className="w-full max-w-md space-y-4 rounded-xl border bg-background p-6">
         <div>
-          <h1 className="text-xl font-semibold">Patient Portal</h1>
-          <p className="text-sm text-muted-foreground">Enter your email to receive a magic link.</p>
+          <h1 className="text-xl font-semibold">{t("portal.layout.magicLinkTitle")}</h1>
+          <p className="text-sm text-muted-foreground">{t("portal.layout.magicLinkDescription")}</p>
         </div>
 
         {sent ? (
           <div className="rounded-lg bg-muted p-4 text-sm text-muted-foreground" data-testid="portal-login-success">
-            Check your email for a sign-in link. You can close this page after signing in.
+            {t("portal.layout.magicLinkSuccess")}
           </div>
         ) : (
           <>
             <Input
-              label="Email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.currentTarget.value)}
-              placeholder="you@example.com"
+              placeholder={t("portal.layout.magicLinkPlaceholder")}
+              aria-label={t("portal.layout.magicLinkEmail")}
               data-testid="portal-login-email"
             />
             {error ? <p className="text-sm text-destructive" data-testid="portal-login-error">{error}</p> : null}
@@ -66,7 +68,7 @@ export const PortalLoginPage = () => {
               className="w-full"
               data-testid="portal-login-submit"
             >
-              {loading ? "Sending..." : "Send magic link"}
+              {loading ? t("portal.layout.magicLinkSending") : t("portal.layout.magicLinkSubmit")}
             </Button>
           </>
         )}

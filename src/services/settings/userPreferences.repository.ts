@@ -2,7 +2,7 @@ import type { UserPreferences, UserPreferencesUpsertInput } from "@/domain/setti
 import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
 
-const PREF_COLUMNS = "id, user_id, dark_mode, created_at, updated_at";
+const PREF_COLUMNS = "id, user_id, dark_mode, locale, created_at, updated_at";
 
 export interface UserPreferencesRepository {
   getByUserId(userId: string): Promise<UserPreferences | null>;
@@ -22,9 +22,17 @@ export const userPreferencesRepository: UserPreferencesRepository = {
     return (data ?? null) as UserPreferences | null;
   },
   async upsert(input) {
+    const payload: Record<string, unknown> = { user_id: input.user_id };
+    if (typeof input.dark_mode === "boolean") {
+      payload.dark_mode = input.dark_mode;
+    }
+    if (input.locale) {
+      payload.locale = input.locale;
+    }
+
     const { data, error } = await supabase
       .from("user_preferences")
-      .upsert({ user_id: input.user_id, dark_mode: input.dark_mode }, { onConflict: "user_id" })
+      .upsert(payload, { onConflict: "user_id" })
       .select(PREF_COLUMNS)
       .single();
     if (error) {

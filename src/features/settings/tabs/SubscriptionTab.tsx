@@ -1,32 +1,28 @@
-﻿import { useSubscription } from "@/core/subscription/SubscriptionContext";
+import { useSubscription } from "@/core/subscription/SubscriptionContext";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/primitives/Button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Crown, Calendar, CreditCard, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
-import { format } from "date-fns";
-import { ar } from "date-fns/locale";
+import { useI18n } from "@/core/i18n/i18nStore";
+import { formatDate, formatCurrency } from "@/shared/utils/formatDate";
 
-const planLabels: Record<string, string> = {
-  free: "مجانية",
-  starter: "المبتدئ",
-  pro: "الاحترافية",
-  enterprise: "المؤسسات",
+const planLabelKeyMap: Record<string, string> = {
+  free: "landing.planFree",
+  starter: "landing.planFree",
+  pro: "landing.planPro",
+  enterprise: "landing.planEnterprise",
 };
 
-const statusLabels: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  active: { label: "نشط", variant: "default" },
-  trialing: { label: "فترة تجريبية", variant: "secondary" },
-  expired: { label: "منتهي", variant: "destructive" },
-  canceled: { label: "ملغي", variant: "outline" },
-};
-
-const billingCycleLabels: Record<string, string> = {
-  monthly: "شهري",
-  annual: "سنوي",
+const statusLabelKeyMap: Record<string, { key: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  active: { key: "billing.paid", variant: "default" },
+  trialing: { key: "settings.subscription.trialing", variant: "secondary" },
+  expired: { key: "billing.overdue", variant: "destructive" },
+  canceled: { key: "appointments.cancelled", variant: "outline" },
 };
 
 export const SubscriptionTab = () => {
+  const { t, locale, calendarType } = useI18n(["settings", "landing", "billing", "appointments"]);
   const { plan, status, amount, currency, billingCycle, isExpired, daysRemaining, isTrialing, expiresAt, isLoading } = useSubscription();
   const navigate = useNavigate();
 
@@ -38,111 +34,102 @@ export const SubscriptionTab = () => {
     );
   }
 
-  const statusInfo = statusLabels[status] || statusLabels.active;
-  const billingCycleLabel = billingCycleLabels[billingCycle] || billingCycle;
+  const statusInfo = statusLabelKeyMap[status] || statusLabelKeyMap.active;
+  const billingCycleLabel = billingCycle === "annual" ? t("common.annual") : t("common.monthly");
   const priceLabel = plan === "enterprise"
-    ? "تواصل معنا"
-    : new Intl.NumberFormat("ar-EG", {
-      style: "currency",
-      currency: currency || "EGP",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(amount ?? 0);
+    ? t("common.contactUs")
+    : formatCurrency(amount ?? 0, locale, currency || (locale === "ar" ? "EGP" : "USD"));
+  const planLabel = t(planLabelKeyMap[plan] || "common.currentPlan");
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">إدارة الاشتراك</h2>
-        <p className="text-sm text-muted-foreground">عرض وإدارة تفاصيل خطتك الحالية</p>
+        <h2 className="text-lg font-semibold">{t("settings.subscription.title")}</h2>
+        <p className="text-sm text-muted-foreground">{t("settings.subscription.subtitle")}</p>
       </div>
 
-      {/* Current Plan Card */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base">
               <Crown className="h-5 w-5 text-primary" />
-              الخطة الحالية
+              {t("settings.subscription.currentPlanCard")}
             </CardTitle>
-            <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+            <Badge variant={statusInfo.variant}>{t(statusInfo.key)}</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between rounded-lg bg-muted/50 p-4">
             <div>
               <p className="text-2xl font-bold text-foreground" data-testid="subscription-current-plan">
-                خطة {planLabels[plan] || plan}
+                {t("common.currentPlan")}: {planLabel}
               </p>
-              <p className="text-sm text-muted-foreground mt-1" data-testid="subscription-current-price">
+              <p className="mt-1 text-sm text-muted-foreground" data-testid="subscription-current-price">
                 {plan === "enterprise" ? priceLabel : `${priceLabel}/${billingCycleLabel}`}
               </p>
             </div>
             {plan !== "enterprise" && (
               <Button onClick={() => navigate("/pricing")} size="sm">
-                ترقية الخطة
+                {t("common.requestUpgrade")}
               </Button>
             )}
           </div>
 
-          {/* Details */}
           <div className="grid gap-3">
             {expiresAt && (
               <div className="flex items-center gap-3 text-sm">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">تاريخ الانتهاء:</span>
-                <span className="font-medium">{format(new Date(expiresAt), "dd MMMM yyyy", { locale: ar })}</span>
+                <span className="text-muted-foreground">{t("common.expiresAt")}:</span>
+                <span className="font-medium">{formatDate(expiresAt, locale, "date", calendarType)}</span>
               </div>
             )}
 
             {daysRemaining > 0 && !isExpired && (
               <div className="flex items-center gap-3 text-sm">
                 <CheckCircle2 className="h-4 w-4 text-primary" />
-                <span className="text-muted-foreground">الأيام المتبقية:</span>
-                <span className="font-medium">{daysRemaining} يوم</span>
+                <span className="text-muted-foreground">{t("common.daysRemaining")}:</span>
+                <span className="font-medium">{daysRemaining}</span>
               </div>
             )}
 
             {isTrialing && (
               <div className="flex items-center gap-3 text-sm">
                 <CreditCard className="h-4 w-4 text-primary" />
-                <span className="text-primary font-medium">أنت في فترة تجريبية</span>
+                <span className="font-medium text-primary">{t("settings.subscription.trialing")}</span>
               </div>
             )}
 
             <div className="flex items-center gap-3 text-sm">
               <CreditCard className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">دورة الفوترة:</span>
+              <span className="text-muted-foreground">{t("common.billingCycle")}:</span>
               <span className="font-medium">{billingCycleLabel}</span>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Warning if expired */}
       {isExpired && (
         <Card className="border-destructive">
           <CardContent className="flex items-start gap-3 pt-6">
-            <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
             <div>
-              <p className="font-semibold text-destructive">اشتراكك منتهي</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                يرجى تجديد اشتراكك للاستمرار في استخدام جميع الميزات.
+              <p className="font-semibold text-destructive">{t("settings.subscription.expiredTitle")}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t("settings.subscription.expiredDescription")}
               </p>
               <Button onClick={() => navigate("/pricing")} variant="danger" size="sm" className="mt-3">
-                تجديد الآن
+                {t("common.renewNow")}
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Actions */}
       <div className="flex gap-3 pt-2">
         <Button variant="outline" onClick={() => navigate("/pricing")}>
-          عرض جميع الخطط
+          {t("common.viewAllPlans")}
         </Button>
       </div>
     </div>
   );
 };
-

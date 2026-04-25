@@ -3,6 +3,7 @@ import { Button } from "@/components/primitives/Button";
 import { Input, Textarea } from "@/components/primitives/Inputs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { useI18n } from "@/core/i18n/i18nStore";
 import type { AdminTenant, AdminTenantCreateInput, AdminTenantUpdateInput } from "@/domain/admin/admin.types";
 
 interface TenantFormDialogProps {
@@ -45,6 +46,7 @@ function toFormState(tenant: AdminTenant | null): TenantFormState {
 }
 
 export const TenantFormDialog = ({ open, mode, tenant, saving, onClose, onSubmit }: TenantFormDialogProps) => {
+  const { t } = useI18n(["admin"]);
   const [form, setForm] = useState<TenantFormState>(defaultForm);
 
   useEffect(() => {
@@ -67,78 +69,88 @@ export const TenantFormDialog = ({ open, mode, tenant, saving, onClose, onSubmit
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{mode === "create" ? "Create tenant" : `Edit ${tenant?.name ?? "tenant"}`}</DialogTitle>
+          <DialogTitle>
+            {mode === "create"
+              ? t("admin.tenantForm.createTitle")
+              : t("admin.tenantForm.editTitle", {
+                name: tenant?.name ?? t("admin.tenantForm.editFallbackName"),
+              })}
+          </DialogTitle>
           <DialogDescription>
-            Manage the clinic identity record that staff accounts, subscriptions, and feature access attach to.
+            {t("admin.tenantForm.description")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="tenant-name">Clinic name *</Label>
+            <Label htmlFor="tenant-name">{t("admin.tenantForm.clinicName")}</Label>
             <Input
               id="tenant-name"
               value={form.name}
               onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-              placeholder="Cairo Heart Clinic"
+              placeholder={t("admin.tenantForm.clinicNamePlaceholder")}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="tenant-slug">Slug *</Label>
+            <Label htmlFor="tenant-slug">{t("admin.tenantForm.slug")}</Label>
             <Input
               id="tenant-slug"
               value={form.slug}
               onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))}
-              placeholder="cairo-heart"
+              placeholder={t("admin.tenantForm.slugPlaceholder")}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="tenant-email">Clinic email</Label>
+            <Label htmlFor="tenant-email">{t("admin.tenantForm.clinicEmail")}</Label>
             <Input
               id="tenant-email"
               type="email"
               value={form.email}
               onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-              placeholder="ops@clinic.com"
+              placeholder={t("admin.tenantForm.clinicEmailPlaceholder")}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="tenant-phone">Phone</Label>
+            <Label htmlFor="tenant-phone">{t("admin.tenantForm.phone")}</Label>
             <Input
               id="tenant-phone"
               value={form.phone}
               onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
-              placeholder="+20 100 000 0000"
+              placeholder={t("admin.tenantForm.phonePlaceholder")}
             />
           </div>
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="tenant-address">Address</Label>
+            <Label htmlFor="tenant-address">{t("admin.tenantForm.address")}</Label>
             <Textarea
               id="tenant-address"
               rows={3}
               value={form.address}
               onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))}
-              placeholder="Clinic address used across admin and patient-facing surfaces."
+              placeholder={t("admin.tenantForm.addressPlaceholder")}
             />
           </div>
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="tenant-owner-email">Pending owner email</Label>
+            <Label htmlFor="tenant-owner-email">{t("admin.tenantForm.pendingOwnerEmail")}</Label>
             <Input
               id="tenant-owner-email"
               type="email"
               value={form.pending_owner_email}
               onChange={(event) => setForm((current) => ({ ...current, pending_owner_email: event.target.value }))}
-              placeholder="owner@clinic.com"
+              placeholder={t("admin.tenantForm.pendingOwnerEmailPlaceholder")}
             />
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={() => void handleSubmit()} disabled={saving}>
-            {saving ? "Saving..." : mode === "create" ? "Create tenant" : "Save changes"}
+            {saving
+              ? t("admin.tenantForm.saving")
+              : mode === "create"
+                ? t("admin.tenantForm.createAction")
+                : t("admin.tenantForm.saveChanges")}
           </Button>
         </DialogFooter>
       </DialogContent>

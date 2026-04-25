@@ -1,4 +1,9 @@
-import type { CalendarType, Locale } from "@/core/i18n/i18nStore";
+import {
+  getDefaultCalendar,
+  getIntlLocale,
+  type CalendarType,
+  type Locale,
+} from "@/core/i18n/config";
 
 /**
  * Format a date string or Date object respecting locale and preferred calendar.
@@ -6,7 +11,7 @@ import type { CalendarType, Locale } from "@/core/i18n/i18nStore";
  * @param raw           ISO string, "YYYY-MM-DD", "YYYY-MM-DD HH:mm", or Date
  * @param locale        Current locale
  * @param opts          Optional: "date" (default), "datetime", "time", "short"
- * @param calendarType  Optional override: "gregorian" | "hijri" (defaults to locale-based behavior)
+ * @param calendarType  Optional override: "gregorian" | "hijri"
  */
 export function formatDate(
   raw: string | Date | null | undefined,
@@ -14,73 +19,67 @@ export function formatDate(
   opts: "date" | "datetime" | "time" | "short" = "date",
   calendarType?: CalendarType,
 ): string {
-  if (!raw) return "—";
+  if (!raw) return "-";
 
-  const d = typeof raw === "string" ? parseDate(raw) : raw;
-  if (Number.isNaN(d.getTime())) return "—";
+  const date = typeof raw === "string" ? parseDate(raw) : raw;
+  if (Number.isNaN(date.getTime())) return "-";
 
-  // Backward compatible default: Arabic -> Hijri, English -> Gregorian
-  const calType: CalendarType = calendarType ?? (locale === "ar" ? "hijri" : "gregorian");
-  const cal = calType === "hijri" ? "islamic-umalqura" : "gregory";
-  const loc = locale === "ar" ? "ar-SA" : "en-US";
+  const resolvedCalendar = calendarType ?? getDefaultCalendar(locale);
+  const intlLocale = getIntlLocale(locale, resolvedCalendar);
 
   switch (opts) {
     case "short":
-      return d.toLocaleDateString(loc, {
-        calendar: cal,
+      return new Intl.DateTimeFormat(intlLocale, {
         month: "short",
         day: "numeric",
-      });
-
+      }).format(date);
     case "time":
-      return d.toLocaleTimeString(loc, {
+      return new Intl.DateTimeFormat(intlLocale, {
         hour: "2-digit",
         minute: "2-digit",
-      });
-
+      }).format(date);
     case "datetime":
-      return d.toLocaleString(loc, {
-        calendar: cal,
+      return new Intl.DateTimeFormat(intlLocale, {
         year: "numeric",
         month: "short",
         day: "numeric",
         hour: "2-digit",
         minute: "2-digit",
-      });
-
+      }).format(date);
     case "date":
     default:
-      return d.toLocaleDateString(loc, {
-        calendar: cal,
+      return new Intl.DateTimeFormat(intlLocale, {
         year: "numeric",
         month: "short",
         day: "numeric",
-      });
+      }).format(date);
   }
 }
 
-/** Parse loose date strings: ISO, "YYYY-MM-DD", "YYYY-MM-DD HH:mm" */
 function parseDate(raw: string): Date {
   if (!raw) return new Date(NaN);
   if (raw.includes("T")) return new Date(raw);
   if (raw.includes(" ")) return new Date(raw.replace(" ", "T"));
-  return new Date(raw + "T00:00:00");
+  return new Date(`${raw}T00:00:00`);
 }
 
-/**
- * Format currency amount respecting locale.
- * Uses SAR for Arabic, USD for English.
- */
 export function formatCurrency(
   amount: number,
   locale: Locale,
-  currency: string = locale === "ar" ? "SAR" : "USD",
+  currency: string = locale === "ar" ? "EGP" : "USD",
 ): string {
-  const loc = locale === "ar" ? "ar-SA" : "en-US";
-  return new Intl.NumberFormat(loc, {
+  return new Intl.NumberFormat(getIntlLocale(locale), {
     style: "currency",
     currency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+export function formatNumber(
+  value: number,
+  locale: Locale,
+  options?: Intl.NumberFormatOptions,
+) {
+  return new Intl.NumberFormat(getIntlLocale(locale), options).format(value);
 }

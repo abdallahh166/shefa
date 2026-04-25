@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Check, ArrowRight } from "lucide-react";
 import { useSubscription } from "@/core/subscription/SubscriptionContext";
 import { useAuth } from "@/core/auth/authStore";
+import { useI18n } from "@/core/i18n/i18nStore";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/primitives/Button";
 import { Badge } from "@/components/ui/badge";
@@ -11,16 +12,11 @@ import { pricingService } from "@/services/pricing/pricing.service";
 import { queryKeys } from "@/services/queryKeys";
 import { cn } from "@/lib/utils";
 
-const faqs = [
-  { q: "هل يمكنني الإلغاء في أي وقت؟", a: "نعم، يمكنك الإلغاء في أي وقت وسيظل الوصول متاحاً حتى نهاية فترة الفوترة الحالية." },
-  { q: "هل بياناتي آمنة؟", a: "نعم، نستخدم ضوابط أمان وتشفير لحماية بيانات العيادة والمرضى." },
-  { q: "هل يمكنني البدء مجاناً؟", a: "نعم، يمكنك البدء بخطة مجانية ثم الترقية عندما تحتاج مزيداً من الإمكانات." },
-];
-
 export const PricingPage = () => {
   const [annual, setAnnual] = useState(false);
   const { plan: currentPlan } = useSubscription();
   const { isAuthenticated } = useAuth();
+  const { t, locale } = useI18n(["landing"]);
   const navigate = useNavigate();
 
   const { data: plans = [], isLoading } = useQuery({
@@ -33,15 +29,35 @@ export const PricingPage = () => {
     [plans],
   );
 
+  const faqItems = useMemo(
+    () => [
+      { q: t("landing.faq1Q"), a: t("landing.faq1A") },
+      { q: t("landing.faq2Q"), a: t("landing.faq2A") },
+      { q: t("landing.faq3Q"), a: t("landing.faq3A") },
+      { q: t("landing.faq4Q"), a: t("landing.faq4A") },
+      { q: t("landing.faq5Q"), a: t("landing.faq5A") },
+    ],
+    [t],
+  );
+
+  const formatPlanPrice = (price: number | null, currency: string | null) => {
+    return new Intl.NumberFormat(locale === "ar" ? "ar-EG" : "en-US", {
+      style: "currency",
+      currency: currency || (locale === "ar" ? "EGP" : "USD"),
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(price ?? 0);
+  };
+
   return (
-    <div className="min-h-screen bg-background" dir="rtl">
-      <div className="text-center py-16 px-4">
-        <h1 className="text-4xl font-bold text-foreground mb-4">اختر الخطة المناسبة لعيادتك</h1>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-          الأسعار والخطط أدناه يتم إدارتها مباشرة من لوحة المشرف العام.
+    <div className="min-h-screen bg-background">
+      <div className="px-4 py-16 text-center">
+        <h1 className="mb-4 text-4xl font-bold text-foreground">{t("landing.pricingTitle")}</h1>
+        <p className="mx-auto mb-8 max-w-2xl text-lg text-muted-foreground">
+          {t("landing.pricingManagedDescription")}
         </p>
 
-        <div className="inline-flex items-center gap-3 bg-muted rounded-full p-1">
+        <div className="inline-flex items-center gap-3 rounded-full bg-muted p-1">
           <Button
             type="button"
             variant="ghost"
@@ -53,7 +69,7 @@ export const PricingPage = () => {
               !annual ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground",
             )}
           >
-            شهري
+            {t("common.monthly")}
           </Button>
           <Button
             type="button"
@@ -66,13 +82,13 @@ export const PricingPage = () => {
               annual ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground",
             )}
           >
-            سنوي
-            <Badge variant="secondary" className="me-2 text-xs">مخفض</Badge>
+            {t("common.annual")}
+            <Badge variant="secondary" className="me-2 text-xs">{t("common.discounted")}</Badge>
           </Button>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 pb-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-4 pb-16 md:grid-cols-2 lg:grid-cols-4">
         {isLoading ? (
           Array.from({ length: 4 }).map((_, index) => (
             <Card key={index} className="min-h-[420px] animate-pulse">
@@ -102,27 +118,29 @@ export const PricingPage = () => {
               )}
             >
               {plan.is_popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="bg-primary text-primary-foreground px-3">الأكثر شعبية</Badge>
+                <div className="absolute start-1/2 top-[-0.75rem] -translate-x-1/2">
+                  <Badge className="bg-primary px-3 text-primary-foreground">{t("landing.mostPopular")}</Badge>
                 </div>
               )}
-              <CardHeader className="text-center pb-2">
+              <CardHeader className="pb-2 text-center">
                 <CardTitle className="text-xl">{plan.name}</CardTitle>
                 <p className="text-sm text-muted-foreground">{plan.doctor_limit_label}</p>
                 {plan.description ? (
-                  <p className="text-sm text-muted-foreground mt-2 min-h-[40px]">{plan.description}</p>
+                  <p className="mt-2 min-h-[40px] text-sm text-muted-foreground">{plan.description}</p>
                 ) : (
                   <div className="min-h-[40px]" />
                 )}
                 {plan.is_enterprise_contact ? (
                   <div className="mt-4">
-                    <span className="text-2xl font-bold text-foreground">تواصل معنا</span>
+                    <span className="text-2xl font-bold text-foreground">{t("common.contactUs")}</span>
                   </div>
                 ) : (
                   <div className="mt-4">
-                    <span className="text-4xl font-bold text-foreground">{price}</span>
-                    <span className="text-muted-foreground text-sm me-1">
-                      {plan.currency}/{annual ? "سنة" : "شهر"}
+                    <span className="text-4xl font-bold text-foreground">
+                      {formatPlanPrice(price, plan.currency)}
+                    </span>
+                    <span className="ms-1 text-sm text-muted-foreground">
+                      /{annual ? t("common.annual") : t("common.month")}
                     </span>
                   </div>
                 )}
@@ -132,7 +150,7 @@ export const PricingPage = () => {
                 <ul className="space-y-3">
                   {plan.features.map((feature) => (
                     <li key={feature} className="flex items-start gap-2 text-sm">
-                      <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                       <span>{feature}</span>
                     </li>
                   ))}
@@ -142,7 +160,7 @@ export const PricingPage = () => {
               <CardFooter className="pt-4">
                 {isCurrent ? (
                   <Button variant="outline" className="w-full" disabled>
-                    خطتك الحالية
+                    {t("common.currentPlan")}
                   </Button>
                 ) : plan.is_enterprise_contact ? (
                   <Button
@@ -152,8 +170,8 @@ export const PricingPage = () => {
                       window.location.href = "mailto:sales@medflow.app?subject=Enterprise pricing inquiry";
                     }}
                   >
-                    تواصل معنا
-                    <ArrowRight className="h-4 w-4 me-2" />
+                    {t("common.contactUs")}
+                    <ArrowRight className="me-2 h-4 w-4" />
                   </Button>
                 ) : (
                   <Button
@@ -167,7 +185,7 @@ export const PricingPage = () => {
                       window.location.href = `mailto:sales@medflow.app?subject=${encodeURIComponent(`Plan upgrade request: ${plan.name}`)}`;
                     }}
                   >
-                    طلب ترقية
+                    {t("common.requestUpgrade")}
                   </Button>
                 )}
               </CardFooter>
@@ -176,10 +194,10 @@ export const PricingPage = () => {
         })}
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 pb-20">
-        <h2 className="text-2xl font-bold text-center mb-8 text-foreground">الأسئلة الشائعة</h2>
+      <div className="mx-auto max-w-3xl px-4 pb-20">
+        <h2 className="mb-8 text-center text-2xl font-bold text-foreground">{t("landing.faqTitle")}</h2>
         <div className="space-y-4">
-          {faqs.map((faq) => (
+          {faqItems.map((faq) => (
             <Card key={faq.q}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">{faq.q}</CardTitle>

@@ -188,7 +188,7 @@ export function DataTable<T>({
   const allSelected = filtered.length > 0 && selectedIds.size === filtered.length;
   const someSelected = selectedIds.size > 0;
   const rowClickable = typeof onRowClick === "function";
-  const resolvedTableLabel = tableLabel ?? "Data table";
+  const resolvedTableLabel = tableLabel ?? t("common.dataTable");
 
   return (
     <div className="space-y-3">
@@ -234,12 +234,12 @@ export function DataTable<T>({
               <>
                 <Button variant="ghost" size="sm" onClick={exportCsv} className="h-8 text-xs">
                   <Download className="h-3.5 w-3.5 me-1" />
-                  CSV
+                  {t("common.exportCsv")}
                 </Button>
                 {pdfExport && (
                   <Button variant="ghost" size="sm" onClick={exportPdfHandler} className="h-8 text-xs">
                     <Download className="h-3.5 w-3.5 me-1" />
-                    PDF
+                    {t("common.exportPdf")}
                   </Button>
                 )}
               </>

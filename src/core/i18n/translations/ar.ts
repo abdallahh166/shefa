@@ -92,6 +92,20 @@
     selected: "محدد",
     showing: "عرض",
     of: "من",
+    dataTable: "جدول البيانات",
+    exportCsv: "CSV",
+    exportPdf: "PDF",
+    monthly: "شهري",
+    annual: "سنوي",
+    discounted: "مخفض",
+    contactUs: "تواصل معنا",
+    currentPlan: "الخطة الحالية",
+    requestUpgrade: "طلب ترقية",
+    renewNow: "جدد الآن",
+    viewAllPlans: "عرض جميع الخطط",
+    daysRemaining: "الأيام المتبقية",
+    expiresAt: "تاريخ الانتهاء",
+    billingCycle: "دورة الفوترة",
   },
 
   roles: {
@@ -361,6 +375,14 @@
     avatarRemoved: "تم إزالة صورة الملف الشخصي",
     avatarTooLarge: "يجب أن تكون الصورة أقل من 2 ميجابايت",
     avatarInvalidType: "يُسمح فقط بصور JPG أو PNG أو WebP",
+    subscription: {
+      title: "إدارة الاشتراك",
+      subtitle: "عرض وإدارة تفاصيل خطتك الحالية",
+      currentPlanCard: "الخطة الحالية",
+      trialing: "أنت حالياً ضمن فترة تجريبية",
+      expiredTitle: "انتهى اشتراكك",
+      expiredDescription: "يرجى تجديد اشتراكك للاستمرار في استخدام جميع الميزات."
+    }
   },
   auth: {
     login: "تسجيل الدخول",
@@ -541,6 +563,7 @@
     testimonial3Text: "تتبع طلبات المختبر سلس بشكل لا يصدق. أستطيع مراجعة النتائج ووصف العلاجات في منصة واحدة.",
     pricingTitle: "أسعار بسيطة وشفافة",
     pricingSubtitle: "اختر الخطة المناسبة لعيادتك. بدون رسوم خفية، إلغاء في أي وقت.",
+    pricingManagedDescription: "تتم إدارة الخطط والأسعار أدناه مركزياً من لوحة إدارة المنصة.",
     mostPopular: "الأكثر شعبية",
     perMonth: "شهر",
     planFree: "المبتدئ",

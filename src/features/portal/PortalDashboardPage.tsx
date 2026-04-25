@@ -1,9 +1,11 @@
-﻿import { useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { portalService } from "@/services/portal/portal.service";
 import { usePortalAuth } from "@/core/auth/portalAuthStore";
+import { useI18n } from "@/core/i18n/i18nStore";
 
 export const PortalDashboardPage = () => {
   const { user } = usePortalAuth();
+  const { t } = useI18n(["portal"]);
 
   const { data: appointments = [] } = useQuery({
     queryKey: ["portal", "appointments", user?.patientId],
@@ -32,24 +34,24 @@ export const PortalDashboardPage = () => {
   return (
     <div className="space-y-6" data-testid="portal-dashboard-page">
       <div>
-        <h2 className="text-xl font-semibold">Welcome back</h2>
-        <p className="text-sm text-muted-foreground">Here is a quick overview of your records.</p>
+        <h2 className="text-xl font-semibold">{t("portal.dashboard.welcomeBack")}</h2>
+        <p className="text-sm text-muted-foreground">{t("portal.dashboard.overview")}</p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="portal-dashboard-summary">
         <div className="rounded-lg border p-4" data-testid="portal-summary-appointments">
-          <p className="text-xs text-muted-foreground">Appointments</p>
+          <p className="text-xs text-muted-foreground">{t("portal.layout.nav.appointments")}</p>
           <p className="text-2xl font-semibold">{appointments.length}</p>
         </div>
         <div className="rounded-lg border p-4" data-testid="portal-summary-prescriptions">
-          <p className="text-xs text-muted-foreground">Prescriptions</p>
+          <p className="text-xs text-muted-foreground">{t("portal.layout.nav.prescriptions")}</p>
           <p className="text-2xl font-semibold">{prescriptions.length}</p>
         </div>
         <div className="rounded-lg border p-4" data-testid="portal-summary-labs">
-          <p className="text-xs text-muted-foreground">Lab Results</p>
+          <p className="text-xs text-muted-foreground">{t("portal.layout.nav.lab-results")}</p>
           <p className="text-2xl font-semibold">{labOrders.length}</p>
         </div>
         <div className="rounded-lg border p-4" data-testid="portal-summary-invoices">
-          <p className="text-xs text-muted-foreground">Invoices</p>
+          <p className="text-xs text-muted-foreground">{t("portal.layout.nav.invoices")}</p>
           <p className="text-2xl font-semibold">{invoices.length}</p>
         </div>
       </div>

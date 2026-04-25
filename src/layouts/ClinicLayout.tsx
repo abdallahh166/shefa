@@ -45,7 +45,7 @@ export const ClinicLayout = () => {
   const { clinicSlug } = useParams();
   const { user, logout, hasPermission, tenantOverride } = useAuth();
   const { hasFeature } = useFeatureAccess();
-  const { t } = useI18n();
+  const { t } = useI18n(["admin"]);
   const navigate = useNavigate();
   const [isExitingImpersonation, setIsExitingImpersonation] = useState(false);
 
@@ -59,8 +59,10 @@ export const ClinicLayout = () => {
     try {
       const result = await adminImpersonationService.stop();
       toast({
-        title: "Impersonation ended",
-        description: `Exited ${result.targetTenant.name}.`,
+        title: t("admin.toasts.impersonationEnded"),
+        description: t("admin.toasts.impersonationEndedDescription", {
+          tenantName: result.targetTenant.name,
+        }),
       });
       navigate("/admin");
     } catch (err: any) {
@@ -79,8 +81,8 @@ export const ClinicLayout = () => {
         return;
       }
       toast({
-        title: "Unable to exit clinic view",
-        description: err?.message || "Failed to stop impersonation",
+        title: t("admin.toasts.exitImpersonationFailed"),
+        description: err?.message || t("admin.toasts.stopImpersonationFailed"),
         variant: "destructive",
       });
     } finally {
@@ -134,7 +136,7 @@ export const ClinicLayout = () => {
                 disabled={isExitingImpersonation}
                 onClick={() => void handleExitImpersonation()}
               >
-                Exit {tenantOverride.name}
+                {t("admin.nav.exitTenant", { tenantName: tenantOverride.name })}
               </Button>
             )}
             <LanguageSwitcher />

@@ -1,0 +1,57 @@
+{
+  "layout": {
+    "title": "Patient Portal",
+    "clinicFallback": "Clinic",
+    "userFallback": "Patient",
+    "signOut": "Sign out",
+    "magicLinkTitle": "Patient Portal",
+    "magicLinkDescription": "Enter your email to receive a magic link.",
+    "magicLinkSuccess": "Check your email for a sign-in link. You can close this page after signing in.",
+    "magicLinkEmail": "Email",
+    "magicLinkPlaceholder": "you@example.com",
+    "magicLinkSending": "Sending...",
+    "magicLinkSubmit": "Send magic link",
+    "invalidClinicLink": "Invalid clinic link",
+    "emailRequired": "Email is required",
+    "magicLinkFailed": "Failed to send magic link",
+    "navigationLabel": "Portal navigation",
+    "nav": {
+      "dashboard": "Dashboard",
+      "appointments": "Appointments",
+      "prescriptions": "Prescriptions",
+      "lab-results": "Lab Results",
+      "documents": "Documents",
+      "invoices": "Invoices"
+    }
+  },
+  "dashboard": {
+    "welcomeBack": "Welcome back",
+    "overview": "Here is a quick overview of your records."
+  },
+  "states": {
+    "doctorFallback": "Doctor",
+    "invoiceFallback": "Invoice",
+    "empty": {
+      "appointments": "No appointments yet.",
+      "prescriptions": "No prescriptions yet.",
+      "labs": "No lab results yet.",
+      "documents": "No documents yet.",
+      "invoices": "No invoices yet."
+    }
+  },
+  "status": {
+    "paid": "Paid",
+    "pending": "Pending",
+    "overdue": "Overdue",
+    "partiallyPaid": "Partially paid",
+    "void": "Void"
+  },
+  "pages": {
+    "due": "Due {date}",
+    "settled": "Settled {date}",
+    "total": "Total {amount}",
+    "paid": "Paid {amount}",
+    "balance": "Balance {amount}",
+    "voidReason": "Void reason: {reason}"
+  }
+}

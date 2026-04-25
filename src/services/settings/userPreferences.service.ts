@@ -3,6 +3,7 @@ import { userPreferencesSchema, userPreferencesUpsertSchema } from "@/domain/set
 import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import { toServiceError } from "@/services/supabase/errors";
 import { userPreferencesRepository } from "./userPreferences.repository";
+import type { Locale } from "@/core/i18n/config";
 
 export const userPreferencesService = {
   async getByUserId(userId: string) {
@@ -14,7 +15,7 @@ export const userPreferencesService = {
       throw toServiceError(err, "Failed to load preferences");
     }
   },
-  async upsert(input: { user_id: string; dark_mode: boolean }) {
+  async upsert(input: { user_id: string; dark_mode?: boolean; locale?: Locale }) {
     try {
       const parsed = userPreferencesUpsertSchema.parse(input);
       const result = await userPreferencesRepository.upsert(parsed);
@@ -25,5 +26,8 @@ export const userPreferencesService = {
   },
   async setDarkMode(userId: string, darkMode: boolean) {
     return this.upsert({ user_id: userId, dark_mode: darkMode });
+  },
+  async setLocale(userId: string, locale: Locale) {
+    return this.upsert({ user_id: userId, locale });
   },
 };

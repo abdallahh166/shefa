@@ -4,18 +4,19 @@ import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, T
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { useI18n } from "@/core/i18n/i18nStore";
 import type { AdminPricingPlan, AdminPricingPlanCreateInput, AdminPricingPlanUpdateInput } from "@/domain/admin/admin.types";
 
 const PLAN_OPTIONS = [
-  { value: "free", label: "Free" },
-  { value: "starter", label: "Starter" },
-  { value: "pro", label: "Pro" },
-  { value: "enterprise", label: "Enterprise" },
+  { value: "free", labelKey: "admin.common.planOptions.free" },
+  { value: "starter", labelKey: "admin.common.planOptions.starter" },
+  { value: "pro", labelKey: "admin.common.planOptions.pro" },
+  { value: "enterprise", labelKey: "admin.common.planOptions.enterprise" },
 ] as const;
 
 const BILLING_CYCLE_OPTIONS = [
-  { value: "monthly", label: "Monthly" },
-  { value: "annual", label: "Annual" },
+  { value: "monthly", labelKey: "admin.common.billingCycleOptions.monthly" },
+  { value: "annual", labelKey: "admin.common.billingCycleOptions.annual" },
 ] as const;
 
 type PricingPlanDialogValue = AdminPricingPlanCreateInput | AdminPricingPlanUpdateInput;
@@ -96,6 +97,7 @@ export const PricingPlanDialog = ({
   onClose,
   onSubmit,
 }: PricingPlanDialogProps) => {
+  const { t } = useI18n(["admin"]);
   const fallbackPlanCode = availablePlanCodes[0] ?? "free";
   const [form, setForm] = useState<PricingPlanFormState>(() => toFormState(plan, fallbackPlanCode));
 
@@ -149,15 +151,21 @@ export const PricingPlanDialog = ({
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>{mode === "create" ? "Create pricing plan" : `Edit ${plan?.name ?? "pricing plan"}`}</DialogTitle>
+          <DialogTitle>
+            {mode === "create"
+              ? t("admin.pricingDialog.createTitle")
+              : t("admin.pricingDialog.editTitle", {
+                name: plan?.name ?? t("admin.pricingDialog.editFallbackName"),
+              })}
+          </DialogTitle>
           <DialogDescription>
-            Manage the canonical SaaS plan catalog that controls public pricing and subscription billing defaults.
+            {t("admin.pricingDialog.description")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="pricing-plan-code">Plan code *</Label>
+            <Label htmlFor="pricing-plan-code">{t("admin.pricingDialog.planCode")}</Label>
             <Select
               value={form.plan_code}
               onValueChange={(value) =>
@@ -166,12 +174,12 @@ export const PricingPlanDialog = ({
               disabled={mode === "edit" || availablePlanCodes.length === 0}
             >
               <SelectTrigger id="pricing-plan-code">
-                <SelectValue placeholder="Select plan code" />
+                <SelectValue placeholder={t("admin.pricingDialog.selectPlanCode")} />
               </SelectTrigger>
               <SelectContent>
                 {(mode === "edit" ? PLAN_OPTIONS : PLAN_OPTIONS.filter((option) => availablePlanCodes.includes(option.value))).map((option) => (
                   <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+                    {t(option.labelKey)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -179,49 +187,49 @@ export const PricingPlanDialog = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="pricing-plan-name">Display name *</Label>
+            <Label htmlFor="pricing-plan-name">{t("admin.pricingDialog.displayName")}</Label>
             <Input
               id="pricing-plan-name"
               value={form.name}
               onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-              placeholder="Professional"
+              placeholder={t("admin.pricingDialog.displayNamePlaceholder")}
             />
           </div>
 
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="pricing-plan-description">Description</Label>
+            <Label htmlFor="pricing-plan-description">{t("admin.pricingDialog.descriptionLabel")}</Label>
             <Textarea
               id="pricing-plan-description"
               rows={3}
               value={form.description}
               onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-              placeholder="Short marketing description for the public pricing page."
+              placeholder={t("admin.pricingDialog.descriptionPlaceholder")}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="pricing-plan-doctor-limit">Doctor limit label *</Label>
+            <Label htmlFor="pricing-plan-doctor-limit">{t("admin.pricingDialog.doctorLimitLabel")}</Label>
             <Input
               id="pricing-plan-doctor-limit"
               value={form.doctor_limit_label}
               onChange={(event) => setForm((current) => ({ ...current, doctor_limit_label: event.target.value }))}
-              placeholder="Up to 10 doctors"
+              placeholder={t("admin.pricingDialog.doctorLimitPlaceholder")}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="pricing-plan-currency">Currency *</Label>
+            <Label htmlFor="pricing-plan-currency">{t("admin.pricingDialog.currency")}</Label>
             <Input
               id="pricing-plan-currency"
               value={form.currency}
               onChange={(event) => setForm((current) => ({ ...current, currency: event.target.value }))}
-              placeholder="EGP"
+              placeholder={t("admin.pricingDialog.currencyPlaceholder")}
               maxLength={10}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="pricing-plan-monthly">Monthly price *</Label>
+            <Label htmlFor="pricing-plan-monthly">{t("admin.pricingDialog.monthlyPrice")}</Label>
             <Input
               id="pricing-plan-monthly"
               type="number"
@@ -233,7 +241,7 @@ export const PricingPlanDialog = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="pricing-plan-annual">Annual price *</Label>
+            <Label htmlFor="pricing-plan-annual">{t("admin.pricingDialog.annualPrice")}</Label>
             <Input
               id="pricing-plan-annual"
               type="number"
@@ -245,7 +253,7 @@ export const PricingPlanDialog = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="pricing-plan-cycle">Default billing cycle *</Label>
+            <Label htmlFor="pricing-plan-cycle">{t("admin.pricingDialog.defaultBillingCycle")}</Label>
             <Select
               value={form.default_billing_cycle}
               onValueChange={(value) =>
@@ -253,12 +261,12 @@ export const PricingPlanDialog = ({
               }
             >
               <SelectTrigger id="pricing-plan-cycle">
-                <SelectValue placeholder="Select billing cycle" />
+                <SelectValue placeholder={t("admin.pricingDialog.selectBillingCycle")} />
               </SelectTrigger>
               <SelectContent>
                 {BILLING_CYCLE_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+                    {t(option.labelKey)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -266,7 +274,7 @@ export const PricingPlanDialog = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="pricing-plan-order">Display order *</Label>
+            <Label htmlFor="pricing-plan-order">{t("admin.pricingDialog.displayOrder")}</Label>
             <Input
               id="pricing-plan-order"
               type="number"
@@ -279,15 +287,17 @@ export const PricingPlanDialog = ({
 
           <div className="space-y-2 md:col-span-2">
             <div className="flex items-center justify-between gap-3">
-              <Label htmlFor="pricing-plan-features">Features *</Label>
-              <span className="text-xs text-muted-foreground">{featurePreviewCount} feature{featurePreviewCount === 1 ? "" : "s"}</span>
+              <Label htmlFor="pricing-plan-features">{t("admin.pricingDialog.features")}</Label>
+              <span className="text-xs text-muted-foreground">
+                {t("admin.common.featuresCount", { count: featurePreviewCount })}
+              </span>
             </div>
             <Textarea
               id="pricing-plan-features"
               rows={7}
               value={form.featuresText}
               onChange={(event) => setForm((current) => ({ ...current, featuresText: event.target.value }))}
-              placeholder={"One feature per line\nAdvanced reports\nInventory management"}
+              placeholder={t("admin.pricingDialog.featuresPlaceholder")}
             />
           </div>
         </div>
@@ -298,14 +308,14 @@ export const PricingPlanDialog = ({
               checked={form.is_popular}
               onCheckedChange={(checked) => setForm((current) => ({ ...current, is_popular: Boolean(checked) }))}
             />
-            Mark as popular plan
+            {t("admin.pricingDialog.popularPlan")}
           </label>
           <label className="flex items-center gap-3 text-sm font-medium">
             <Checkbox
               checked={form.is_public}
               onCheckedChange={(checked) => setForm((current) => ({ ...current, is_public: Boolean(checked) }))}
             />
-            Show on public pricing page
+            {t("admin.pricingDialog.showOnPublicPricing")}
           </label>
           <label className="flex items-center gap-3 text-sm font-medium">
             <Checkbox
@@ -314,16 +324,20 @@ export const PricingPlanDialog = ({
                 setForm((current) => ({ ...current, is_enterprise_contact: Boolean(checked) }))
               }
             />
-            Use contact-sales CTA
+            {t("admin.pricingDialog.useContactSalesCta")}
           </label>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={() => void handleSubmit()} disabled={saving || submitDisabled}>
-            {saving ? "Saving..." : mode === "create" ? "Create plan" : "Save changes"}
+            {saving
+              ? t("admin.pricingDialog.saving")
+              : mode === "create"
+                ? t("admin.pricingDialog.createAction")
+                : t("admin.pricingDialog.saveChanges")}
           </Button>
         </DialogFooter>
       </DialogContent>

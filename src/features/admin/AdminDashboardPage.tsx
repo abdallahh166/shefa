@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { formatDate } from "@/shared/utils/formatDate";
+import { formatCurrency, formatDate, formatNumber } from "@/shared/utils/formatDate";
 import { toast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/primitives/Inputs";
 import { adminService } from "@/services/admin/admin.service";
@@ -59,7 +59,7 @@ function formatTrendBucketLabel(bucketStart: string, locale: "en" | "ar") {
 }
 
 export const AdminDashboardPage = () => {
-  const { locale, t } = useI18n();
+  const { locale, t } = useI18n(["admin"]);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -226,6 +226,22 @@ export const AdminDashboardPage = () => {
       : operationsDashboard?.overall_severity === "warning"
         ? "warning"
         : "success";
+  const translatePlan = (plan?: string | null) =>
+    t(`admin.common.planOptions.${plan ?? "free"}`);
+  const translateSubscriptionStatus = (status: string) =>
+    t(`admin.common.subscriptionStatusOptions.${status}`);
+  const translateTenantStatus = (status: string) =>
+    t(`admin.common.tenantStatusOptions.${status}`);
+  const translateCycle = (cycle: string) =>
+    t(`admin.common.billingCycleOptions.${cycle}`);
+  const translateField = (field: "plan" | "status" | "billing_cycle") =>
+    t(`admin.common.subscriptionFieldOptions.${field}`);
+  const translateSeverity = (severity?: string | null) =>
+    severity ? t(`admin.common.severityOptions.${severity}`) : t("admin.common.severityOptions.healthy");
+  const translateJobStatus = (status: string) =>
+    t(`admin.common.jobStatusOptions.${status}`);
+  const translateLogLevel = (level: string) =>
+    t(`admin.common.logLevelOptions.${level}`);
 
   const handleLogout = async () => {
     await logout();
@@ -249,8 +265,10 @@ export const AdminDashboardPage = () => {
     try {
       await adminImpersonationService.start(tenant);
       toast({
-        title: "Impersonation started",
-        description: `You are now viewing ${tenant.name} as a super admin.`,
+        title: t("admin.toasts.impersonationStarted"),
+        description: t("admin.toasts.impersonationStartedDescription", {
+          tenantName: tenant.name,
+        }),
       });
       navigate(`/tenant/${tenant.slug}/dashboard`);
     } catch (err: any) {
@@ -264,8 +282,8 @@ export const AdminDashboardPage = () => {
         return;
       }
       toast({
-        title: "Unable to open clinic",
-        description: err?.message || "Failed to start impersonation",
+        title: t("admin.toasts.openClinicFailed"),
+        description: err?.message || t("admin.toasts.startImpersonationFailed"),
         variant: "destructive",
       });
     } finally {
@@ -280,7 +298,17 @@ export const AdminDashboardPage = () => {
     try {
       const updatePayload = updatePayloadFromAction(action);
       await adminService.updateSubscription(action.id, updatePayload);
-      toast({ title: "Updated", description: `Subscription ${action.field} changed to ${action.value}` });
+      toast({
+        title: t("admin.toasts.subscriptionUpdated"),
+        description: t("admin.toasts.subscriptionUpdatedDescription", {
+          field: translateField(action.field),
+          value: action.field === "plan"
+            ? translatePlan(action.value)
+            : action.field === "billing_cycle"
+              ? translateCycle(action.value)
+              : translateSubscriptionStatus(action.value),
+        }),
+      });
       queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "tenants"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.subscriptionStats() });
@@ -289,7 +317,17 @@ export const AdminDashboardPage = () => {
         try {
           await requestFreshAuth();
           await adminService.updateSubscription(action.id, updatePayloadFromAction(action));
-          toast({ title: "Updated", description: `Subscription ${action.field} changed to ${action.value}` });
+          toast({
+            title: t("admin.toasts.subscriptionUpdated"),
+            description: t("admin.toasts.subscriptionUpdatedDescription", {
+              field: translateField(action.field),
+              value: action.field === "plan"
+                ? translatePlan(action.value)
+                : action.field === "billing_cycle"
+                  ? translateCycle(action.value)
+                  : translateSubscriptionStatus(action.value),
+            }),
+          });
           queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] });
           queryClient.invalidateQueries({ queryKey: ["admin", "tenants"] });
           queryClient.invalidateQueries({ queryKey: queryKeys.admin.subscriptionStats() });
@@ -298,7 +336,11 @@ export const AdminDashboardPage = () => {
         }
         return;
       }
-      toast({ title: "Error", description: err?.message || "Failed to update", variant: "destructive" });
+      toast({
+        title: t("common.error"),
+        description: err?.message || t("admin.toasts.updateFailed"),
+        variant: "destructive",
+      });
     } finally {
       setActionLoading(false);
       setConfirmAction(null);
@@ -322,10 +364,18 @@ export const AdminDashboardPage = () => {
     try {
       if (tenantDialogMode === "create") {
         await adminService.createTenant(input);
-        toast({ title: "Tenant created", description: "The clinic has been added to the platform." });
+        toast({
+          title: t("admin.toasts.tenantCreated"),
+          description: t("admin.toasts.tenantCreatedDescription"),
+        });
       } else if (editingTenant) {
         await adminService.updateTenant(editingTenant.id, input);
-        toast({ title: "Tenant updated", description: `${editingTenant.name} details were updated.` });
+        toast({
+          title: t("admin.toasts.tenantUpdated"),
+          description: t("admin.toasts.tenantUpdatedDescription", {
+            name: editingTenant.name,
+          }),
+        });
       }
 
       await Promise.all([
@@ -348,7 +398,10 @@ export const AdminDashboardPage = () => {
             queryClient.invalidateQueries({ queryKey: ["admin", "tenants"] }),
             queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] }),
           ]);
-          toast({ title: "Tenant saved", description: "The tenant changes were applied successfully." });
+          toast({
+            title: t("admin.toasts.tenantSaved"),
+            description: t("admin.toasts.tenantSavedDescription"),
+          });
           setTenantDialogOpen(false);
           setEditingTenant(null);
         } catch {
@@ -358,8 +411,8 @@ export const AdminDashboardPage = () => {
       }
 
       toast({
-        title: "Unable to save tenant",
-        description: err?.message || "The tenant record could not be saved.",
+        title: t("admin.toasts.tenantSaveFailed"),
+        description: err?.message || t("admin.toasts.tenantSaveFailedDescription"),
         variant: "destructive",
       });
     } finally {
@@ -373,8 +426,11 @@ export const AdminDashboardPage = () => {
     try {
       await adminService.updateTenantStatus(tenantStatusTarget.tenant.id, input);
       toast({
-        title: "Tenant status updated",
-        description: `${tenantStatusTarget.tenant.name} is now ${input.status}.`,
+        title: t("admin.toasts.tenantStatusUpdated"),
+        description: t("admin.toasts.tenantStatusUpdatedDescription", {
+          name: tenantStatusTarget.tenant.name,
+          status: translateTenantStatus(input.status),
+        }),
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin", "tenants"] }),
@@ -391,8 +447,11 @@ export const AdminDashboardPage = () => {
             queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] }),
           ]);
           toast({
-            title: "Tenant status updated",
-            description: `${tenantStatusTarget.tenant.name} is now ${input.status}.`,
+            title: t("admin.toasts.tenantStatusUpdated"),
+            description: t("admin.toasts.tenantStatusUpdatedDescription", {
+              name: tenantStatusTarget.tenant.name,
+              status: translateTenantStatus(input.status),
+            }),
           });
           setTenantStatusTarget(null);
         } catch {
@@ -402,8 +461,8 @@ export const AdminDashboardPage = () => {
       }
 
       toast({
-        title: "Unable to update tenant status",
-        description: err?.message || "The tenant lifecycle change failed.",
+        title: t("admin.toasts.tenantStatusFailed"),
+        description: err?.message || t("admin.toasts.tenantStatusFailedDescription"),
         variant: "destructive",
       });
     } finally {
@@ -421,8 +480,12 @@ export const AdminDashboardPage = () => {
         enabled,
       });
       toast({
-        title: "Tenant module updated",
-        description: `${tenantModulesTarget.name} now has ${enabled ? "enabled" : "disabled"} access to ${featureKey}.`,
+        title: t("admin.toasts.tenantModuleUpdated"),
+        description: t("admin.toasts.tenantModuleUpdatedDescription", {
+          name: tenantModulesTarget.name,
+          state: enabled ? t("admin.toasts.enabled") : t("admin.toasts.disabled"),
+          feature: t(`admin.tenantModules.features.${featureKey}.title`),
+        }),
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.admin.featureFlags(tenantModulesTarget.id) });
     } catch (err: any) {
@@ -435,8 +498,12 @@ export const AdminDashboardPage = () => {
           });
           await queryClient.invalidateQueries({ queryKey: queryKeys.admin.featureFlags(tenantModulesTarget.id) });
           toast({
-            title: "Tenant module updated",
-            description: `${tenantModulesTarget.name} now has ${enabled ? "enabled" : "disabled"} access to ${featureKey}.`,
+            title: t("admin.toasts.tenantModuleUpdated"),
+            description: t("admin.toasts.tenantModuleUpdatedDescription", {
+              name: tenantModulesTarget.name,
+              state: enabled ? t("admin.toasts.enabled") : t("admin.toasts.disabled"),
+              feature: t(`admin.tenantModules.features.${featureKey}.title`),
+            }),
           });
         } catch {
           return;
@@ -445,8 +512,8 @@ export const AdminDashboardPage = () => {
       }
 
       toast({
-        title: "Unable to update tenant module",
-        description: err?.message || "The tenant module flag could not be updated.",
+        title: t("admin.toasts.tenantModuleFailed"),
+        description: err?.message || t("admin.toasts.tenantModuleFailedDescription"),
         variant: "destructive",
       });
     } finally {
@@ -475,12 +542,15 @@ export const AdminDashboardPage = () => {
     try {
       if (pricingDialogMode === "create") {
         await adminService.createPricingPlan(input);
-        toast({ title: "Pricing plan created", description: "The new plan is now available to the platform." });
+        toast({
+          title: t("admin.toasts.pricingPlanCreated"),
+          description: t("admin.toasts.pricingPlanCreatedDescription"),
+        });
       } else if (editingPricingPlan) {
         await adminService.updatePricingPlan(editingPricingPlan.id, input);
         toast({
-          title: "Pricing updated",
-          description: "Tenant-facing pricing and billing defaults have been refreshed.",
+          title: t("admin.toasts.pricingUpdated"),
+          description: t("admin.toasts.pricingUpdatedDescription"),
         });
       }
 
@@ -510,7 +580,10 @@ export const AdminDashboardPage = () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.subscriptionStats() }),
           ]);
 
-          toast({ title: "Pricing updated", description: "The pricing catalog changes were saved successfully." });
+          toast({
+            title: t("admin.toasts.pricingUpdated"),
+            description: t("admin.toasts.pricingUpdatedDescription"),
+          });
           setPricingDialogOpen(false);
           setEditingPricingPlan(null);
         } catch {
@@ -520,8 +593,8 @@ export const AdminDashboardPage = () => {
       }
 
       toast({
-        title: "Unable to save pricing plan",
-        description: err?.message || "The pricing plan could not be saved.",
+        title: t("admin.toasts.pricingSaveFailed"),
+        description: err?.message || t("admin.toasts.pricingSaveFailedDescription"),
         variant: "destructive",
       });
     } finally {
@@ -536,8 +609,10 @@ export const AdminDashboardPage = () => {
     try {
       await adminService.deletePricingPlan(pricingDeletePlan.id);
       toast({
-        title: "Pricing plan deleted",
-        description: `${pricingDeletePlan.name} was removed from the catalog.`,
+        title: t("admin.toasts.pricingDeleted"),
+        description: t("admin.toasts.pricingDeletedDescription", {
+          name: pricingDeletePlan.name,
+        }),
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.pricingPlans() }),
@@ -554,8 +629,10 @@ export const AdminDashboardPage = () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.pricing.public() }),
           ]);
           toast({
-            title: "Pricing plan deleted",
-            description: `${pricingDeletePlan.name} was removed from the catalog.`,
+            title: t("admin.toasts.pricingDeleted"),
+            description: t("admin.toasts.pricingDeletedDescription", {
+              name: pricingDeletePlan.name,
+            }),
           });
           setPricingDeletePlan(null);
         } catch {
@@ -565,8 +642,8 @@ export const AdminDashboardPage = () => {
       }
 
       toast({
-        title: "Unable to delete pricing plan",
-        description: err?.message || "This plan may still be assigned to active tenants.",
+        title: t("admin.toasts.pricingDeleteFailed"),
+        description: err?.message || t("admin.toasts.pricingDeleteFailedDescription"),
         variant: "destructive",
       });
     } finally {
@@ -575,16 +652,16 @@ export const AdminDashboardPage = () => {
   };
 
   const tabs: { key: AdminTab; icon: any; label: string }[] = [
-    { key: "overview", icon: BarChart3, label: "Overview" },
-    { key: "operations", icon: Server, label: "Operations" },
-    { key: "clinics", icon: Building2, label: "Clinics" },
-    { key: "users", icon: Users, label: "Users" },
-    { key: "subscriptions", icon: CreditCard, label: "Subscriptions" },
-    { key: "pricing", icon: TrendingUp, label: "Pricing" },
+    { key: "overview", icon: BarChart3, label: t("admin.tabs.overview") },
+    { key: "operations", icon: Server, label: t("admin.tabs.operations") },
+    { key: "clinics", icon: Building2, label: t("admin.tabs.clinics") },
+    { key: "users", icon: Users, label: t("admin.tabs.users") },
+    { key: "subscriptions", icon: CreditCard, label: t("admin.tabs.subscriptions") },
+    { key: "pricing", icon: TrendingUp, label: t("admin.tabs.pricing") },
   ];
 
   const clinicColumns: Column<any>[] = [
-    { key: "name", header: "Clinic Name", searchable: true, sortable: true, render: (c) => (
+    { key: "name", header: t("admin.clinics.columns.clinicName"), searchable: true, sortable: true, render: (c) => (
       <div className="flex items-center gap-3">
         <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">{c.name?.charAt(0)}</div>
         <div>
@@ -593,20 +670,20 @@ export const AdminDashboardPage = () => {
         </div>
       </div>
     )},
-    { key: "email", header: "Email", searchable: true, render: (c) => c.email || "-" },
-    { key: "phone", header: "Phone", render: (c) => c.phone || "-" },
+    { key: "email", header: t("admin.clinics.columns.email"), searchable: true, render: (c) => c.email || "-" },
+    { key: "phone", header: t("admin.clinics.columns.phone"), render: (c) => c.phone || "-" },
     {
       key: "plan",
-      header: "Plan",
+      header: t("admin.clinics.columns.plan"),
       render: (c) => {
         const plan = c.plan ?? "free";
         const variant = plan === "pro" ? "success" : plan === "enterprise" ? "info" : "default";
-        return <StatusBadge variant={variant as any}>{plan}</StatusBadge>;
+        return <StatusBadge variant={variant as any}>{translatePlan(plan)}</StatusBadge>;
       },
     },
     {
       key: "tenant_status",
-      header: "Lifecycle",
+      header: t("admin.clinics.columns.lifecycle"),
       render: (c) => (
         <StatusBadge
           variant={
@@ -617,18 +694,18 @@ export const AdminDashboardPage = () => {
                 : "destructive"
           }
         >
-          {c.tenant_status}
+          {translateTenantStatus(c.tenant_status)}
         </StatusBadge>
       ),
     },
-    { key: "created_at", header: "Created", sortable: true, render: (c) => formatDate(c.created_at, locale, "date") },
+    { key: "created_at", header: t("admin.dashboard.created"), sortable: true, render: (c) => formatDate(c.created_at, locale, "date") },
     { key: "actions", header: "", render: (c) => (
       <div className="flex items-center justify-end gap-1">
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Edit clinic"
-          title="Edit clinic"
+          aria-label={t("admin.clinics.actions.edit")}
+          title={t("admin.clinics.actions.edit")}
           data-testid={`admin-clinic-edit-${c.id}`}
           onClick={() => openEditTenant(c)}
         >
@@ -637,8 +714,8 @@ export const AdminDashboardPage = () => {
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Manage modules"
-          title="Manage modules"
+          aria-label={t("admin.clinics.actions.modules")}
+          title={t("admin.clinics.actions.modules")}
           data-testid={`admin-clinic-modules-${c.id}`}
           onClick={() => setTenantModulesTarget(c)}
         >
@@ -647,8 +724,8 @@ export const AdminDashboardPage = () => {
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="View clinic"
-          title="View clinic"
+          aria-label={t("admin.clinics.actions.view")}
+          title={t("admin.clinics.actions.view")}
           data-testid={`admin-clinic-view-${c.id}`}
           disabled={impersonatingTenantId === c.id}
           onClick={() => void handleImpersonateTenant({ id: c.id, slug: c.slug, name: c.name })}
@@ -660,8 +737,8 @@ export const AdminDashboardPage = () => {
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Suspend clinic"
-              title="Suspend clinic"
+              aria-label={t("admin.clinics.actions.suspend")}
+              title={t("admin.clinics.actions.suspend")}
               data-testid={`admin-clinic-suspend-${c.id}`}
               onClick={() => setTenantStatusTarget({ tenant: c, status: "suspended" })}
             >
@@ -670,8 +747,8 @@ export const AdminDashboardPage = () => {
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Deactivate clinic"
-              title="Deactivate clinic"
+              aria-label={t("admin.clinics.actions.deactivate")}
+              title={t("admin.clinics.actions.deactivate")}
               data-testid={`admin-clinic-deactivate-${c.id}`}
               onClick={() => setTenantStatusTarget({ tenant: c, status: "deactivated" })}
             >
@@ -682,8 +759,8 @@ export const AdminDashboardPage = () => {
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Reactivate clinic"
-            title="Reactivate clinic"
+            aria-label={t("admin.clinics.actions.reactivate")}
+            title={t("admin.clinics.actions.reactivate")}
             data-testid={`admin-clinic-reactivate-${c.id}`}
             onClick={() => setTenantStatusTarget({ tenant: c, status: "active" })}
           >
@@ -697,7 +774,7 @@ export const AdminDashboardPage = () => {
   const recentClinicColumns: Column<any>[] = [
     {
       key: "name",
-      header: "Clinic",
+      header: t("admin.clinics.columns.clinic"),
       render: (t) => (
         <div className="flex items-center gap-3">
           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">{t.name?.charAt(0)}</div>
@@ -710,16 +787,16 @@ export const AdminDashboardPage = () => {
     },
     {
       key: "plan",
-      header: "Plan",
+      header: t("admin.clinics.columns.plan"),
       render: (t) => {
         const plan = t.plan ?? "free";
         const variant = plan === "pro" ? "success" : plan === "enterprise" ? "info" : "default";
-        return <StatusBadge variant={variant as any}>{plan}</StatusBadge>;
+        return <StatusBadge variant={variant as any}>{translatePlan(plan)}</StatusBadge>;
       },
     },
     {
       key: "tenant_status",
-      header: "Lifecycle",
+      header: t("admin.clinics.columns.lifecycle"),
       render: (t) => (
         <StatusBadge
           variant={
@@ -730,19 +807,19 @@ export const AdminDashboardPage = () => {
                 : "destructive"
           }
         >
-          {t.tenant_status}
+          {translateTenantStatus(t.tenant_status)}
         </StatusBadge>
       ),
     },
     {
       key: "created_at",
-      header: "Created",
+      header: t("admin.dashboard.created"),
       render: (t) => <span className="text-muted-foreground">{formatDate(t.created_at, locale, "date")}</span>,
     },
   ];
 
   const userColumns: Column<any>[] = [
-    { key: "full_name", header: "Name", searchable: true, sortable: true, render: (p) => (
+    { key: "full_name", header: t("admin.users.columns.name"), searchable: true, sortable: true, render: (p) => (
       <div className="flex items-center gap-3">
         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs">
           {p.full_name?.charAt(0) || "U"}
@@ -750,17 +827,17 @@ export const AdminDashboardPage = () => {
         <span className="font-medium">{p.full_name}</span>
       </div>
     )},
-    { key: "role", header: "Role", render: (p) => {
+    { key: "role", header: t("admin.users.columns.role"), render: (p) => {
       const role = (p.user_roles as any)?.[0]?.role || "-";
       const variant = role === "clinic_admin" ? "info" : role === "super_admin" ? "destructive" : "default";
-      return <StatusBadge variant={variant as any}>{role.replace("_", " ")}</StatusBadge>;
+      return <StatusBadge variant={variant as any}>{role === "-" ? "-" : t(`roles.${role}`)}</StatusBadge>;
     }},
-    { key: "tenant_id", header: "Clinic", render: (p) => p.tenants?.name || "-" },
-    { key: "created_at", header: "Joined", sortable: true, render: (p) => formatDate(p.created_at, locale, "date") },
+    { key: "tenant_id", header: t("admin.users.columns.clinic"), render: (p) => p.tenants?.name || "-" },
+    { key: "created_at", header: t("admin.dashboard.joined"), sortable: true, render: (p) => formatDate(p.created_at, locale, "date") },
   ];
 
   const subColumns: Column<any>[] = [
-    { key: "tenant", header: "Clinic", searchable: true, render: (s) => (
+    { key: "tenant", header: t("admin.subscriptions.columns.clinic"), searchable: true, render: (s) => (
       <div className="flex items-center gap-3">
         <Building2 className="h-4 w-4 text-muted-foreground" />
         <div>
@@ -769,7 +846,7 @@ export const AdminDashboardPage = () => {
         </div>
       </div>
     )},
-    { key: "plan", header: "Plan", sortable: true, render: (s) => (
+    { key: "plan", header: t("admin.subscriptions.columns.plan"), sortable: true, render: (s) => (
       <Select
         value={s.plan}
         onValueChange={(val) => setConfirmAction({ id: s.id, field: "plan", value: val })}
@@ -779,13 +856,20 @@ export const AdminDashboardPage = () => {
         </SelectTrigger>
         <SelectContent>
           {PLAN_OPTIONS.map((p) => (
-            <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>
+            <SelectItem key={p} value={p}>{translatePlan(p)}</SelectItem>
           ))}
         </SelectContent>
       </Select>
     )},
-    { key: "amount", header: "Amount", sortable: true, render: (s) => s.amount > 0 ? `${s.currency} ${Number(s.amount).toLocaleString()}` : "Free" },
-    { key: "billing_cycle", header: "Cycle", render: (s) => (
+    {
+      key: "amount",
+      header: t("admin.subscriptions.columns.amount"),
+      sortable: true,
+      render: (s) => s.amount > 0
+        ? formatCurrency(Number(s.amount), locale, s.currency)
+        : t("admin.subscriptions.freeAmount"),
+    },
+    { key: "billing_cycle", header: t("admin.subscriptions.columns.cycle"), render: (s) => (
       <Select
         value={s.billing_cycle}
         onValueChange={(val) => setConfirmAction({ id: s.id, field: "billing_cycle", value: val })}
@@ -795,12 +879,12 @@ export const AdminDashboardPage = () => {
         </SelectTrigger>
         <SelectContent>
           {BILLING_CYCLE_OPTIONS.map((cycle) => (
-            <SelectItem key={cycle} value={cycle}>{cycle.charAt(0).toUpperCase() + cycle.slice(1)}</SelectItem>
+            <SelectItem key={cycle} value={cycle}>{translateCycle(cycle)}</SelectItem>
           ))}
         </SelectContent>
       </Select>
     )},
-    { key: "status", header: "Status", sortable: true, render: (s) => (
+    { key: "status", header: t("admin.subscriptions.columns.status"), sortable: true, render: (s) => (
       <Select
         value={s.status}
         onValueChange={(val) => setConfirmAction({ id: s.id, field: "status", value: val })}
@@ -810,28 +894,28 @@ export const AdminDashboardPage = () => {
         </SelectTrigger>
         <SelectContent>
           {STATUS_OPTIONS.map((st) => (
-            <SelectItem key={st} value={st}>{st.charAt(0).toUpperCase() + st.slice(1)}</SelectItem>
+            <SelectItem key={st} value={st}>{translateSubscriptionStatus(st)}</SelectItem>
           ))}
         </SelectContent>
       </Select>
     )},
-    { key: "expires_at", header: "Expires", sortable: true, render: (s) => s.expires_at ? formatDate(s.expires_at, locale, "date") : "-" },
+    { key: "expires_at", header: t("admin.dashboard.expires"), sortable: true, render: (s) => s.expires_at ? formatDate(s.expires_at, locale, "date") : "-" },
   ];
 
   const jobActivityColumns: Column<AdminRecentJobActivity>[] = [
     {
       key: "type",
-      header: "Job",
+      header: t("admin.operations.jobColumn"),
       render: (job) => (
         <div>
           <p className="font-medium">{job.type}</p>
-          <p className="text-xs text-muted-foreground">{job.tenant_name || "Unknown tenant"}</p>
+          <p className="text-xs text-muted-foreground">{job.tenant_name || t("admin.common.unknownTenant")}</p>
         </div>
       ),
     },
     {
       key: "status",
-      header: "Status",
+      header: t("admin.operations.statusColumn"),
       render: (job) => (
         <StatusBadge
           variant={
@@ -842,27 +926,27 @@ export const AdminDashboardPage = () => {
                 : "info"
           }
         >
-          {job.status}
+          {translateJobStatus(job.status)}
         </StatusBadge>
       ),
     },
     {
       key: "attempts",
-      header: "Attempts",
+      header: t("admin.operations.attemptsColumn"),
       render: (job) => `${job.attempts}/${job.max_attempts}`,
     },
     {
       key: "last_error",
-      header: "Last Error",
+      header: t("admin.operations.lastErrorColumn"),
       render: (job) => (
         <span className="line-clamp-2 max-w-[320px] text-sm text-muted-foreground">
-          {job.last_error || "No error message"}
+          {job.last_error || t("admin.operations.noErrorMessage")}
         </span>
       ),
     },
     {
       key: "updated_at",
-      header: "Updated",
+      header: t("admin.dashboard.updated"),
       render: (job) => formatDate(job.updated_at, locale, "datetime"),
     },
   ];
@@ -870,26 +954,26 @@ export const AdminDashboardPage = () => {
   const systemErrorColumns: Column<AdminRecentSystemError>[] = [
     {
       key: "service",
-      header: "Service",
+      header: t("admin.operations.serviceColumn"),
       render: (log) => (
         <div>
           <p className="font-medium">{log.service}</p>
-          <p className="text-xs text-muted-foreground">{log.tenant_name || "Platform-wide"}</p>
+          <p className="text-xs text-muted-foreground">{log.tenant_name || t("admin.common.platformWide")}</p>
         </div>
       ),
     },
     {
       key: "level",
-      header: "Level",
+      header: t("admin.operations.levelColumn"),
       render: (log) => (
         <StatusBadge variant={log.level === "error" ? "destructive" : "warning"}>
-          {log.level}
+          {translateLogLevel(log.level)}
         </StatusBadge>
       ),
     },
     {
       key: "message",
-      header: "Message",
+      header: t("admin.operations.messageColumn"),
       render: (log) => (
         <span className="line-clamp-2 max-w-[360px] text-sm text-muted-foreground">
           {log.message}
@@ -898,7 +982,7 @@ export const AdminDashboardPage = () => {
     },
     {
       key: "created_at",
-      header: "Created",
+      header: t("admin.dashboard.created"),
       render: (log) => formatDate(log.created_at, locale, "datetime"),
     },
   ];
@@ -926,8 +1010,8 @@ export const AdminDashboardPage = () => {
               <HeartPulse className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-bold text-foreground">MedFlow Admin</h1>
-              <p className="text-xs text-muted-foreground flex items-center gap-1"><Crown className="h-3 w-3" /> Super Admin</p>
+              <h1 className="font-bold text-foreground">{t("admin.nav.brand")}</h1>
+              <p className="text-xs text-muted-foreground flex items-center gap-1"><Crown className="h-3 w-3" /> {t("admin.nav.role")}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -938,7 +1022,7 @@ export const AdminDashboardPage = () => {
               </div>
               <span className="text-sm font-medium">{user?.name}</span>
             </div>
-            <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Log out" title="Log out">
+            <Button variant="ghost" size="icon" onClick={handleLogout} aria-label={t("admin.nav.logout")} title={t("admin.nav.logout")}>
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
@@ -972,73 +1056,83 @@ export const AdminDashboardPage = () => {
         {activeTab === "overview" && (
           <div className="space-y-6 animate-fade-in">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard title="Total Clinics" value={String(totalClinics)} icon={Building2} accent="primary" />
-              <StatCard title="Total Users" value={String(totalUsers)} icon={Users} accent="info" />
-              <StatCard title="Active Subscriptions" value={String(activeSubs)} icon={CreditCard} accent="success" />
-              <StatCard title="Monthly Revenue" value={`EGP ${totalRevenue.toLocaleString()}`} icon={TrendingUp} accent="warning" />
+              <StatCard title={t("admin.dashboard.totalClinics")} value={formatNumber(totalClinics, locale)} icon={Building2} accent="primary" />
+              <StatCard title={t("admin.dashboard.totalUsers")} value={formatNumber(totalUsers, locale)} icon={Users} accent="info" />
+              <StatCard title={t("admin.dashboard.activeSubscriptions")} value={formatNumber(activeSubs, locale)} icon={CreditCard} accent="success" />
+              <StatCard title={t("admin.dashboard.monthlyRevenue")} value={formatCurrency(totalRevenue, locale, "EGP")} icon={TrendingUp} accent="warning" />
             </div>
 
             <div className="rounded-2xl border bg-card p-5 space-y-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold">Operations Alerts</h3>
+                    <h3 className="font-semibold">{t("admin.dashboard.operationsAlerts")}</h3>
                     <StatusBadge variant={operationsSeverityVariant as "success" | "warning" | "destructive"}>
-                      {operationsDashboard?.overall_severity ?? "healthy"}
+                      {translateSeverity(operationsDashboard?.overall_severity)}
                     </StatusBadge>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Job backlog, worker failures, edge-function failures, and recent client-side error spikes.
+                    {t("admin.dashboard.operationsAlertsDescription")}
                   </p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Alert window: last 15 minutes
+                  {t("admin.dashboard.alertWindow")}
                 </p>
               </div>
 
               {loadingOperationsDashboard ? (
                 <div className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
-                  Loading operations telemetry...
+                  {t("admin.dashboard.loadingOperationsTelemetry")}
                 </div>
               ) : (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                     <StatCard
-                      title="Pending Jobs"
-                      value={String(operationsSummary?.pending_jobs_count ?? 0)}
+                      title={t("admin.operations.pendingJobs")}
+                      value={formatNumber(operationsSummary?.pending_jobs_count ?? 0, locale)}
                       icon={Activity}
                       accent={(operationsSummary?.pending_jobs_count ?? 0) >= 20 ? "warning" : "info"}
-                      subtitle={`${operationsSummary?.processing_jobs_count ?? 0} processing`}
+                      subtitle={t("admin.common.processingCount", {
+                        count: formatNumber(operationsSummary?.processing_jobs_count ?? 0, locale),
+                      })}
                     />
                     <StatCard
-                      title="Retrying Jobs"
-                      value={String(operationsSummary?.retrying_jobs_count ?? 0)}
+                      title={t("admin.operations.retryingJobs")}
+                      value={formatNumber(operationsSummary?.retrying_jobs_count ?? 0, locale)}
                       icon={AlertTriangle}
                       accent={(operationsSummary?.retrying_jobs_count ?? 0) > 0 ? "warning" : "success"}
-                      subtitle={`${operationsSummary?.recent_job_failures_count ?? 0} worker failures in 15m`}
+                      subtitle={t("admin.common.workerFailuresCount", {
+                        count: formatNumber(operationsSummary?.recent_job_failures_count ?? 0, locale),
+                      })}
                     />
                     <StatCard
-                      title="Dead Letters"
-                      value={String(operationsSummary?.dead_letter_jobs_count ?? 0)}
+                      title={t("admin.operations.deadLetters")}
+                      value={formatNumber(operationsSummary?.dead_letter_jobs_count ?? 0, locale)}
                       icon={Server}
                       accent={(operationsSummary?.dead_letter_jobs_count ?? 0) > 0 ? "destructive" : "success"}
-                      subtitle={`${operationsSummary?.stale_processing_jobs_count ?? 0} stuck processing`}
+                      subtitle={t("admin.common.stuckProcessingCount", {
+                        count: formatNumber(operationsSummary?.stale_processing_jobs_count ?? 0, locale),
+                      })}
                     />
                     <StatCard
-                      title="Edge Failures"
-                      value={String(operationsSummary?.recent_edge_failures_count ?? 0)}
+                      title={t("admin.operations.edgeFailures")}
+                      value={formatNumber(operationsSummary?.recent_edge_failures_count ?? 0, locale)}
                       icon={BarChart3}
                       accent={(operationsSummary?.recent_edge_failures_count ?? 0) > 0 ? "destructive" : "success"}
-                      subtitle={`${operationsSummary?.recent_client_errors_count ?? 0} client errors in 15m`}
+                      subtitle={t("admin.common.clientErrorsCount", {
+                        count: formatNumber(operationsSummary?.recent_client_errors_count ?? 0, locale),
+                      })}
                     />
                   </div>
 
                   <div className="rounded-xl border bg-muted/20 p-4">
                     <div className="flex items-center justify-between gap-3">
-                      <h4 className="text-sm font-medium">Active Signals</h4>
+                      <h4 className="text-sm font-medium">{t("admin.operations.activeSignals")}</h4>
                       {operationsDashboard?.active_alerts.length ? (
                         <span className="text-xs text-muted-foreground">
-                          {operationsDashboard.active_alerts.length} active
+                          {t("admin.common.activeAlerts", {
+                            count: operationsDashboard.active_alerts.length,
+                          })}
                         </span>
                       ) : null}
                     </div>
@@ -1060,7 +1154,7 @@ export const AdminDashboardPage = () => {
                                   }
                                   dot
                                 >
-                                  {alert.severity}
+                                  {translateSeverity(alert.severity)}
                                 </StatusBadge>
                               </div>
                               <p className="text-sm text-muted-foreground">{alert.description}</p>
@@ -1071,7 +1165,7 @@ export const AdminDashboardPage = () => {
                       </div>
                     ) : (
                       <p className="mt-3 text-sm text-muted-foreground">
-                        No active production alerts right now. The queue and edge functions are currently healthy.
+                        {t("admin.dashboard.noActiveAlerts")}
                       </p>
                     )}
                   </div>
@@ -1082,17 +1176,17 @@ export const AdminDashboardPage = () => {
             {/* Recent clinics */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Recent Clinics</h3>
+                <h3 className="font-semibold">{t("admin.dashboard.recentClinics")}</h3>
                 <Button variant="ghost" size="sm" onClick={() => setActiveTab("clinics")}>
-                  View All <ChevronRight className="h-4 w-4" />
+                  {t("admin.dashboard.viewAllClinics")} <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
               <DataTable
                 columns={recentClinicColumns}
                 data={recentTenants}
                 keyExtractor={(t) => t.id}
-                emptyMessage="No clinics yet"
-                tableLabel="Recent clinics"
+                emptyMessage={t("admin.dashboard.recentClinicsEmpty")}
+                tableLabel={t("admin.dashboard.recentClinicsTable")}
                 onRowClick={(t) => void handleImpersonateTenant({ id: t.id, slug: t.slug, name: t.name })}
               />
             </div>
@@ -1102,13 +1196,13 @@ export const AdminDashboardPage = () => {
               {planBreakdown.map(({ plan, count, pct, variant }) => (
                 <div key={plan} className="bg-card rounded-xl border p-5">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium capitalize">{plan} Plan</span>
-                    <StatusBadge variant={variant as any}>{count}</StatusBadge>
+                    <span className="text-sm font-medium capitalize">{t("admin.common.planBreakdown", { plan: translatePlan(plan) })}</span>
+                    <StatusBadge variant={variant as any}>{formatNumber(count, locale)}</StatusBadge>
                   </div>
                   <div className="h-2 bg-muted rounded-full">
                     <div className="h-2 bg-primary rounded-full transition-all" style={{ width: `${pct}%` }} />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">{pct}% of total</p>
+                  <p className="text-xs text-muted-foreground mt-2">{t("admin.common.percentOfTotal", { percentage: pct })}</p>
                 </div>
               ))}
             </div>
@@ -1119,32 +1213,40 @@ export const AdminDashboardPage = () => {
           <div className="space-y-6 animate-fade-in">
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               <StatCard
-                title="Pending Jobs"
-                value={String(operationsSummary?.pending_jobs_count ?? 0)}
+                title={t("admin.operations.pendingJobs")}
+                value={formatNumber(operationsSummary?.pending_jobs_count ?? 0, locale)}
                 icon={Activity}
                 accent={(operationsSummary?.pending_jobs_count ?? 0) >= 20 ? "warning" : "info"}
-                subtitle={`${operationsSummary?.processing_jobs_count ?? 0} processing`}
+                subtitle={t("admin.common.processingCount", {
+                  count: formatNumber(operationsSummary?.processing_jobs_count ?? 0, locale),
+                })}
               />
               <StatCard
-                title="Retrying Jobs"
-                value={String(operationsSummary?.retrying_jobs_count ?? 0)}
+                title={t("admin.operations.retryingJobs")}
+                value={formatNumber(operationsSummary?.retrying_jobs_count ?? 0, locale)}
                 icon={AlertTriangle}
                 accent={(operationsSummary?.retrying_jobs_count ?? 0) > 0 ? "warning" : "success"}
-                subtitle={`${operationsSummary?.recent_job_failures_count ?? 0} worker failures in 15m`}
+                subtitle={t("admin.common.workerFailuresCount", {
+                  count: formatNumber(operationsSummary?.recent_job_failures_count ?? 0, locale),
+                })}
               />
               <StatCard
-                title="Recent Edge Failures"
-                value={String(operationsSummary?.recent_edge_failures_count ?? 0)}
+                title={t("admin.operations.recentEdgeFailures")}
+                value={formatNumber(operationsSummary?.recent_edge_failures_count ?? 0, locale)}
                 icon={Server}
                 accent={(operationsSummary?.recent_edge_failures_count ?? 0) > 0 ? "destructive" : "success"}
-                subtitle={operationsSummary?.last_edge_failure_at ? formatDate(operationsSummary.last_edge_failure_at, locale, "datetime") : "No recent failures"}
+                subtitle={operationsSummary?.last_edge_failure_at
+                  ? formatDate(operationsSummary.last_edge_failure_at, locale, "datetime")
+                  : t("admin.operations.noRecentFailures")}
               />
               <StatCard
-                title="Recent Client Errors"
-                value={String(operationsSummary?.recent_client_errors_count ?? 0)}
+                title={t("admin.operations.recentClientErrors")}
+                value={formatNumber(operationsSummary?.recent_client_errors_count ?? 0, locale)}
                 icon={BarChart3}
                 accent={(operationsSummary?.recent_client_errors_count ?? 0) >= 5 ? "warning" : "info"}
-                subtitle={operationsSummary?.last_client_error_at ? formatDate(operationsSummary.last_client_error_at, locale, "datetime") : "No recent client errors"}
+                subtitle={operationsSummary?.last_client_error_at
+                  ? formatDate(operationsSummary.last_client_error_at, locale, "datetime")
+                  : t("admin.operations.noRecentClientErrors")}
               />
             </div>
 
@@ -1152,13 +1254,13 @@ export const AdminDashboardPage = () => {
               <div className="xl:col-span-2 rounded-2xl border bg-card p-5 space-y-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h3 className="font-semibold">Recent Job Failures</h3>
+                    <h3 className="font-semibold">{t("admin.operations.recentJobFailures")}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Latest retrying, failed, and dead-letter jobs across all tenants.
+                      {t("admin.operations.recentJobFailuresDescription")}
                     </p>
                   </div>
                   <StatusBadge variant={operationsSeverityVariant as "success" | "warning" | "destructive"}>
-                    {operationsDashboard?.overall_severity ?? "healthy"}
+                    {translateSeverity(operationsDashboard?.overall_severity)}
                   </StatusBadge>
                 </div>
 
@@ -1166,16 +1268,16 @@ export const AdminDashboardPage = () => {
                   columns={jobActivityColumns}
                   data={operationsDashboard?.recent_job_activity ?? []}
                   keyExtractor={(job) => job.id}
-                  emptyMessage="No recent job failures or retries."
-                  tableLabel="Recent job failures"
+                  emptyMessage={t("admin.operations.recentJobFailuresEmpty")}
+                  tableLabel={t("admin.operations.recentJobFailuresTable")}
                 />
               </div>
 
               <div className="rounded-2xl border bg-card p-5 space-y-4">
                 <div>
-                  <h3 className="font-semibold">Client Error Trend</h3>
+                  <h3 className="font-semibold">{t("admin.operations.clientErrorTrend")}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Browser-side error volume across the last six 15-minute buckets.
+                    {t("admin.operations.clientErrorTrendDescription")}
                   </p>
                 </div>
 
@@ -1187,7 +1289,10 @@ export const AdminDashboardPage = () => {
                         <div key={point.bucket_start} className="space-y-1">
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <span>{formatTrendBucketLabel(point.bucket_start, locale)}</span>
-                            <span>{point.error_count} errors / {point.affected_tenants_count} tenants</span>
+                            <span>{t("admin.common.errorsAndTenants", {
+                              errors: formatNumber(point.error_count, locale),
+                              tenants: formatNumber(point.affected_tenants_count, locale),
+                            })}</span>
                           </div>
                           <div className="h-2 rounded-full bg-muted">
                             <div
@@ -1199,7 +1304,7 @@ export const AdminDashboardPage = () => {
                       );
                     })
                   ) : (
-                    <p className="text-sm text-muted-foreground">No client error trend data available yet.</p>
+                    <p className="text-sm text-muted-foreground">{t("admin.operations.clientErrorTrendEmpty")}</p>
                   )}
                 </div>
               </div>
@@ -1207,9 +1312,9 @@ export const AdminDashboardPage = () => {
 
             <div className="rounded-2xl border bg-card p-5 space-y-4">
               <div>
-                <h3 className="font-semibold">Recent System Errors</h3>
+                <h3 className="font-semibold">{t("admin.operations.recentSystemErrors")}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Latest warning and error logs captured by workers and edge functions.
+                  {t("admin.operations.recentSystemErrorsDescription")}
                 </p>
               </div>
 
@@ -1217,8 +1322,8 @@ export const AdminDashboardPage = () => {
                 columns={systemErrorColumns}
                 data={operationsDashboard?.recent_system_errors ?? []}
                 keyExtractor={(log) => log.id}
-                emptyMessage="No recent system errors."
-                tableLabel="Recent system errors"
+                emptyMessage={t("admin.operations.recentSystemErrorsEmpty")}
+                tableLabel={t("admin.operations.recentSystemErrorsTable")}
               />
             </div>
           </div>
@@ -1229,14 +1334,14 @@ export const AdminDashboardPage = () => {
           <div className="space-y-4 animate-fade-in">
             <div className="flex flex-col gap-3 rounded-2xl border bg-card p-5 md:flex-row md:items-start md:justify-between">
               <div className="space-y-1">
-                <h3 className="font-semibold">Tenant Lifecycle</h3>
+                <h3 className="font-semibold">{t("admin.clinics.title")}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Create clinics, update tenant identity details, and suspend, deactivate, or reactivate access.
+                  {t("admin.clinics.description")}
                 </p>
               </div>
               <Button onClick={openCreateTenant} className="shrink-0" data-testid="admin-create-tenant-trigger">
                 <Plus className="h-4 w-4" />
-                Create tenant
+                {t("admin.clinics.createTenant")}
               </Button>
             </div>
             <DataTable
@@ -1258,7 +1363,7 @@ export const AdminDashboardPage = () => {
               onSortChange={(column, direction) => setClinicSort({ column: column as "name" | "created_at", direction })}
               filterSlot={
                 <StatusFilter
-                  options={PLAN_OPTIONS.map((p) => ({ value: p, label: p.charAt(0).toUpperCase() + p.slice(1) }))}
+                  options={PLAN_OPTIONS.map((p) => ({ value: p, label: translatePlan(p) }))}
                   selected={clinicFilter}
                   onChange={setClinicFilter}
                 />
@@ -1313,7 +1418,7 @@ export const AdminDashboardPage = () => {
               onSortChange={(column, direction) => setSubSort({ column: column as typeof subSort.column, direction })}
               filterSlot={
                 <StatusFilter
-                  options={PLAN_OPTIONS.map((p) => ({ value: p, label: p.charAt(0).toUpperCase() + p.slice(1) }))}
+                  options={PLAN_OPTIONS.map((p) => ({ value: p, label: translatePlan(p) }))}
                   selected={subFilter}
                   onChange={setSubFilter}
                 />
@@ -1326,9 +1431,9 @@ export const AdminDashboardPage = () => {
           <div className="space-y-6 animate-fade-in">
             <div className="flex flex-col gap-3 rounded-2xl border bg-card p-5 md:flex-row md:items-start md:justify-between">
               <div className="space-y-1">
-                <h3 className="font-semibold">Pricing Catalog</h3>
+                <h3 className="font-semibold">{t("admin.pricing.title")}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Manage the public SaaS plans, billing defaults, and the catalog that subscriptions map to.
+                  {t("admin.pricing.description")}
                 </p>
               </div>
               <Button
@@ -1338,44 +1443,48 @@ export const AdminDashboardPage = () => {
                 data-testid="admin-create-pricing-plan-trigger"
               >
                 <Plus className="h-4 w-4" />
-                Create plan
+                {t("admin.pricing.createPlan")}
               </Button>
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard
-                title="Catalog Plans"
-                value={String(pricingPlans.length)}
+                title={t("admin.pricing.catalogPlans")}
+                value={formatNumber(pricingPlans.length, locale)}
                 icon={CreditCard}
                 accent="info"
-                subtitle={`${pricingPlans.filter((plan) => plan.is_public).length} public`}
+                subtitle={t("admin.common.publicPlansCount", {
+                  count: pricingPlans.filter((plan) => plan.is_public).length,
+                })}
               />
               <StatCard
-                title="Popular Plans"
-                value={String(pricingPlans.filter((plan) => plan.is_popular).length)}
+                title={t("admin.pricing.popularPlans")}
+                value={formatNumber(pricingPlans.filter((plan) => plan.is_popular).length, locale)}
                 icon={TrendingUp}
                 accent="warning"
-                subtitle="Highlighted in public pricing"
+                subtitle={t("admin.pricing.highlightedInPublicPricing")}
               />
               <StatCard
-                title="Enterprise CTA"
-                value={String(pricingPlans.filter((plan) => plan.is_enterprise_contact).length)}
+                title={t("admin.pricing.enterpriseCta")}
+                value={formatNumber(pricingPlans.filter((plan) => plan.is_enterprise_contact).length, locale)}
                 icon={Crown}
                 accent="success"
-                subtitle="Contact-sales plan cards"
+                subtitle={t("admin.pricing.contactSalesPlanCards")}
               />
               <StatCard
-                title="Missing Slots"
-                value={String(availablePlanCodes.length)}
+                title={t("admin.pricing.missingSlots")}
+                value={formatNumber(availablePlanCodes.length, locale)}
                 icon={AlertTriangle}
                 accent={availablePlanCodes.length > 0 ? "warning" : "success"}
-                subtitle={availablePlanCodes.length > 0 ? "Canonical plan code available" : "Catalog complete"}
+                subtitle={availablePlanCodes.length > 0
+                  ? t("admin.pricing.canonicalPlanCodeAvailable")
+                  : t("admin.pricing.catalogComplete")}
               />
             </div>
 
             {loadingPricingPlans ? (
               <div className="rounded-2xl border border-dashed bg-card p-6 text-sm text-muted-foreground">
-                Loading pricing catalog...
+                {t("admin.pricing.loadingCatalog")}
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -1389,12 +1498,12 @@ export const AdminDashboardPage = () => {
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <h3 className="font-semibold">{plan.name}</h3>
-                          <StatusBadge variant="default">{plan.plan_code}</StatusBadge>
-                          {plan.is_popular ? <StatusBadge variant="warning">popular</StatusBadge> : null}
-                          {!plan.is_public ? <StatusBadge variant="destructive">hidden</StatusBadge> : null}
+                          <StatusBadge variant="default">{translatePlan(plan.plan_code)}</StatusBadge>
+                          {plan.is_popular ? <StatusBadge variant="warning">{t("admin.pricing.popularBadge")}</StatusBadge> : null}
+                          {!plan.is_public ? <StatusBadge variant="destructive">{t("admin.pricing.hiddenBadge")}</StatusBadge> : null}
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          {plan.description || "No description configured for the public pricing page yet."}
+                          {plan.description || t("admin.common.notConfiguredYet")}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1405,7 +1514,7 @@ export const AdminDashboardPage = () => {
                           data-testid={`admin-pricing-edit-${plan.plan_code}`}
                         >
                           <Pencil className="h-4 w-4" />
-                          Edit
+                          {t("admin.pricing.editPlan")}
                         </Button>
                         <Button
                           variant="ghost"
@@ -1414,35 +1523,35 @@ export const AdminDashboardPage = () => {
                           data-testid={`admin-pricing-delete-${plan.plan_code}`}
                         >
                           <Trash2 className="h-4 w-4" />
-                          Delete
+                          {t("admin.pricing.deletePlan")}
                         </Button>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 gap-3 rounded-xl border bg-muted/20 p-4 sm:grid-cols-2">
                       <div>
-                        <div className="text-xs text-muted-foreground">Monthly</div>
-                        <div className="font-medium">{plan.currency} {Number(plan.monthly_price).toLocaleString()}</div>
+                        <div className="text-xs text-muted-foreground">{t("admin.pricing.monthlyPrice")}</div>
+                        <div className="font-medium">{formatCurrency(Number(plan.monthly_price), locale, plan.currency)}</div>
                       </div>
                       <div>
-                        <div className="text-xs text-muted-foreground">Annual</div>
-                        <div className="font-medium">{plan.currency} {Number(plan.annual_price).toLocaleString()}</div>
+                        <div className="text-xs text-muted-foreground">{t("admin.pricing.annualPrice")}</div>
+                        <div className="font-medium">{formatCurrency(Number(plan.annual_price), locale, plan.currency)}</div>
                       </div>
                       <div>
-                        <div className="text-xs text-muted-foreground">Default cycle</div>
-                        <div className="font-medium capitalize">{plan.default_billing_cycle}</div>
+                        <div className="text-xs text-muted-foreground">{t("admin.pricing.defaultCycle")}</div>
+                        <div className="font-medium capitalize">{translateCycle(plan.default_billing_cycle)}</div>
                       </div>
                       <div>
-                        <div className="text-xs text-muted-foreground">Doctor limit label</div>
+                        <div className="text-xs text-muted-foreground">{t("admin.pricing.doctorLimitLabel")}</div>
                         <div className="font-medium">{plan.doctor_limit_label}</div>
                       </div>
                     </div>
 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-medium">Features</h4>
+                        <h4 className="text-sm font-medium">{t("admin.pricing.features")}</h4>
                         <span className="text-xs text-muted-foreground">
-                          order {plan.display_order} • {plan.features.length} items
+                          {t("admin.common.orderValue", { count: plan.display_order })} • {t("admin.common.featureCount", { count: plan.features.length })}
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -1458,7 +1567,7 @@ export const AdminDashboardPage = () => {
 
                 {pricingPlans.length === 0 ? (
                   <div className="rounded-2xl border border-dashed bg-card p-6 text-sm text-muted-foreground">
-                    No pricing plans are configured yet.
+                    {t("admin.pricing.empty")}
                   </div>
                 ) : null}
               </div>
@@ -1470,10 +1579,19 @@ export const AdminDashboardPage = () => {
       {/* Confirm dialog for subscription changes */}
       <ConfirmDialog
         open={!!confirmAction}
-        title="Confirm Subscription Change"
-        message={`Are you sure you want to change ${confirmAction?.field} to "${confirmAction?.value}"?`}
-        confirmLabel="Update"
-        cancelLabel="Cancel"
+        title={t("admin.dialogs.confirmSubscriptionChangeTitle")}
+        message={confirmAction
+          ? t("admin.dialogs.confirmSubscriptionChangeMessage", {
+            field: translateField(confirmAction.field),
+            value: confirmAction.field === "plan"
+              ? translatePlan(confirmAction.value)
+              : confirmAction.field === "billing_cycle"
+                ? translateCycle(confirmAction.value)
+                : translateSubscriptionStatus(confirmAction.value),
+          })
+          : ""}
+        confirmLabel={t("admin.dialogs.updateAction")}
+        cancelLabel={t("common.cancel")}
         variant="warning"
         loading={actionLoading}
         onConfirm={handleSubUpdate}
@@ -1526,10 +1644,12 @@ export const AdminDashboardPage = () => {
 
       <ConfirmDialog
         open={!!pricingDeletePlan}
-        title="Delete Pricing Plan"
-        message={`Delete "${pricingDeletePlan?.name}" from the catalog? This will fail if tenants still depend on the plan.`}
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
+        title={t("admin.dialogs.deletePricingPlanTitle")}
+        message={pricingDeletePlan
+          ? t("admin.dialogs.deletePricingPlanMessage", { name: pricingDeletePlan.name })
+          : ""}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
         variant="danger"
         loading={pricingDeleteLoading}
         onConfirm={handleDeletePricingPlan}

@@ -1,0 +1,334 @@
+{
+  "nav": {
+    "brand": "إدارة MedFlow",
+    "role": "مدير المنصة",
+    "logout": "تسجيل الخروج",
+    "exitTenant": "الخروج من {tenantName}"
+  },
+  "tabs": {
+    "overview": "نظرة عامة",
+    "operations": "العمليات",
+    "clinics": "العيادات",
+    "users": "المستخدمون",
+    "subscriptions": "الاشتراكات",
+    "pricing": "التسعير"
+  },
+  "common": {
+    "planOptions": {
+      "free": "مجاني",
+      "starter": "مبتدئ",
+      "pro": "احترافي",
+      "enterprise": "مؤسسات"
+    },
+    "billingCycleOptions": {
+      "monthly": "شهري",
+      "annual": "سنوي"
+    },
+    "subscriptionStatusOptions": {
+      "active": "نشط",
+      "trialing": "تجريبي",
+      "expired": "منتهي",
+      "canceled": "ملغي"
+    },
+    "tenantStatusOptions": {
+      "active": "نشط",
+      "suspended": "معلق",
+      "deactivated": "معطل"
+    },
+    "subscriptionFieldOptions": {
+      "plan": "الخطة",
+      "status": "الحالة",
+      "billing_cycle": "دورة الفوترة"
+    },
+    "severityOptions": {
+      "healthy": "سليم",
+      "warning": "تحذير",
+      "critical": "حرج"
+    },
+    "jobStatusOptions": {
+      "queued": "في الانتظار",
+      "processing": "قيد المعالجة",
+      "failed": "فشل",
+      "retrying": "إعادة المحاولة",
+      "dead_letter": "قائمة ميتة"
+    },
+    "logLevelOptions": {
+      "warning": "تحذير",
+      "error": "خطأ"
+    },
+    "unknownTenant": "عيادة غير معروفة",
+    "platformWide": "على مستوى المنصة",
+    "healthy": "سليم",
+    "activeAlerts": "{count, plural, one {تنبيه نشط واحد} other {# تنبيهات نشطة}}",
+    "planBreakdown": "خطة {plan}",
+    "percentOfTotal": "{percentage}% من الإجمالي",
+    "errorsAndTenants": "{errors} أخطاء / {tenants} عيادات",
+    "processingCount": "{count} قيد المعالجة",
+    "workerFailuresCount": "{count} فشل عامل خلال 15 دقيقة",
+    "stuckProcessingCount": "{count} عالق قيد المعالجة",
+    "clientErrorsCount": "{count} أخطاء عميل خلال 15 دقيقة",
+    "publicPlansCount": "{count} عامة",
+    "featureCount": "{count, plural, one {عنصر واحد} other {# عناصر}}",
+    "featuresCount": "{count, plural, one {ميزة واحدة} other {# ميزات}}",
+    "orderValue": "الترتيب {count}",
+    "notConfiguredYet": "لا يوجد وصف مضبوط لصفحة التسعير العامة بعد."
+  },
+  "dashboard": {
+    "title": "إدارة المنصة",
+    "subtitle": "إدارة العيادات والتسعير والاشتراكات وعمليات المنصة.",
+    "created": "تاريخ الإنشاء",
+    "joined": "تاريخ الانضمام",
+    "expires": "تاريخ الانتهاء",
+    "updated": "تم التحديث",
+    "totalClinics": "إجمالي العيادات",
+    "totalUsers": "إجمالي المستخدمين",
+    "activeSubscriptions": "الاشتراكات النشطة",
+    "monthlyRevenue": "الإيراد الشهري",
+    "recentClinics": "العيادات الأخيرة",
+    "recentClinicsEmpty": "لا توجد عيادات بعد",
+    "recentClinicsTable": "العيادات الأخيرة",
+    "viewAllClinics": "عرض الكل",
+    "operationsAlerts": "تنبيهات العمليات",
+    "operationsAlertsDescription": "تراكم المهام، وفشل العمال، وأعطال وظائف الحافة، وارتفاع أخطاء العميل الأخيرة.",
+    "alertWindow": "نافذة التنبيه: آخر 15 دقيقة",
+    "loadingOperationsTelemetry": "جار تحميل مؤشرات العمليات...",
+    "noActiveAlerts": "لا توجد تنبيهات إنتاج نشطة حالياً. الطوابير ووظائف الحافة تعمل بشكل سليم."
+  },
+  "operations": {
+    "pendingJobs": "المهام المعلقة",
+    "retryingJobs": "المهام المعاد تنفيذها",
+    "deadLetters": "الرسائل الميتة",
+    "edgeFailures": "أعطال الحافة",
+    "recentEdgeFailures": "أعطال الحافة الأخيرة",
+    "recentClientErrors": "أخطاء العميل الأخيرة",
+    "noRecentFailures": "لا توجد أعطال حديثة",
+    "noRecentClientErrors": "لا توجد أخطاء عميل حديثة",
+    "activeSignals": "الإشارات النشطة",
+    "recentJobFailures": "إخفاقات المهام الأخيرة",
+    "recentJobFailuresDescription": "أحدث المهام المعاد تنفيذها أو الفاشلة أو المحولة إلى القائمة الميتة عبر جميع العيادات.",
+    "recentJobFailuresEmpty": "لا توجد إخفاقات أو إعادة محاولات حديثة.",
+    "recentJobFailuresTable": "إخفاقات المهام الأخيرة",
+    "clientErrorTrend": "اتجاه أخطاء العميل",
+    "clientErrorTrendDescription": "حجم أخطاء المتصفح عبر آخر ست فترات مدة كل منها 15 دقيقة.",
+    "clientErrorTrendEmpty": "لا توجد بيانات لاتجاه أخطاء العميل حتى الآن.",
+    "recentSystemErrors": "أخطاء النظام الأخيرة",
+    "recentSystemErrorsDescription": "أحدث سجلات التحذير والخطأ الملتقطة من العمال ووظائف الحافة.",
+    "recentSystemErrorsEmpty": "لا توجد أخطاء نظام حديثة.",
+    "recentSystemErrorsTable": "أخطاء النظام الأخيرة",
+    "jobColumn": "المهمة",
+    "statusColumn": "الحالة",
+    "attemptsColumn": "المحاولات",
+    "lastErrorColumn": "آخر خطأ",
+    "serviceColumn": "الخدمة",
+    "levelColumn": "المستوى",
+    "messageColumn": "الرسالة",
+    "noErrorMessage": "لا توجد رسالة خطأ"
+  },
+  "clinics": {
+    "title": "دورة حياة العيادة",
+    "description": "إنشاء العيادات وتحديث بياناتها وتعليق الوصول أو تعطيله أو إعادة تفعيله.",
+    "createTenant": "إنشاء عيادة",
+    "columns": {
+      "clinic": "العيادة",
+      "clinicName": "اسم العيادة",
+      "email": "البريد الإلكتروني",
+      "phone": "الهاتف",
+      "plan": "الخطة",
+      "lifecycle": "دورة الحياة"
+    },
+    "actions": {
+      "edit": "تعديل العيادة",
+      "modules": "إدارة الوحدات",
+      "view": "عرض العيادة",
+      "suspend": "تعليق العيادة",
+      "deactivate": "تعطيل العيادة",
+      "reactivate": "إعادة تفعيل العيادة"
+    }
+  },
+  "users": {
+    "columns": {
+      "name": "الاسم",
+      "role": "الدور",
+      "clinic": "العيادة"
+    }
+  },
+  "subscriptions": {
+    "columns": {
+      "clinic": "العيادة",
+      "plan": "الخطة",
+      "amount": "المبلغ",
+      "cycle": "الدورة",
+      "status": "الحالة"
+    },
+    "freeAmount": "مجاني"
+  },
+  "pricing": {
+    "title": "كتالوج التسعير",
+    "description": "إدارة خطط SaaS العامة وإعدادات الفوترة الافتراضية والكتالوج الذي ترتبط به الاشتراكات.",
+    "createPlan": "إنشاء خطة",
+    "catalogPlans": "خطط الكتالوج",
+    "popularPlans": "الخطط الشائعة",
+    "enterpriseCta": "دعوة المؤسسات",
+    "missingSlots": "المواضع الناقصة",
+    "highlightedInPublicPricing": "مميزة في صفحة التسعير العامة",
+    "contactSalesPlanCards": "بطاقات تواصل مع المبيعات",
+    "canonicalPlanCodeAvailable": "يوجد رمز خطة قياسي متاح",
+    "catalogComplete": "الكتالوج مكتمل",
+    "loadingCatalog": "جار تحميل كتالوج التسعير...",
+    "empty": "لا توجد خطط تسعير مضبوطة بعد.",
+    "popularBadge": "شائع",
+    "hiddenBadge": "مخفي",
+    "editPlan": "تعديل",
+    "deletePlan": "حذف",
+    "monthlyPrice": "شهري",
+    "annualPrice": "سنوي",
+    "defaultCycle": "الدورة الافتراضية",
+    "doctorLimitLabel": "وصف حد الأطباء",
+    "features": "الميزات"
+  },
+  "tenantForm": {
+    "createTitle": "إنشاء عيادة",
+    "editTitle": "تعديل {name}",
+    "editFallbackName": "العيادة",
+    "description": "إدارة سجل هوية العيادة الذي ترتبط به حسابات الموظفين والاشتراكات والوصول إلى الميزات.",
+    "clinicName": "اسم العيادة *",
+    "slug": "الرابط المختصر *",
+    "clinicEmail": "بريد العيادة الإلكتروني",
+    "phone": "الهاتف",
+    "address": "العنوان",
+    "pendingOwnerEmail": "بريد المالك المعلق",
+    "clinicNamePlaceholder": "عيادة قلب القاهرة",
+    "slugPlaceholder": "cairo-heart",
+    "clinicEmailPlaceholder": "ops@clinic.com",
+    "phonePlaceholder": "+20 100 000 0000",
+    "addressPlaceholder": "عنوان العيادة المستخدم في شاشات الإدارة وتجربة المرضى.",
+    "pendingOwnerEmailPlaceholder": "owner@clinic.com",
+    "saving": "جار الحفظ...",
+    "createAction": "إنشاء عيادة",
+    "saveChanges": "حفظ التغييرات"
+  },
+  "pricingDialog": {
+    "createTitle": "إنشاء خطة تسعير",
+    "editTitle": "تعديل {name}",
+    "editFallbackName": "خطة التسعير",
+    "description": "إدارة كتالوج خطط SaaS القياسي الذي يتحكم في التسعير العام وإعدادات فوترة الاشتراك الافتراضية.",
+    "planCode": "رمز الخطة *",
+    "displayName": "الاسم الظاهر *",
+    "descriptionLabel": "الوصف",
+    "doctorLimitLabel": "وصف حد الأطباء *",
+    "currency": "العملة *",
+    "monthlyPrice": "السعر الشهري *",
+    "annualPrice": "السعر السنوي *",
+    "defaultBillingCycle": "دورة الفوترة الافتراضية *",
+    "displayOrder": "ترتيب العرض *",
+    "features": "الميزات *",
+    "selectPlanCode": "اختر رمز الخطة",
+    "selectBillingCycle": "اختر دورة الفوترة",
+    "displayNamePlaceholder": "احترافي",
+    "descriptionPlaceholder": "وصف تسويقي قصير لصفحة التسعير العامة.",
+    "doctorLimitPlaceholder": "حتى 10 أطباء",
+    "currencyPlaceholder": "EGP",
+    "featuresPlaceholder": "ميزة في كل سطر\nتقارير متقدمة\nإدارة المخزون",
+    "popularPlan": "تمييز كخطة شائعة",
+    "showOnPublicPricing": "إظهارها في صفحة التسعير العامة",
+    "useContactSalesCta": "استخدام زر التواصل مع المبيعات",
+    "saving": "جار الحفظ...",
+    "createAction": "إنشاء خطة",
+    "saveChanges": "حفظ التغييرات"
+  },
+  "tenantModules": {
+    "title": "وحدات العيادة",
+    "description": "تفعيل أو تعطيل وحدات العيادة لـ {tenantName}. تُطبَّق التغييرات فوراً.",
+    "fallbackTenantName": "هذه العيادة",
+    "loading": "جار تحميل صلاحيات الوحدات...",
+    "features": {
+      "advanced_reports": {
+        "title": "التقارير والتحليلات",
+        "description": "تتحكم في التقارير المتقدمة ولوحات المعلومات وواجهات التحليلات."
+      },
+      "lab_module": {
+        "title": "المختبر",
+        "description": "تتحكم في طلبات المختبر والنتائج المنظمة وعمليات المختبر."
+      },
+      "pharmacy_module": {
+        "title": "الصيدلية",
+        "description": "تتحكم في مخزون الصيدلية وتوفر الأدوية وسير صرفها."
+      },
+      "insurance_module": {
+        "title": "التأمين",
+        "description": "تتحكم في المطالبات وطوابير المتابعة وعمليات التأمين."
+      }
+    }
+  },
+  "tenantStatusDialog": {
+    "reason": "السبب",
+    "reasonPlaceholder": "تعليق فوترة، مراجعة امتثال، إنهاء عقد، نقل ملكية، وغير ذلك.",
+    "saving": "جار الحفظ...",
+    "tenantPrefix": "العيادة: {name}.",
+    "statuses": {
+      "active": {
+        "title": "إعادة تفعيل العيادة",
+        "description": "استعادة وصول الموظفين ومسارات العمل الموجهة للمرضى.",
+        "action": "إعادة تفعيل العيادة"
+      },
+      "suspended": {
+        "title": "تعليق العيادة",
+        "description": "إيقاف وصول العيادة مؤقتاً دون اعتبارها مغلقة بشكل دائم.",
+        "action": "تعليق العيادة"
+      },
+      "deactivated": {
+        "title": "تعطيل العيادة",
+        "description": "حظر وصول هذه العيادة حتى يعيد مدير المنصة تفعيلها.",
+        "action": "تعطيل العيادة"
+      }
+    }
+  },
+  "dialogs": {
+    "confirmSubscriptionChangeTitle": "تأكيد تغيير الاشتراك",
+    "confirmSubscriptionChangeMessage": "هل أنت متأكد من تغيير {field} إلى \"{value}\"؟",
+    "deletePricingPlanTitle": "حذف خطة التسعير",
+    "deletePricingPlanMessage": "هل تريد حذف \"{name}\" من الكتالوج؟ سيفشل ذلك إذا كانت العيادات لا تزال تعتمد على هذه الخطة.",
+    "updateAction": "تحديث"
+  },
+  "toasts": {
+    "impersonationStarted": "تم بدء الانتحال",
+    "impersonationStartedDescription": "أنت الآن تعرض {tenantName} بصلاحية مدير المنصة.",
+    "impersonationEnded": "تم إنهاء الانتحال",
+    "impersonationEndedDescription": "تم الخروج من {tenantName}.",
+    "openClinicFailed": "تعذر فتح العيادة",
+    "exitImpersonationFailed": "تعذر الخروج من عرض العيادة",
+    "stopImpersonationFailed": "فشل إيقاف الانتحال",
+    "startImpersonationFailed": "فشل بدء الانتحال",
+    "subscriptionUpdated": "تم تحديث الاشتراك",
+    "subscriptionUpdatedDescription": "تم تغيير {field} إلى {value}.",
+    "updateFailed": "فشل التحديث",
+    "tenantCreated": "تم إنشاء العيادة",
+    "tenantCreatedDescription": "تمت إضافة العيادة إلى المنصة.",
+    "tenantUpdated": "تم تحديث العيادة",
+    "tenantUpdatedDescription": "تم تحديث تفاصيل {name}.",
+    "tenantSaved": "تم حفظ العيادة",
+    "tenantSavedDescription": "تم تطبيق تغييرات العيادة بنجاح.",
+    "tenantSaveFailed": "تعذر حفظ العيادة",
+    "tenantSaveFailedDescription": "تعذر حفظ سجل العيادة.",
+    "tenantStatusUpdated": "تم تحديث حالة العيادة",
+    "tenantStatusUpdatedDescription": "أصبحت {name} الآن {status}.",
+    "tenantStatusFailed": "تعذر تحديث حالة العيادة",
+    "tenantStatusFailedDescription": "فشل تغيير دورة حياة العيادة.",
+    "tenantModuleUpdated": "تم تحديث وحدة العيادة",
+    "tenantModuleUpdatedDescription": "أصبح لدى {name} وصول {state} إلى {feature}.",
+    "tenantModuleFailed": "تعذر تحديث وحدة العيادة",
+    "tenantModuleFailedDescription": "تعذر تحديث علامة وحدة العيادة.",
+    "enabled": "مفعّل",
+    "disabled": "معطل",
+    "pricingPlanCreated": "تم إنشاء خطة التسعير",
+    "pricingPlanCreatedDescription": "أصبحت الخطة الجديدة متاحة على المنصة.",
+    "pricingUpdated": "تم تحديث التسعير",
+    "pricingUpdatedDescription": "تم حفظ تغييرات كتالوج التسعير بنجاح.",
+    "pricingSaveFailed": "تعذر حفظ خطة التسعير",
+    "pricingSaveFailedDescription": "تعذر حفظ خطة التسعير.",
+    "pricingDeleted": "تم حذف خطة التسعير",
+    "pricingDeletedDescription": "تمت إزالة {name} من الكتالوج.",
+    "pricingDeleteFailed": "تعذر حذف خطة التسعير",
+    "pricingDeleteFailedDescription": "قد تكون هذه الخطة ما زالت مخصصة لعيادات نشطة."
+  }
+}

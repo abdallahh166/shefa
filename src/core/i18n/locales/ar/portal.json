@@ -1,0 +1,57 @@
+{
+  "layout": {
+    "title": "بوابة المرضى",
+    "clinicFallback": "العيادة",
+    "userFallback": "المريض",
+    "signOut": "تسجيل الخروج",
+    "magicLinkTitle": "بوابة المرضى",
+    "magicLinkDescription": "أدخل بريدك الإلكتروني لاستلام رابط سحري.",
+    "magicLinkSuccess": "تحقق من بريدك الإلكتروني للحصول على رابط تسجيل الدخول. يمكنك إغلاق هذه الصفحة بعد تسجيل الدخول.",
+    "magicLinkEmail": "البريد الإلكتروني",
+    "magicLinkPlaceholder": "you@example.com",
+    "magicLinkSending": "جارٍ الإرسال...",
+    "magicLinkSubmit": "إرسال الرابط السحري",
+    "invalidClinicLink": "رابط العيادة غير صالح",
+    "emailRequired": "البريد الإلكتروني مطلوب",
+    "magicLinkFailed": "تعذر إرسال الرابط السحري",
+    "navigationLabel": "تنقل البوابة",
+    "nav": {
+      "dashboard": "لوحة التحكم",
+      "appointments": "المواعيد",
+      "prescriptions": "الوصفات الطبية",
+      "lab-results": "نتائج المختبر",
+      "documents": "المستندات",
+      "invoices": "الفواتير"
+    }
+  },
+  "dashboard": {
+    "welcomeBack": "مرحباً بعودتك",
+    "overview": "إليك نظرة سريعة على سجلاتك."
+  },
+  "states": {
+    "doctorFallback": "الطبيب",
+    "invoiceFallback": "فاتورة",
+    "empty": {
+      "appointments": "لا توجد مواعيد بعد.",
+      "prescriptions": "لا توجد وصفات طبية بعد.",
+      "labs": "لا توجد نتائج مختبر بعد.",
+      "documents": "لا توجد مستندات بعد.",
+      "invoices": "لا توجد فواتير بعد."
+    }
+  },
+  "status": {
+    "paid": "مدفوع",
+    "pending": "معلق",
+    "overdue": "متأخر",
+    "partiallyPaid": "مدفوع جزئياً",
+    "void": "ملغاة"
+  },
+  "pages": {
+    "due": "الاستحقاق {date}",
+    "settled": "تم السداد {date}",
+    "total": "الإجمالي {amount}",
+    "paid": "المدفوع {amount}",
+    "balance": "الرصيد {amount}",
+    "voidReason": "سبب الإلغاء: {reason}"
+  }
+}

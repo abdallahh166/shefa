@@ -10,35 +10,48 @@ import { ProtectedRoute } from "./core/auth/ProtectedRoute";
 import { PortalProtectedRoute } from "./core/auth/PortalProtectedRoute";
 import { SubscriptionProvider } from "./core/subscription/SubscriptionContext";
 import { ErrorBoundary } from "./shared/components/ErrorBoundary";
+import { ensureNamespaces, translatePath, type TranslationNamespace } from "./core/i18n/config";
 
-const LandingPage = lazy(() => import("./pages/LandingPage").then((m) => ({ default: m.LandingPage })));
-const AdminDashboardPage = lazy(() => import("./features/admin/AdminDashboardPage").then((m) => ({ default: m.AdminDashboardPage })));
-const LoginPage = lazy(() => import("./pages/LoginPage").then((m) => ({ default: m.LoginPage })));
-const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage").then((m) => ({ default: m.ForgotPasswordPage })));
-const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage").then((m) => ({ default: m.ResetPasswordPage })));
-const TutorialPage = lazy(() => import("./pages/TutorialPage").then((m) => ({ default: m.TutorialPage })));
-const PricingPage = lazy(() => import("./pages/PricingPage").then((m) => ({ default: m.PricingPage })));
-const ClinicLayout = lazy(() => import("./layouts/ClinicLayout").then((m) => ({ default: m.ClinicLayout })));
-const PortalLayout = lazy(() => import("./features/portal/PortalLayout").then((m) => ({ default: m.PortalLayout })));
-const PortalLoginPage = lazy(() => import("./pages/PortalLoginPage").then((m) => ({ default: m.PortalLoginPage })));
-const PortalDashboardPage = lazy(() => import("./features/portal/PortalDashboardPage").then((m) => ({ default: m.PortalDashboardPage })));
-const PortalAppointmentsPage = lazy(() => import("./features/portal/PortalPages").then((m) => ({ default: m.PortalAppointmentsPage })));
-const PortalPrescriptionsPage = lazy(() => import("./features/portal/PortalPages").then((m) => ({ default: m.PortalPrescriptionsPage })));
-const PortalLabResultsPage = lazy(() => import("./features/portal/PortalPages").then((m) => ({ default: m.PortalLabResultsPage })));
-const PortalDocumentsPage = lazy(() => import("./features/portal/PortalPages").then((m) => ({ default: m.PortalDocumentsPage })));
-const PortalInvoicesPage = lazy(() => import("./features/portal/PortalPages").then((m) => ({ default: m.PortalInvoicesPage })));
-const DashboardPage = lazy(() => import("./features/dashboard/DashboardPage").then((m) => ({ default: m.DashboardPage })));
-const PatientsPage = lazy(() => import("./features/patients/PatientsPage").then((m) => ({ default: m.PatientsPage })));
-const PatientDetailPage = lazy(() => import("./features/patients/PatientDetailPage").then((m) => ({ default: m.PatientDetailPage })));
-const AppointmentsPage = lazy(() => import("./features/appointments/AppointmentsPage").then((m) => ({ default: m.AppointmentsPage })));
-const DoctorsPage = lazy(() => import("./features/doctors/DoctorsPage").then((m) => ({ default: m.DoctorsPage })));
-const BillingPage = lazy(() => import("./features/billing/BillingPage").then((m) => ({ default: m.BillingPage })));
-const PharmacyPage = lazy(() => import("./features/pharmacy/PharmacyPage").then((m) => ({ default: m.PharmacyPage })));
-const LaboratoryPage = lazy(() => import("./features/laboratory/LaboratoryPage").then((m) => ({ default: m.LaboratoryPage })));
-const InsurancePage = lazy(() => import("./features/insurance/InsurancePage").then((m) => ({ default: m.InsurancePage })));
-const ReportsPage = lazy(() => import("./features/reports/ReportsPage").then((m) => ({ default: m.ReportsPage })));
-const SettingsPage = lazy(() => import("./features/settings/SettingsPage").then((m) => ({ default: m.SettingsPage })));
-const TelemedicineCallPage = lazy(() => import("./features/telemedicine/TelemedicineCallPage").then((m) => ({ default: m.TelemedicineCallPage })));
+function lazyPage<TModule>(
+  loader: () => Promise<TModule>,
+  selector: (module: TModule) => React.ComponentType,
+  namespaces: readonly TranslationNamespace[],
+) {
+  return lazy(async () => {
+    await ensureNamespaces(namespaces);
+    const module = await loader();
+    return { default: selector(module) };
+  });
+}
+
+const LandingPage = lazyPage(() => import("./pages/LandingPage"), (m) => m.LandingPage, ["common", "landing", "auth"]);
+const AdminDashboardPage = lazyPage(() => import("./features/admin/AdminDashboardPage"), (m) => m.AdminDashboardPage, ["common", "admin"]);
+const LoginPage = lazyPage(() => import("./pages/LoginPage"), (m) => m.LoginPage, ["common", "auth"]);
+const ForgotPasswordPage = lazyPage(() => import("./pages/ForgotPasswordPage"), (m) => m.ForgotPasswordPage, ["common", "auth"]);
+const ResetPasswordPage = lazyPage(() => import("./pages/ResetPasswordPage"), (m) => m.ResetPasswordPage, ["common", "auth"]);
+const TutorialPage = lazyPage(() => import("./pages/TutorialPage"), (m) => m.TutorialPage, ["common", "tutorial"]);
+const PricingPage = lazyPage(() => import("./pages/PricingPage"), (m) => m.PricingPage, ["common", "landing"]);
+const ClinicLayout = lazyPage(() => import("./layouts/ClinicLayout"), (m) => m.ClinicLayout, ["common", "auth"]);
+const PortalLayout = lazyPage(() => import("./features/portal/PortalLayout"), (m) => m.PortalLayout, ["common", "portal"]);
+const PortalLoginPage = lazyPage(() => import("./pages/PortalLoginPage"), (m) => m.PortalLoginPage, ["common", "auth", "portal"]);
+const PortalDashboardPage = lazyPage(() => import("./features/portal/PortalDashboardPage"), (m) => m.PortalDashboardPage, ["common", "portal"]);
+const PortalAppointmentsPage = lazyPage(() => import("./features/portal/PortalPages"), (m) => m.PortalAppointmentsPage, ["common", "portal", "appointments"]);
+const PortalPrescriptionsPage = lazyPage(() => import("./features/portal/PortalPages"), (m) => m.PortalPrescriptionsPage, ["common", "portal", "patients"]);
+const PortalLabResultsPage = lazyPage(() => import("./features/portal/PortalPages"), (m) => m.PortalLabResultsPage, ["common", "portal", "laboratory"]);
+const PortalDocumentsPage = lazyPage(() => import("./features/portal/PortalPages"), (m) => m.PortalDocumentsPage, ["common", "portal", "patients"]);
+const PortalInvoicesPage = lazyPage(() => import("./features/portal/PortalPages"), (m) => m.PortalInvoicesPage, ["common", "portal", "billing"]);
+const DashboardPage = lazyPage(() => import("./features/dashboard/DashboardPage"), (m) => m.DashboardPage, ["common", "dashboard"]);
+const PatientsPage = lazyPage(() => import("./features/patients/PatientsPage"), (m) => m.PatientsPage, ["common", "patients"]);
+const PatientDetailPage = lazyPage(() => import("./features/patients/PatientDetailPage"), (m) => m.PatientDetailPage, ["common", "patients", "appointments", "billing", "laboratory"]);
+const AppointmentsPage = lazyPage(() => import("./features/appointments/AppointmentsPage"), (m) => m.AppointmentsPage, ["common", "appointments", "patients", "doctors"]);
+const DoctorsPage = lazyPage(() => import("./features/doctors/DoctorsPage"), (m) => m.DoctorsPage, ["common", "doctors"]);
+const BillingPage = lazyPage(() => import("./features/billing/BillingPage"), (m) => m.BillingPage, ["common", "billing", "patients"]);
+const PharmacyPage = lazyPage(() => import("./features/pharmacy/PharmacyPage"), (m) => m.PharmacyPage, ["common", "pharmacy"]);
+const LaboratoryPage = lazyPage(() => import("./features/laboratory/LaboratoryPage"), (m) => m.LaboratoryPage, ["common", "laboratory", "patients", "doctors"]);
+const InsurancePage = lazyPage(() => import("./features/insurance/InsurancePage"), (m) => m.InsurancePage, ["common", "insurance", "patients", "billing"]);
+const ReportsPage = lazyPage(() => import("./features/reports/ReportsPage"), (m) => m.ReportsPage, ["common", "reports"]);
+const SettingsPage = lazyPage(() => import("./features/settings/SettingsPage"), (m) => m.SettingsPage, ["common", "settings", "auth"]);
+const TelemedicineCallPage = lazyPage(() => import("./features/telemedicine/TelemedicineCallPage"), (m) => m.TelemedicineCallPage, ["common", "appointments"]);
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -58,7 +71,7 @@ const App = () => (
               v7_relativeSplatPath: true,
             }}
           >
-            <Suspense fallback={<div className="min-h-screen grid place-items-center text-sm text-muted-foreground">Loading...</div>}>
+            <Suspense fallback={<div className="min-h-screen grid place-items-center text-sm text-muted-foreground">{translatePath("common.loading")}</div>}>
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />

@@ -5,11 +5,9 @@
  * It defines the full CSS custom property system for theming,
  * including light mode, dark mode, and RTL support.
  *
- * Font loading strategy: use font-display: swap to prevent render blocking.
- * Self-host Inter + IBM Plex Sans Arabic for production HIPAA environments.
+ * Font loading strategy: the active language font is injected at runtime
+ * to avoid bundling both families into every initial render.
  */
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -23,7 +21,7 @@
   /* ── Font stacks ──────────────────────────────────────────────────────────── */
   :root {
     --font-sans:   'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --font-arabic: 'IBM Plex Sans Arabic', 'Inter', system-ui, sans-serif;
+    --font-arabic: 'Cairo', 'Inter', system-ui, sans-serif;
     --font-mono:   'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
 
     /* ── Base radius — change this single value to restyle the entire app ── */
@@ -171,15 +169,20 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    font-family: var(--font-sans);
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* RTL: switch to Arabic font stack automatically */
-  [dir="rtl"] body,
-  [dir="rtl"] .font-sans {
+  html[data-font="arabic"] body,
+  html[data-font="arabic"] .font-sans {
     font-family: var(--font-arabic);
+  }
+
+  html[data-font="latin"] body,
+  html[data-font="latin"] .font-sans {
+    font-family: var(--font-sans);
   }
 
   /* Accessible focus outline — visible on all backgrounds */
@@ -239,15 +242,13 @@
   }
 
   .data-table th {
-    @apply text-muted-foreground font-medium text-left px-4 py-3 border-b border-border text-xs tracking-wide uppercase;
-  }
-
-  [dir="rtl"] .data-table th {
-    @apply text-right;
+    @apply text-muted-foreground font-medium px-4 py-3 border-b border-border text-xs tracking-wide uppercase;
+    text-align: start;
   }
 
   .data-table td {
     @apply px-4 py-3 border-b border-border/60;
+    text-align: start;
   }
 
   .data-table tbody tr {
@@ -320,6 +321,7 @@
            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
            disabled:cursor-not-allowed disabled:opacity-50
            aria-[invalid=true]:border-destructive aria-[invalid=true]:ring-destructive/20;
+    text-align: start;
   }
 
   /* ── Card variants ──────────────────────────────────────────────────────── */

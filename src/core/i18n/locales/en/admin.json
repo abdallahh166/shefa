@@ -1,0 +1,334 @@
+{
+  "nav": {
+    "brand": "MedFlow Admin",
+    "role": "Super Admin",
+    "logout": "Log out",
+    "exitTenant": "Exit {tenantName}"
+  },
+  "tabs": {
+    "overview": "Overview",
+    "operations": "Operations",
+    "clinics": "Clinics",
+    "users": "Users",
+    "subscriptions": "Subscriptions",
+    "pricing": "Pricing"
+  },
+  "common": {
+    "planOptions": {
+      "free": "Free",
+      "starter": "Starter",
+      "pro": "Pro",
+      "enterprise": "Enterprise"
+    },
+    "billingCycleOptions": {
+      "monthly": "Monthly",
+      "annual": "Annual"
+    },
+    "subscriptionStatusOptions": {
+      "active": "Active",
+      "trialing": "Trialing",
+      "expired": "Expired",
+      "canceled": "Canceled"
+    },
+    "tenantStatusOptions": {
+      "active": "Active",
+      "suspended": "Suspended",
+      "deactivated": "Deactivated"
+    },
+    "subscriptionFieldOptions": {
+      "plan": "plan",
+      "status": "status",
+      "billing_cycle": "billing cycle"
+    },
+    "severityOptions": {
+      "healthy": "Healthy",
+      "warning": "Warning",
+      "critical": "Critical"
+    },
+    "jobStatusOptions": {
+      "queued": "Queued",
+      "processing": "Processing",
+      "failed": "Failed",
+      "retrying": "Retrying",
+      "dead_letter": "Dead letter"
+    },
+    "logLevelOptions": {
+      "warning": "Warning",
+      "error": "Error"
+    },
+    "unknownTenant": "Unknown tenant",
+    "platformWide": "Platform-wide",
+    "healthy": "healthy",
+    "activeAlerts": "{count, plural, one {# active alert} other {# active alerts}}",
+    "planBreakdown": "{plan} plan",
+    "percentOfTotal": "{percentage}% of total",
+    "errorsAndTenants": "{errors} errors / {tenants} tenants",
+    "processingCount": "{count} processing",
+    "workerFailuresCount": "{count} worker failures in 15m",
+    "stuckProcessingCount": "{count} stuck processing",
+    "clientErrorsCount": "{count} client errors in 15m",
+    "publicPlansCount": "{count} public",
+    "featureCount": "{count, plural, one {# item} other {# items}}",
+    "featuresCount": "{count, plural, one {# feature} other {# features}}",
+    "orderValue": "order {count}",
+    "notConfiguredYet": "No description configured for the public pricing page yet."
+  },
+  "dashboard": {
+    "title": "Platform Administration",
+    "subtitle": "Manage tenants, pricing, subscriptions, and platform operations.",
+    "created": "Created",
+    "joined": "Joined",
+    "expires": "Expires",
+    "updated": "Updated",
+    "totalClinics": "Total Clinics",
+    "totalUsers": "Total Users",
+    "activeSubscriptions": "Active Subscriptions",
+    "monthlyRevenue": "Monthly Revenue",
+    "recentClinics": "Recent Clinics",
+    "recentClinicsEmpty": "No clinics yet",
+    "recentClinicsTable": "Recent clinics",
+    "viewAllClinics": "View all",
+    "operationsAlerts": "Operations Alerts",
+    "operationsAlertsDescription": "Job backlog, worker failures, edge-function failures, and recent client-side error spikes.",
+    "alertWindow": "Alert window: last 15 minutes",
+    "loadingOperationsTelemetry": "Loading operations telemetry...",
+    "noActiveAlerts": "No active production alerts right now. The queue and edge functions are currently healthy."
+  },
+  "operations": {
+    "pendingJobs": "Pending Jobs",
+    "retryingJobs": "Retrying Jobs",
+    "deadLetters": "Dead Letters",
+    "edgeFailures": "Edge Failures",
+    "recentEdgeFailures": "Recent Edge Failures",
+    "recentClientErrors": "Recent Client Errors",
+    "noRecentFailures": "No recent failures",
+    "noRecentClientErrors": "No recent client errors",
+    "activeSignals": "Active Signals",
+    "recentJobFailures": "Recent Job Failures",
+    "recentJobFailuresDescription": "Latest retrying, failed, and dead-letter jobs across all tenants.",
+    "recentJobFailuresEmpty": "No recent job failures or retries.",
+    "recentJobFailuresTable": "Recent job failures",
+    "clientErrorTrend": "Client Error Trend",
+    "clientErrorTrendDescription": "Browser-side error volume across the last six 15-minute buckets.",
+    "clientErrorTrendEmpty": "No client error trend data available yet.",
+    "recentSystemErrors": "Recent System Errors",
+    "recentSystemErrorsDescription": "Latest warning and error logs captured by workers and edge functions.",
+    "recentSystemErrorsEmpty": "No recent system errors.",
+    "recentSystemErrorsTable": "Recent system errors",
+    "jobColumn": "Job",
+    "statusColumn": "Status",
+    "attemptsColumn": "Attempts",
+    "lastErrorColumn": "Last Error",
+    "serviceColumn": "Service",
+    "levelColumn": "Level",
+    "messageColumn": "Message",
+    "noErrorMessage": "No error message"
+  },
+  "clinics": {
+    "title": "Tenant Lifecycle",
+    "description": "Create clinics, update tenant identity details, and suspend, deactivate, or reactivate access.",
+    "createTenant": "Create tenant",
+    "columns": {
+      "clinic": "Clinic",
+      "clinicName": "Clinic Name",
+      "email": "Email",
+      "phone": "Phone",
+      "plan": "Plan",
+      "lifecycle": "Lifecycle"
+    },
+    "actions": {
+      "edit": "Edit clinic",
+      "modules": "Manage modules",
+      "view": "View clinic",
+      "suspend": "Suspend clinic",
+      "deactivate": "Deactivate clinic",
+      "reactivate": "Reactivate clinic"
+    }
+  },
+  "users": {
+    "columns": {
+      "name": "Name",
+      "role": "Role",
+      "clinic": "Clinic"
+    }
+  },
+  "subscriptions": {
+    "columns": {
+      "clinic": "Clinic",
+      "plan": "Plan",
+      "amount": "Amount",
+      "cycle": "Cycle",
+      "status": "Status"
+    },
+    "freeAmount": "Free"
+  },
+  "pricing": {
+    "title": "Pricing Catalog",
+    "description": "Manage the public SaaS plans, billing defaults, and the catalog that subscriptions map to.",
+    "createPlan": "Create plan",
+    "catalogPlans": "Catalog Plans",
+    "popularPlans": "Popular Plans",
+    "enterpriseCta": "Enterprise CTA",
+    "missingSlots": "Missing Slots",
+    "highlightedInPublicPricing": "Highlighted in public pricing",
+    "contactSalesPlanCards": "Contact-sales plan cards",
+    "canonicalPlanCodeAvailable": "Canonical plan code available",
+    "catalogComplete": "Catalog complete",
+    "loadingCatalog": "Loading pricing catalog...",
+    "empty": "No pricing plans are configured yet.",
+    "popularBadge": "Popular",
+    "hiddenBadge": "Hidden",
+    "editPlan": "Edit",
+    "deletePlan": "Delete",
+    "monthlyPrice": "Monthly",
+    "annualPrice": "Annual",
+    "defaultCycle": "Default cycle",
+    "doctorLimitLabel": "Doctor limit label",
+    "features": "Features"
+  },
+  "tenantForm": {
+    "createTitle": "Create tenant",
+    "editTitle": "Edit {name}",
+    "editFallbackName": "tenant",
+    "description": "Manage the clinic identity record that staff accounts, subscriptions, and feature access attach to.",
+    "clinicName": "Clinic name *",
+    "slug": "Slug *",
+    "clinicEmail": "Clinic email",
+    "phone": "Phone",
+    "address": "Address",
+    "pendingOwnerEmail": "Pending owner email",
+    "clinicNamePlaceholder": "Cairo Heart Clinic",
+    "slugPlaceholder": "cairo-heart",
+    "clinicEmailPlaceholder": "ops@clinic.com",
+    "phonePlaceholder": "+20 100 000 0000",
+    "addressPlaceholder": "Clinic address used across admin and patient-facing surfaces.",
+    "pendingOwnerEmailPlaceholder": "owner@clinic.com",
+    "saving": "Saving...",
+    "createAction": "Create tenant",
+    "saveChanges": "Save changes"
+  },
+  "pricingDialog": {
+    "createTitle": "Create pricing plan",
+    "editTitle": "Edit {name}",
+    "editFallbackName": "pricing plan",
+    "description": "Manage the canonical SaaS plan catalog that controls public pricing and subscription billing defaults.",
+    "planCode": "Plan code *",
+    "displayName": "Display name *",
+    "descriptionLabel": "Description",
+    "doctorLimitLabel": "Doctor limit label *",
+    "currency": "Currency *",
+    "monthlyPrice": "Monthly price *",
+    "annualPrice": "Annual price *",
+    "defaultBillingCycle": "Default billing cycle *",
+    "displayOrder": "Display order *",
+    "features": "Features *",
+    "selectPlanCode": "Select plan code",
+    "selectBillingCycle": "Select billing cycle",
+    "displayNamePlaceholder": "Professional",
+    "descriptionPlaceholder": "Short marketing description for the public pricing page.",
+    "doctorLimitPlaceholder": "Up to 10 doctors",
+    "currencyPlaceholder": "EGP",
+    "featuresPlaceholder": "One feature per line\nAdvanced reports\nInventory management",
+    "popularPlan": "Mark as popular plan",
+    "showOnPublicPricing": "Show on public pricing page",
+    "useContactSalesCta": "Use contact-sales CTA",
+    "saving": "Saving...",
+    "createAction": "Create plan",
+    "saveChanges": "Save changes"
+  },
+  "tenantModules": {
+    "title": "Tenant modules",
+    "description": "Enable or disable tenant-level modules for {tenantName}. Changes apply immediately.",
+    "fallbackTenantName": "this clinic",
+    "loading": "Loading module access...",
+    "features": {
+      "advanced_reports": {
+        "title": "Reports & Analytics",
+        "description": "Controls advanced reporting, dashboards, and analytics views."
+      },
+      "lab_module": {
+        "title": "Laboratory",
+        "description": "Controls lab orders, structured results, and laboratory operations."
+      },
+      "pharmacy_module": {
+        "title": "Pharmacy",
+        "description": "Controls pharmacy inventory, medication stock, and dispensing workflows."
+      },
+      "insurance_module": {
+        "title": "Insurance",
+        "description": "Controls claims, follow-up queues, and insurance operations."
+      }
+    }
+  },
+  "tenantStatusDialog": {
+    "reason": "Reason",
+    "reasonPlaceholder": "Billing hold, compliance review, contract termination, ownership transfer, etc.",
+    "saving": "Saving...",
+    "tenantPrefix": "Tenant: {name}.",
+    "statuses": {
+      "active": {
+        "title": "Reactivate tenant",
+        "description": "Restore clinic access for staff and patient-facing workflows.",
+        "action": "Reactivate tenant"
+      },
+      "suspended": {
+        "title": "Suspend tenant",
+        "description": "Pause clinic access without treating the tenant as permanently shut down.",
+        "action": "Suspend tenant"
+      },
+      "deactivated": {
+        "title": "Deactivate tenant",
+        "description": "Block clinic access for this tenant until a super admin reactivates it.",
+        "action": "Deactivate tenant"
+      }
+    }
+  },
+  "dialogs": {
+    "confirmSubscriptionChangeTitle": "Confirm Subscription Change",
+    "confirmSubscriptionChangeMessage": "Are you sure you want to change {field} to \"{value}\"?",
+    "deletePricingPlanTitle": "Delete Pricing Plan",
+    "deletePricingPlanMessage": "Delete \"{name}\" from the catalog? This will fail if tenants still depend on the plan.",
+    "updateAction": "Update"
+  },
+  "toasts": {
+    "impersonationStarted": "Impersonation started",
+    "impersonationStartedDescription": "You are now viewing {tenantName} as a super admin.",
+    "impersonationEnded": "Impersonation ended",
+    "impersonationEndedDescription": "Exited {tenantName}.",
+    "openClinicFailed": "Unable to open clinic",
+    "exitImpersonationFailed": "Unable to exit clinic view",
+    "stopImpersonationFailed": "Failed to stop impersonation",
+    "startImpersonationFailed": "Failed to start impersonation",
+    "subscriptionUpdated": "Subscription updated",
+    "subscriptionUpdatedDescription": "Subscription {field} changed to {value}.",
+    "updateFailed": "Failed to update",
+    "tenantCreated": "Tenant created",
+    "tenantCreatedDescription": "The clinic has been added to the platform.",
+    "tenantUpdated": "Tenant updated",
+    "tenantUpdatedDescription": "{name} details were updated.",
+    "tenantSaved": "Tenant saved",
+    "tenantSavedDescription": "The tenant changes were applied successfully.",
+    "tenantSaveFailed": "Unable to save tenant",
+    "tenantSaveFailedDescription": "The tenant record could not be saved.",
+    "tenantStatusUpdated": "Tenant status updated",
+    "tenantStatusUpdatedDescription": "{name} is now {status}.",
+    "tenantStatusFailed": "Unable to update tenant status",
+    "tenantStatusFailedDescription": "The tenant lifecycle change failed.",
+    "tenantModuleUpdated": "Tenant module updated",
+    "tenantModuleUpdatedDescription": "{name} now has {state} access to {feature}.",
+    "tenantModuleFailed": "Unable to update tenant module",
+    "tenantModuleFailedDescription": "The tenant module flag could not be updated.",
+    "enabled": "enabled",
+    "disabled": "disabled",
+    "pricingPlanCreated": "Pricing plan created",
+    "pricingPlanCreatedDescription": "The new plan is now available to the platform.",
+    "pricingUpdated": "Pricing updated",
+    "pricingUpdatedDescription": "The pricing catalog changes were saved successfully.",
+    "pricingSaveFailed": "Unable to save pricing plan",
+    "pricingSaveFailedDescription": "The pricing plan could not be saved.",
+    "pricingDeleted": "Pricing plan deleted",
+    "pricingDeletedDescription": "{name} was removed from the catalog.",
+    "pricingDeleteFailed": "Unable to delete pricing plan",
+    "pricingDeleteFailedDescription": "This plan may still be assigned to active tenants."
+  }
+}

@@ -101,6 +101,20 @@ export const en = {
     selected: "selected",
     showing: "Showing",
     of: "of",
+    dataTable: "Data table",
+    exportCsv: "CSV",
+    exportPdf: "PDF",
+    monthly: "Monthly",
+    annual: "Annual",
+    discounted: "Discounted",
+    contactUs: "Contact us",
+    currentPlan: "Current plan",
+    requestUpgrade: "Request upgrade",
+    renewNow: "Renew now",
+    viewAllPlans: "View all plans",
+    daysRemaining: "Days remaining",
+    expiresAt: "Expires on",
+    billingCycle: "Billing cycle",
   },
 
   roles: {
@@ -391,6 +405,14 @@ export const en = {
     avatarRemoved: "Profile photo removed",
     avatarTooLarge: "Image must be under 2 MB",
     avatarInvalidType: "Only JPG, PNG, or WebP images are allowed",
+    subscription: {
+      title: "Subscription Management",
+      subtitle: "View and manage your current plan details",
+      currentPlanCard: "Current plan",
+      trialing: "You are currently on a trial period",
+      expiredTitle: "Your subscription has expired",
+      expiredDescription: "Please renew your subscription to continue using all features."
+    }
   },
   auth: {
     login: "Sign In",
@@ -587,6 +609,7 @@ export const en = {
     testimonial3Text: "The lab order tracking is incredibly smooth. I can review results and prescribe treatments all in one platform.",
     pricingTitle: "Simple, Transparent Pricing",
     pricingSubtitle: "Choose the plan that fits your clinic. No hidden fees, cancel anytime.",
+    pricingManagedDescription: "Plans and pricing below are managed centrally from the platform administration console.",
     mostPopular: "Most Popular",
     perMonth: "month",
     planFree: "Starter",
