@@ -95,6 +95,7 @@ export const PricingPage = () => {
           return (
             <Card
               key={plan.id}
+              data-testid={`pricing-card-${plan.plan_code}`}
               className={cn(
                 "relative flex flex-col",
                 plan.is_popular && "border-primary shadow-lg ring-2 ring-primary/20",

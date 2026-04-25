@@ -70,8 +70,10 @@ export const SubscriptionTab = () => {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between rounded-lg bg-muted/50 p-4">
             <div>
-              <p className="text-2xl font-bold text-foreground">خطة {planLabels[plan] || plan}</p>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-2xl font-bold text-foreground" data-testid="subscription-current-plan">
+                خطة {planLabels[plan] || plan}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1" data-testid="subscription-current-price">
                 {plan === "enterprise" ? priceLabel : `${priceLabel}/${billingCycleLabel}`}
               </p>
             </div>

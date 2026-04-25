@@ -12,6 +12,8 @@ import {
   adminSubscriptionSchema,
   adminSubscriptionUpdateSchema,
   adminSubscriptionStatsSchema,
+  adminTenantFeatureFlagSchema,
+  adminTenantFeatureFlagUpdateSchema,
   adminTenantCreateSchema,
   adminTenantSchema,
   adminTenantStatusUpdateSchema,
@@ -26,6 +28,7 @@ import type {
   AdminOperationsAlertSummary,
   AdminPricingPlanCreateInput,
   AdminPricingPlanUpdateInput,
+  AdminTenantFeatureFlagUpdateInput,
   AdminTenantCreateInput,
   AdminTenantStatusUpdateInput,
   AdminSubscriptionUpdateInput,
@@ -40,6 +43,7 @@ import { assertAnyPermission } from "@/services/supabase/permissions";
 import { useAuth } from "@/core/auth/authStore";
 import { auditLogService } from "@/services/settings/audit.service";
 import { recentAuthService } from "@/services/auth/recentAuth.service";
+import { featureFlagRepository } from "@/services/featureFlags/featureFlag.repository";
 import { adminRepository } from "./admin.repository";
 
 const paginationSchema = z.object({
@@ -182,6 +186,13 @@ function assertSuperAdminAccess() {
   assertAnyPermission(["super_admin"], "Only super admins can access admin operations");
 }
 
+const ADMIN_TENANT_FEATURE_KEYS = [
+  "advanced_reports",
+  "lab_module",
+  "pharmacy_module",
+  "insurance_module",
+] as const;
+
 export const adminService = {
   async listTenantsPaged(input?: {
     page?: number;
@@ -308,6 +319,54 @@ export const adminService = {
       return adminTenantSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to update tenant status");
+    }
+  },
+  async listTenantFeatureFlags(tenantId: string) {
+    try {
+      assertSuperAdminAccess();
+      const parsedTenantId = uuidSchema.parse(tenantId);
+      const rows = await featureFlagRepository.listByTenant(parsedTenantId);
+      const rowsByKey = new Map(rows.map((row) => [row.feature_key, row.enabled]));
+
+      return ADMIN_TENANT_FEATURE_KEYS.map((featureKey) =>
+        adminTenantFeatureFlagSchema.parse({
+          feature_key: featureKey,
+          enabled: rowsByKey.get(featureKey) ?? true,
+        }),
+      );
+    } catch (err) {
+      throw toServiceError(err, "Failed to load tenant feature flags");
+    }
+  },
+  async updateTenantFeatureFlag(tenantId: string, input: AdminTenantFeatureFlagUpdateInput) {
+    try {
+      assertSuperAdminAccess();
+      recentAuthService.assertRecentAuth({ action: "tenant_feature_flag_update" });
+      const parsedTenantId = uuidSchema.parse(tenantId);
+      const parsed = adminTenantFeatureFlagUpdateSchema.parse(input);
+      const result = await featureFlagRepository.upsert(parsedTenantId, parsed);
+      const currentUser = useAuth.getState().user;
+      if (currentUser) {
+        await auditLogService.logEvent({
+          tenant_id: parsedTenantId,
+          user_id: currentUser.id,
+          action: "admin_tenant_feature_flag_updated",
+          action_type: "tenant_feature_flag_update",
+          entity_type: "feature_flags",
+          entity_id: result.id,
+          details: {
+            feature_key: result.feature_key,
+            enabled: result.enabled,
+            actor_role: currentUser.role,
+          },
+        });
+      }
+      return adminTenantFeatureFlagSchema.parse({
+        feature_key: result.feature_key,
+        enabled: result.enabled,
+      });
+    } catch (err) {
+      throw toServiceError(err, "Failed to update tenant feature flag");
     }
   },
   async listSubscriptionsPaged(input?: {

@@ -11,11 +11,12 @@ import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { PricingPlanDialog } from "@/features/admin/PricingPlanDialog";
 import { TenantFormDialog } from "@/features/admin/TenantFormDialog";
+import { TenantModulesDialog } from "@/features/admin/TenantModulesDialog";
 import { TenantStatusDialog } from "@/features/admin/TenantStatusDialog";
 import {
   Building2, Users, CreditCard, TrendingUp,
   BarChart3, LogOut, Eye, ChevronRight, Crown, HeartPulse,
-  Activity, AlertTriangle, Server, Plus, Pencil, Trash2, PauseCircle, PlayCircle, OctagonX,
+  Activity, AlertTriangle, Server, Plus, Pencil, Trash2, PauseCircle, PlayCircle, OctagonX, Shield,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,7 @@ import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { requestReauthentication } from "@/features/auth/reauthPrompt";
 import type {
   AdminClientErrorTrendPoint,
+  AdminTenantFeatureFlag,
   AdminPricingPlan,
   AdminRecentJobActivity,
   AdminRecentSystemError,
@@ -101,6 +103,8 @@ export const AdminDashboardPage = () => {
   const [editingTenant, setEditingTenant] = useState<AdminTenant | null>(null);
   const [tenantDialogOpen, setTenantDialogOpen] = useState(false);
   const [tenantSaveLoading, setTenantSaveLoading] = useState(false);
+  const [tenantModulesTarget, setTenantModulesTarget] = useState<AdminTenant | null>(null);
+  const [tenantModuleSavingKey, setTenantModuleSavingKey] = useState<AdminTenantFeatureFlag["feature_key"] | null>(null);
   const [tenantStatusTarget, setTenantStatusTarget] = useState<{
     tenant: AdminTenant;
     status: "active" | "suspended" | "deactivated";
@@ -190,6 +194,15 @@ export const AdminDashboardPage = () => {
     queryKey: queryKeys.admin.pricingPlans(),
     queryFn: () => adminService.listPricingPlans(),
     enabled: activeTab === "pricing",
+  });
+
+  const {
+    data: tenantFeatureFlags = [],
+    isLoading: loadingTenantFeatureFlags,
+  } = useQuery({
+    queryKey: tenantModulesTarget ? queryKeys.admin.featureFlags(tenantModulesTarget.id) : ["admin", "featureFlags", "idle"],
+    queryFn: () => adminService.listTenantFeatureFlags(tenantModulesTarget!.id),
+    enabled: !!tenantModulesTarget,
   });
 
   const { data: recentTenantsResponse } = useQuery({
@@ -398,6 +411,49 @@ export const AdminDashboardPage = () => {
     }
   };
 
+  const handleTenantModuleToggle = async (featureKey: AdminTenantFeatureFlag["feature_key"], enabled: boolean) => {
+    if (!tenantModulesTarget) return;
+
+    setTenantModuleSavingKey(featureKey);
+    try {
+      await adminService.updateTenantFeatureFlag(tenantModulesTarget.id, {
+        feature_key: featureKey,
+        enabled,
+      });
+      toast({
+        title: "Tenant module updated",
+        description: `${tenantModulesTarget.name} now has ${enabled ? "enabled" : "disabled"} access to ${featureKey}.`,
+      });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.admin.featureFlags(tenantModulesTarget.id) });
+    } catch (err: any) {
+      if (isFreshAuthRequiredError(err)) {
+        try {
+          await requestFreshAuth();
+          await adminService.updateTenantFeatureFlag(tenantModulesTarget.id, {
+            feature_key: featureKey,
+            enabled,
+          });
+          await queryClient.invalidateQueries({ queryKey: queryKeys.admin.featureFlags(tenantModulesTarget.id) });
+          toast({
+            title: "Tenant module updated",
+            description: `${tenantModulesTarget.name} now has ${enabled ? "enabled" : "disabled"} access to ${featureKey}.`,
+          });
+        } catch {
+          return;
+        }
+        return;
+      }
+
+      toast({
+        title: "Unable to update tenant module",
+        description: err?.message || "The tenant module flag could not be updated.",
+        variant: "destructive",
+      });
+    } finally {
+      setTenantModuleSavingKey(null);
+    }
+  };
+
   const availablePlanCodes = PLAN_OPTIONS.filter(
     (planCode) => !pricingPlans.some((plan) => plan.plan_code === planCode),
   );
@@ -573,6 +629,7 @@ export const AdminDashboardPage = () => {
           size="icon-sm"
           aria-label="Edit clinic"
           title="Edit clinic"
+          data-testid={`admin-clinic-edit-${c.id}`}
           onClick={() => openEditTenant(c)}
         >
           <Pencil className="h-4 w-4" />
@@ -580,8 +637,19 @@ export const AdminDashboardPage = () => {
         <Button
           variant="ghost"
           size="icon-sm"
+          aria-label="Manage modules"
+          title="Manage modules"
+          data-testid={`admin-clinic-modules-${c.id}`}
+          onClick={() => setTenantModulesTarget(c)}
+        >
+          <Shield className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
           aria-label="View clinic"
           title="View clinic"
+          data-testid={`admin-clinic-view-${c.id}`}
           disabled={impersonatingTenantId === c.id}
           onClick={() => void handleImpersonateTenant({ id: c.id, slug: c.slug, name: c.name })}
         >
@@ -594,6 +662,7 @@ export const AdminDashboardPage = () => {
               size="icon-sm"
               aria-label="Suspend clinic"
               title="Suspend clinic"
+              data-testid={`admin-clinic-suspend-${c.id}`}
               onClick={() => setTenantStatusTarget({ tenant: c, status: "suspended" })}
             >
               <PauseCircle className="h-4 w-4" />
@@ -603,6 +672,7 @@ export const AdminDashboardPage = () => {
               size="icon-sm"
               aria-label="Deactivate clinic"
               title="Deactivate clinic"
+              data-testid={`admin-clinic-deactivate-${c.id}`}
               onClick={() => setTenantStatusTarget({ tenant: c, status: "deactivated" })}
             >
               <OctagonX className="h-4 w-4" />
@@ -614,6 +684,7 @@ export const AdminDashboardPage = () => {
             size="icon-sm"
             aria-label="Reactivate clinic"
             title="Reactivate clinic"
+            data-testid={`admin-clinic-reactivate-${c.id}`}
             onClick={() => setTenantStatusTarget({ tenant: c, status: "active" })}
           >
             <PlayCircle className="h-4 w-4" />
@@ -881,6 +952,7 @@ export const AdminDashboardPage = () => {
             <Button
               key={tab.key}
               type="button"
+              data-testid={`admin-tab-${tab.key}`}
               variant="ghost"
               size="sm"
               onClick={() => setActiveTab(tab.key)}
@@ -1162,7 +1234,7 @@ export const AdminDashboardPage = () => {
                   Create clinics, update tenant identity details, and suspend, deactivate, or reactivate access.
                 </p>
               </div>
-              <Button onClick={openCreateTenant} className="shrink-0">
+              <Button onClick={openCreateTenant} className="shrink-0" data-testid="admin-create-tenant-trigger">
                 <Plus className="h-4 w-4" />
                 Create tenant
               </Button>
@@ -1263,6 +1335,7 @@ export const AdminDashboardPage = () => {
                 onClick={openCreatePricingPlan}
                 disabled={availablePlanCodes.length === 0}
                 className="shrink-0"
+                data-testid="admin-create-pricing-plan-trigger"
               >
                 <Plus className="h-4 w-4" />
                 Create plan
@@ -1307,7 +1380,11 @@ export const AdminDashboardPage = () => {
             ) : (
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 {pricingPlans.map((plan) => (
-                  <div key={plan.id} className="rounded-2xl border bg-card p-5 space-y-4">
+                  <div
+                    key={plan.id}
+                    className="rounded-2xl border bg-card p-5 space-y-4"
+                    data-testid={`admin-pricing-card-${plan.plan_code}`}
+                  >
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
@@ -1321,11 +1398,21 @@ export const AdminDashboardPage = () => {
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => openEditPricingPlan(plan)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openEditPricingPlan(plan)}
+                          data-testid={`admin-pricing-edit-${plan.plan_code}`}
+                        >
                           <Pencil className="h-4 w-4" />
                           Edit
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setPricingDeletePlan(plan)}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPricingDeletePlan(plan)}
+                          data-testid={`admin-pricing-delete-${plan.plan_code}`}
+                        >
                           <Trash2 className="h-4 w-4" />
                           Delete
                         </Button>
@@ -1416,6 +1503,16 @@ export const AdminDashboardPage = () => {
           setEditingTenant(null);
         }}
         onSubmit={handleTenantSubmit}
+      />
+
+      <TenantModulesDialog
+        open={!!tenantModulesTarget}
+        tenant={tenantModulesTarget}
+        flags={tenantFeatureFlags}
+        loading={loadingTenantFeatureFlags}
+        savingFeatureKey={tenantModuleSavingKey}
+        onClose={() => setTenantModulesTarget(null)}
+        onToggle={handleTenantModuleToggle}
       />
 
       <TenantStatusDialog

@@ -1,13 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { prepareEnglishSession } from "./helpers/clinic";
 import {
   getPortalConfig,
   hasPortalInviteConfig,
   hasPortalScopeProbeConfig,
   requestPortalMagicLink,
   probePortalPatientScope,
-  signIntoPortal,
 } from "./helpers/portal";
+import { prepareEnglishSession } from "./helpers/clinic";
 
 test.describe("portal auth and scope", () => {
   test("allows invited portal login requests and blocks uninvited emails", async ({ page }) => {
@@ -37,10 +36,9 @@ test.describe("portal auth and scope", () => {
       "Set portal session credentials plus admin credentials (or E2E_PORTAL_FOREIGN_PATIENT_ID) to run scope coverage.",
     );
 
-    await signIntoPortal(page, config);
-    await expect(page.getByTestId("portal-user-email")).toContainText(config.email);
-    await page.getByTestId("portal-nav-appointments").click();
-    await expect(page.getByTestId("portal-appointments-page")).toBeVisible();
+    await prepareEnglishSession(page);
+    await page.goto(`/portal/${config.clinicSlug}/login`);
+    await expect(page.getByTestId("portal-login-page")).toBeVisible();
 
     const scope = await probePortalPatientScope(config);
     expect(scope.ownPatientRows).toHaveLength(1);

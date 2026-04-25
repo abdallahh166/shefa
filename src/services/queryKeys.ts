@@ -103,6 +103,7 @@ export const queryKeys = {
     }) =>
       ["admin", "subscriptions", args] as const,
     pricingPlans: () => ["admin", "pricingPlans"] as const,
+    featureFlags: (tenantId: string) => ["admin", "featureFlags", tenantId] as const,
     subscriptionStats: () => ["admin", "subscriptionStats"] as const,
     operationsAlerts: () => ["admin", "operationsAlerts"] as const,
     operationsDashboard: () => ["admin", "operationsDashboard"] as const,

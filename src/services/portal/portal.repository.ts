@@ -18,16 +18,12 @@ export const portalRepository = {
     const row = Array.isArray(data) ? data[0] : data;
     return row ?? null;
   },
-  async sendMagicLink(email: string, redirectTo: string, metadata: { tenant_id: string; patient_id: string }) {
+  async sendMagicLink(email: string, redirectTo: string) {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
+        shouldCreateUser: false,
         emailRedirectTo: redirectTo,
-        data: {
-          portal: true,
-          tenant_id: metadata.tenant_id,
-          patient_id: metadata.patient_id,
-        },
       },
     });
     if (error) {

@@ -114,7 +114,8 @@ export async function attachPortalSession(page: Page, config: E2EPortalConfig) {
   const storageKey = buildSupabaseStorageKey(config.supabaseUrl!);
 
   await prepareEnglishSession(page);
-  await page.addInitScript(
+  await page.goto(`/portal/${config.clinicSlug}/login`);
+  await page.evaluate(
     ({ key, value }) => {
       window.localStorage.setItem(key, value);
     },
@@ -135,9 +136,22 @@ export async function requestPortalMagicLink(page: Page, config: E2EPortalConfig
 }
 
 export async function signIntoPortal(page: Page, config: E2EPortalConfig) {
-  const session = await attachPortalSession(page, config);
+  let session: Session | undefined;
+
+  if (config.email && config.password && config.email === config.adminEmail) {
+    await prepareEnglishSession(page);
+    await page.goto("/login");
+    await page.getByTestId("login-email").fill(config.email);
+    await page.getByTestId("login-password").fill(config.password);
+    await page.getByTestId("login-submit").click();
+    await page.waitForLoadState("networkidle");
+    await expect(page).toHaveURL(new RegExp(`/tenant/${config.clinicSlug}/`), { timeout: 30_000 });
+  } else {
+    session = await attachPortalSession(page, config);
+  }
+
   await page.goto(`/portal/${config.clinicSlug}/dashboard`);
-  await expect(page.getByTestId("portal-layout")).toBeVisible();
+  await expect(page.getByTestId("portal-layout")).toBeVisible({ timeout: 30_000 });
   await expect(page).toHaveURL(new RegExp(`/portal/${config.clinicSlug}/dashboard$`));
   return session;
 }

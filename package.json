@@ -15,6 +15,8 @@
     "test:db": "supabase test db",
     "test:db:remote": "node scripts/test-remote-db.mjs",
     "test:coverage": "vitest run --coverage",
+    "e2e:bootstrap": "node scripts/bootstrap-e2e.mjs",
+    "pretest:e2e": "npm run e2e:bootstrap",
     "test:e2e": "playwright test",
     "test:load": "node scripts/load-test.mjs",
     "env:remote": "node scripts/switch-env.mjs remote",

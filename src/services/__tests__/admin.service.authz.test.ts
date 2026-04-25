@@ -24,8 +24,14 @@ const permissions = vi.hoisted(() => ({
   assertAnyPermission: vi.fn(),
 }));
 
+const featureFlagRepository = vi.hoisted(() => ({
+  listByTenant: vi.fn(),
+  upsert: vi.fn(),
+}));
+
 vi.mock("@/services/admin/admin.repository", () => ({ adminRepository }));
 vi.mock("@/services/supabase/permissions", () => permissions);
+vi.mock("@/services/featureFlags/featureFlag.repository", () => ({ featureFlagRepository }));
 vi.mock("@/services/auth/recentAuth.service", () => ({
   recentAuthService: {
     assertRecentAuth: vi.fn(),
@@ -131,5 +137,32 @@ describe("adminService authorization", () => {
     });
 
     expect(adminRepository.updateTenantStatus).not.toHaveBeenCalled();
+  });
+
+  it("checks for super admin access before listing tenant feature flags", async () => {
+    featureFlagRepository.listByTenant.mockResolvedValue([]);
+
+    await adminService.listTenantFeatureFlags("00000000-0000-0000-0000-000000000444");
+
+    expect(permissions.assertAnyPermission).toHaveBeenCalledWith(
+      ["super_admin"],
+      "Only super admins can access admin operations",
+    );
+  });
+
+  it("blocks tenant feature flag changes for non-super-admin callers", async () => {
+    permissions.assertAnyPermission.mockImplementation(() => {
+      throw new AuthorizationError("Only super admins can access admin operations");
+    });
+
+    await expect(adminService.updateTenantFeatureFlag(
+      "00000000-0000-0000-0000-000000000444",
+      { feature_key: "advanced_reports", enabled: false },
+    )).rejects.toMatchObject({
+      name: "AuthorizationError",
+      message: "Only super admins can access admin operations",
+    });
+
+    expect(featureFlagRepository.upsert).not.toHaveBeenCalled();
   });
 });

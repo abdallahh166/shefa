@@ -10,8 +10,8 @@ export const portalService = {
       if (!metadata) {
         throw new Error("No portal invite found for this email");
       }
-      const safeMetadata = portalLoginMetadataSchema.parse(metadata);
-      await portalRepository.sendMagicLink(parsed.email, parsed.redirectTo, safeMetadata);
+      portalLoginMetadataSchema.parse(metadata);
+      await portalRepository.sendMagicLink(parsed.email, parsed.redirectTo);
     } catch (err) {
       throw toServiceError(err, "Failed to send magic link");
     }

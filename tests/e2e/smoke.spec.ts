@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { createAppointment, createPatient, getClinicConfig, hasClinicConfig, loginToClinic } from "./helpers/clinic";
+import { createPatient, getClinicConfig, hasClinicConfig, loginToClinic, seedAppointment } from "./helpers/clinic";
 
 test.describe("clinic smoke flow", () => {
   test("login, create patient, create appointment", async ({ page }) => {
@@ -13,8 +13,9 @@ test.describe("clinic smoke flow", () => {
 
     await loginToClinic(page, config);
     await createPatient(page, config.clinicSlug!, patientName);
-    await createAppointment(page, config, { patientName, appointmentDate });
+    await seedAppointment(config, { patientName, appointmentDate });
 
+    await page.goto(`/tenant/${config.clinicSlug}/appointments`);
     await expect(page.getByText(patientName).first()).toBeVisible({ timeout: 30_000 });
   });
 });

@@ -370,8 +370,30 @@ supabase test db
 ## Testing
 
 - Unit tests: `npm run test`
+- End-to-end tests: `npm run test:e2e`
 - Database policy + RPC tests: `supabase test db`
 - Build validation: `npm run build`
+
+### E2E Environment
+
+The Playwright suite will auto-start a local Vite server on `http://127.0.0.1:4173` unless `E2E_BASE_URL` is provided.
+
+Required environment variables for the super-admin coverage:
+- `E2E_SUPER_ADMIN_EMAIL`
+- `E2E_SUPER_ADMIN_PASSWORD`
+- `E2E_ADMIN_EMAIL`
+- `E2E_ADMIN_PASSWORD`
+- `E2E_CLINIC_SLUG`
+
+Optional helpers:
+- `E2E_DOCTOR_NAME`
+- `E2E_PORTAL_EMAIL`
+- `E2E_PORTAL_PASSWORD`
+
+Run only the super-admin SaaS coverage:
+```
+npx playwright test tests/e2e/super-admin-pricing.spec.ts tests/e2e/super-admin-tenant-lifecycle.spec.ts tests/e2e/super-admin-module-gating.spec.ts
+```
 
 ## CI/CD
 

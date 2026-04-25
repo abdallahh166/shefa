@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { dateTimeStringSchema } from "../shared/date.schema";
 import { uuidSchema } from "../shared/identifiers.schema";
+import { featureFlagKeySchema, featureFlagUpsertSchema } from "../featureFlags/featureFlag.schema";
 import { pricingBillingCycleEnum, pricingPlanSchema } from "../pricing/pricing.schema";
 import { tenantStatusEnum } from "../settings/tenant.schema";
 
@@ -38,6 +39,13 @@ export const adminTenantStatusUpdateSchema = z.object({
   status: tenantStatusEnum,
   status_reason: z.string().trim().max(500).optional().nullable(),
 });
+
+export const adminTenantFeatureFlagSchema = z.object({
+  feature_key: featureFlagKeySchema,
+  enabled: z.boolean(),
+});
+
+export const adminTenantFeatureFlagUpdateSchema = featureFlagUpsertSchema;
 
 export const adminSubscriptionSchema = z.object({
   id: uuidSchema,

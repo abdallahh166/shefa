@@ -91,6 +91,7 @@ export const SettingsPage = () => {
               variant="ghost"
               size="sm"
               key={tab.key}
+              data-testid={`settings-tab-${tab.key}`}
               onClick={() => setActiveTab(tab.key)}
               aria-pressed={activeTab === tab.key}
               className={cn(
