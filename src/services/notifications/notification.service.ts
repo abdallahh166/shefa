@@ -67,13 +67,14 @@ export const notificationService = {
   }) {
     try {
       const parsed = notificationCreateSchema.parse(input);
-      const { tenantId, userId } = getTenantContext();
-      const payload = {
+      const { tenantId } = getTenantContext();
+      if (parsed.tenant_id !== tenantId) {
+        throw new Error("Notification tenant does not match the current tenant context");
+      }
+      const result = await notificationRepository.create({
         ...parsed,
-        tenant_id: tenantId,
-        user_id: userId,
-      };
-      const result = await notificationRepository.create(payload);
+        user_id: parsed.user_id,
+      });
       return notificationSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to create notification");

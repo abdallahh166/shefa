@@ -1,4 +1,5 @@
 import { portalLoginInputSchema, portalLoginMetadataSchema } from "@/domain/portal/portal.schema";
+import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import { toServiceError } from "@/services/supabase/errors";
 import { portalRepository } from "./portal.repository";
 
@@ -18,42 +19,48 @@ export const portalService = {
   },
   async getAccountByAuthUserId(userId: string) {
     try {
-      return await portalRepository.getAccountByAuthUserId(userId);
+      const parsedUserId = uuidSchema.parse(userId);
+      return await portalRepository.getAccountByAuthUserId(parsedUserId);
     } catch (err) {
       throw toServiceError(err, "Failed to load portal account");
     }
   },
   async listAppointments(patientId: string) {
     try {
-      return await portalRepository.listAppointments(patientId);
+      const parsedPatientId = uuidSchema.parse(patientId);
+      return await portalRepository.listAppointments(parsedPatientId);
     } catch (err) {
       throw toServiceError(err, "Failed to load appointments");
     }
   },
   async listPrescriptions(patientId: string) {
     try {
-      return await portalRepository.listPrescriptions(patientId);
+      const parsedPatientId = uuidSchema.parse(patientId);
+      return await portalRepository.listPrescriptions(parsedPatientId);
     } catch (err) {
       throw toServiceError(err, "Failed to load prescriptions");
     }
   },
   async listLabOrders(patientId: string) {
     try {
-      return await portalRepository.listLabOrders(patientId);
+      const parsedPatientId = uuidSchema.parse(patientId);
+      return await portalRepository.listLabOrders(parsedPatientId);
     } catch (err) {
       throw toServiceError(err, "Failed to load lab orders");
     }
   },
   async listDocuments(patientId: string) {
     try {
-      return await portalRepository.listDocuments(patientId);
+      const parsedPatientId = uuidSchema.parse(patientId);
+      return await portalRepository.listDocuments(parsedPatientId);
     } catch (err) {
       throw toServiceError(err, "Failed to load documents");
     }
   },
   async listInvoices(patientId: string) {
     try {
-      return await portalRepository.listInvoices(patientId);
+      const parsedPatientId = uuidSchema.parse(patientId);
+      return await portalRepository.listInvoices(parsedPatientId);
     } catch (err) {
       throw toServiceError(err, "Failed to load invoices");
     }
