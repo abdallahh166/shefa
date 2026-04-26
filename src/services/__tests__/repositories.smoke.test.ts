@@ -189,6 +189,7 @@ describe("repositories smoke", () => {
     await adminRepository.getSubscriptionStats();
     await adminRepository.getOperationsAlertSummary();
     await adminRepository.getRecentJobActivity();
+    await adminRepository.getRecentActivity();
     await adminRepository.getRecentSystemErrors();
     await adminRepository.getClientErrorTrend();
     await adminRepository.updateSubscription(recordId, { plan: "pro" });
@@ -206,7 +207,7 @@ describe("repositories smoke", () => {
     await authRepository.resetPasswordForEmail("user@example.com", "http://localhost/reset");
     await authRepository.updatePassword("password123");
     await authRepository.getProfileByUserId(userId);
-    await authRepository.getRoleByUserId(userId);
+    await authRepository.getRolesByUserId(userId);
     await authRepository.registerClinic({ name: "Clinic" });
 
     await clinicSlugRepository.checkSlug({ clinicName: "My Clinic", customSlug: "my-clinic" });

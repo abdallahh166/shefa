@@ -9,6 +9,12 @@ const LIMITS: Record<string, RateLimitConfig> = {
   lab_upload: { maxHits: 20, windowSeconds: 600 },
   document_upload: { maxHits: 10, windowSeconds: 600 },
   invoice_create: { maxHits: 20, windowSeconds: 600 },
+  super_admin_tenant_create: { maxHits: 5, windowSeconds: 3600 },
+  super_admin_tenant_lifecycle: { maxHits: 15, windowSeconds: 3600 },
+  super_admin_subscription_update: { maxHits: 20, windowSeconds: 3600 },
+  super_admin_pricing_update: { maxHits: 20, windowSeconds: 3600 },
+  super_admin_job_retry: { maxHits: 20, windowSeconds: 300 },
+  super_admin_job_retry_bulk: { maxHits: 5, windowSeconds: 300 },
 };
 
 function buildKey(action: string, parts: Array<string | undefined>) {

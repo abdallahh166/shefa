@@ -106,7 +106,9 @@ export const queryKeys = {
     featureFlags: (tenantId: string) => ["admin", "featureFlags", tenantId] as const,
     subscriptionStats: () => ["admin", "subscriptionStats"] as const,
     operationsAlerts: () => ["admin", "operationsAlerts"] as const,
-    operationsDashboard: () => ["admin", "operationsDashboard"] as const,
+    operationsDashboard: (tenantId?: string) => ["admin", "operationsDashboard", tenantId ?? "all"] as const,
+    activity: (tenantId?: string) => ["admin", "activity", tenantId ?? "all"] as const,
+    tenantUsage: (tenantId: string) => ["admin", "tenantUsage", tenantId] as const,
   },
   pricing: {
     public: () => ["pricing", "public"] as const,

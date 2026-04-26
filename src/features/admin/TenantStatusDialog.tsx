@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/primitives/Button";
-import { Textarea } from "@/components/primitives/Inputs";
+import { Input, Textarea } from "@/components/primitives/Inputs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/core/i18n/i18nStore";
@@ -25,10 +25,20 @@ export const TenantStatusDialog = ({
 }: TenantStatusDialogProps) => {
   const { t } = useI18n(["admin"]);
   const [reason, setReason] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const requiresTypedConfirmation = targetStatus !== "active";
+  const expectedConfirmation = tenant?.slug ?? "";
+  const impactMessage =
+    targetStatus === "suspended"
+      ? "This will suspend ALL users in this tenant."
+      : targetStatus === "deactivated"
+        ? "This will deactivate ALL users in this tenant until a super admin restores access."
+        : "This will restore access for the tenant and its users.";
 
   useEffect(() => {
     if (!open) return;
     setReason("");
+    setConfirmation("");
   }, [open, targetStatus, tenant?.id]);
 
   if (!targetStatus) return null;
@@ -55,6 +65,24 @@ export const TenantStatusDialog = ({
           />
         </div>
 
+        <div className="rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm text-muted-foreground">
+          {impactMessage}
+        </div>
+
+        {requiresTypedConfirmation ? (
+          <div className="space-y-2">
+            <Label htmlFor="tenant-status-confirmation">
+              Type <span className="font-mono">{expectedConfirmation}</span> to confirm
+            </Label>
+            <Input
+              id="tenant-status-confirmation"
+              value={confirmation}
+              onChange={(event) => setConfirmation(event.target.value)}
+              placeholder={expectedConfirmation}
+            />
+          </div>
+        ) : null}
+
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>
             {t("common.cancel")}
@@ -62,7 +90,7 @@ export const TenantStatusDialog = ({
           <Button
             variant={targetStatus === "deactivated" ? "danger" : "default"}
             onClick={() => void onSubmit({ status: targetStatus, status_reason: reason.trim() || null })}
-            disabled={saving}
+            disabled={saving || (requiresTypedConfirmation && confirmation.trim() !== expectedConfirmation)}
           >
             {saving
               ? t("admin.tenantStatusDialog.saving")

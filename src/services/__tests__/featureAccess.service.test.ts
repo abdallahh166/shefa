@@ -32,13 +32,17 @@ describe("featureAccessService", () => {
     useAuthState.getState.mockReturnValue({
       user: {
         id: "00000000-0000-0000-0000-000000000222",
-        role: "clinic_admin",
+        tenantRoles: ["clinic_admin"],
+        globalRoles: [],
       },
       tenantOverride: null,
     });
     subscriptionRepository.getByTenant.mockResolvedValue({
       plan: "starter",
       status: "active",
+      amount: 0,
+      currency: "EGP",
+      billing_cycle: "monthly",
       expires_at: "2099-01-01T00:00:00.000Z",
     });
     featureFlagRepository.listByTenant.mockResolvedValue([]);
@@ -56,6 +60,9 @@ describe("featureAccessService", () => {
     subscriptionRepository.getByTenant.mockResolvedValue({
       plan: "pro",
       status: "active",
+      amount: 0,
+      currency: "EGP",
+      billing_cycle: "monthly",
       expires_at: "2099-01-01T00:00:00.000Z",
     });
     featureFlagRepository.listByTenant.mockResolvedValue([
@@ -79,6 +86,9 @@ describe("featureAccessService", () => {
     subscriptionRepository.getByTenant.mockResolvedValue({
       plan: "enterprise",
       status: "expired",
+      amount: 0,
+      currency: "EGP",
+      billing_cycle: "monthly",
       expires_at: "2026-04-01T00:00:00.000Z",
     });
 
@@ -93,7 +103,8 @@ describe("featureAccessService", () => {
     useAuthState.getState.mockReturnValue({
       user: {
         id: "00000000-0000-0000-0000-000000000222",
-        role: "super_admin",
+        tenantRoles: [],
+        globalRoles: ["super_admin"],
       },
       tenantOverride: null,
     });

@@ -3,7 +3,9 @@ import { persist } from "zustand/middleware";
 import { profileStorage } from "@/services/settings/profile.storage";
 import { authService } from "@/services/auth/auth.service";
 
-export type Role = "super_admin" | "clinic_admin" | "doctor" | "receptionist" | "nurse" | "accountant";
+export type GlobalRole = "super_admin";
+export type TenantRole = "clinic_admin" | "doctor" | "receptionist" | "nurse" | "accountant";
+export type Role = GlobalRole | TenantRole;
 export type TenantStatus = "active" | "suspended" | "deactivated";
 
 type SupaUser = {
@@ -58,11 +60,12 @@ export interface AppUser {
   id: string;
   name: string;
   email: string;
-  role: Role;
-  tenantId: string;
-  tenantSlug: string;
-  tenantName: string;
-  tenantStatus: TenantStatus;
+  tenantId: string | null;
+  tenantSlug: string | null;
+  tenantName: string | null;
+  tenantStatus: TenantStatus | null;
+  tenantRoles: TenantRole[];
+  globalRoles: GlobalRole[];
   tenantStatusReason?: string | null;
   avatar?: string;
 }
@@ -76,7 +79,7 @@ export type TenantOverride = {
 export type ImpersonationSession = {
   requestId: string;
   startedAt: string;
-  actor: Pick<AppUser, "id" | "name" | "email" | "role">;
+  actor: Pick<AppUser, "id" | "name" | "email" | "tenantRoles" | "globalRoles">;
   targetTenant: Exclude<TenantOverride, null>;
 } | null;
 
@@ -101,6 +104,24 @@ interface AuthState {
   initialize: () => Promise<void>;
 }
 
+export function isSuperAdmin(user?: Pick<AppUser, "globalRoles"> | null) {
+  return Boolean(user?.globalRoles?.includes("super_admin"));
+}
+
+export function getPrimaryTenantRole(user?: Pick<AppUser, "tenantRoles"> | null): TenantRole | null {
+  return user?.tenantRoles?.[0] ?? null;
+}
+
+export function getPrimaryRole(user?: Pick<AppUser, "tenantRoles" | "globalRoles"> | null): Role | null {
+  if (isSuperAdmin(user as Pick<AppUser, "globalRoles"> | null)) return "super_admin";
+  return getPrimaryTenantRole(user as Pick<AppUser, "tenantRoles"> | null);
+}
+
+function getEffectiveRoles(user?: Pick<AppUser, "tenantRoles" | "globalRoles"> | null): Role[] {
+  if (!user) return [];
+  return [...(user.globalRoles ?? []), ...(user.tenantRoles ?? [])];
+}
+
 export const useAuth = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -116,8 +137,8 @@ export const useAuth = create<AuthState>()(
         supabaseUser: supabaseUser ?? null,
         isAuthenticated: !!user,
         isLoading: false,
-        tenantOverride: user?.role === "super_admin" ? get().tenantOverride : null,
-        impersonationSession: user?.role === "super_admin" ? get().impersonationSession : null,
+        tenantOverride: isSuperAdmin(user) ? get().tenantOverride : null,
+        impersonationSession: isSuperAdmin(user) ? get().impersonationSession : null,
         lastVerifiedAt: user ? get().lastVerifiedAt : null,
       }),
       setLoading: (isLoading) => set({ isLoading }),
@@ -135,9 +156,15 @@ export const useAuth = create<AuthState>()(
       hasPermission: (permission) => {
         const { user } = get();
         if (!user) return false;
-        return ROLE_PERMISSIONS[user.role]?.includes(permission) ?? false;
+        return getEffectiveRoles(user).some((role) => ROLE_PERMISSIONS[role]?.includes(permission) ?? false);
       },
-      hasRole: (role) => get().user?.role === role,
+      hasRole: (role) => {
+        const user = get().user;
+        if (!user) return false;
+        return role === "super_admin"
+          ? isSuperAdmin(user)
+          : user.tenantRoles.includes(role as TenantRole);
+      },
       setTenantOverride: (tenant) => {
         set({
           tenantOverride: tenant,
@@ -173,7 +200,7 @@ export const useAuth = create<AuthState>()(
               timeout,
             ]);
             const { user, lastVerifiedAt } = get();
-            if (!user || user.role !== "super_admin") {
+            if (!user || !isSuperAdmin(user)) {
               set({ tenantOverride: null, impersonationSession: null });
             }
             if (user && !lastVerifiedAt) {
@@ -226,9 +253,24 @@ async function loadUserProfile(
     set({ user: null, supabaseUser: null, isAuthenticated: false });
     return;
   }
-  const { profile, role } = await authService.loadUserProfile(supaUser.id);
-  if (profile && role) {
+  const { profile, roles } = await authService.loadUserProfile(supaUser.id);
+  const hasAnyRole = roles.globalRoles.length > 0 || roles.tenantRoles.length > 0;
+  if (profile && hasAnyRole) {
     const tenant = profile.tenants as any;
+    const superAdmin = roles.globalRoles.includes("super_admin");
+    const nextUser: AppUser = {
+      id: supaUser.id,
+      name: profile.full_name,
+      email: supaUser.email ?? "",
+      tenantId: profile.tenant_id ?? null,
+      tenantSlug: tenant?.slug ?? (superAdmin ? null : "default"),
+      tenantName: tenant?.name ?? (superAdmin ? null : "Clinic"),
+      tenantStatus: tenant?.status ?? (superAdmin ? null : "active"),
+      tenantRoles: roles.tenantRoles as TenantRole[],
+      globalRoles: roles.globalRoles as GlobalRole[],
+      tenantStatusReason: tenant?.status_reason ?? null,
+      avatar: undefined,
+    };
     let avatarUrl: string | undefined = profile.avatar_url ?? undefined;
 
     if (avatarUrl && !avatarUrl.startsWith("http")) {
@@ -239,23 +281,14 @@ async function loadUserProfile(
       }
     }
 
+    nextUser.avatar = avatarUrl;
+
     set({
-      user: {
-        id: supaUser.id,
-        name: profile.full_name,
-        email: supaUser.email ?? "",
-        role: role as Role,
-        tenantId: profile.tenant_id,
-        tenantSlug: tenant?.slug ?? "default",
-        tenantName: tenant?.name ?? "Clinic",
-        tenantStatus: tenant?.status ?? "active",
-        tenantStatusReason: tenant?.status_reason ?? null,
-        avatar: avatarUrl,
-      },
+      user: nextUser,
       supabaseUser: supaUser,
       isAuthenticated: true,
-      tenantOverride: useAuth.getState().user?.role === "super_admin" ? useAuth.getState().tenantOverride : null,
-      impersonationSession: useAuth.getState().user?.role === "super_admin" ? useAuth.getState().impersonationSession : null,
+      tenantOverride: isSuperAdmin(nextUser) ? useAuth.getState().tenantOverride : null,
+      impersonationSession: isSuperAdmin(nextUser) ? useAuth.getState().impersonationSession : null,
       lastVerifiedAt: useAuth.getState().lastVerifiedAt,
     });
   } else {

@@ -1,5 +1,5 @@
 import { useSubscription } from "./SubscriptionContext";
-import { useAuth } from "@/core/auth/authStore";
+import { isSuperAdmin, useAuth } from "@/core/auth/authStore";
 import { useNavigate } from "react-router-dom";
 import { ShieldAlert } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,7 +11,7 @@ export const PaywallModal = () => {
   const navigate = useNavigate();
 
   // Don't show for super_admins or while loading
-  if (isLoading || !isExpired || user?.role === "super_admin") return null;
+  if (isLoading || !isExpired || isSuperAdmin(user)) return null;
 
   const formattedDate = expiresAt
     ? new Date(expiresAt).toLocaleDateString("ar-EG", {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ServiceError } from "@/services/supabase/errors";
+import { AuthorizationError, ServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 
 const useAuthMock = vi.hoisted(() => ({ getState: vi.fn() }));
@@ -14,16 +14,25 @@ describe("getTenantContext", () => {
 
   it("uses tenant override for super admins", () => {
     useAuthMock.getState.mockReturnValue({
-      user: { id: "user-1", tenantId: "tenant-1", role: "super_admin" },
+      user: { id: "user-1", tenantId: null, globalRoles: ["super_admin"], tenantRoles: [] },
       tenantOverride: { id: "tenant-override" },
     });
 
     expect(getTenantContext()).toEqual({ tenantId: "tenant-override", userId: "user-1" });
   });
 
+  it("throws for super admins without tenant override", () => {
+    useAuthMock.getState.mockReturnValue({
+      user: { id: "user-1", tenantId: null, globalRoles: ["super_admin"], tenantRoles: [] },
+      tenantOverride: null,
+    });
+
+    expect(() => getTenantContext()).toThrow(AuthorizationError);
+  });
+
   it("uses user tenant for non-super admins", () => {
     useAuthMock.getState.mockReturnValue({
-      user: { id: "user-2", tenantId: "tenant-2", role: "doctor" },
+      user: { id: "user-2", tenantId: "tenant-2", globalRoles: [], tenantRoles: ["doctor"] },
       tenantOverride: { id: "tenant-override" },
     });
 

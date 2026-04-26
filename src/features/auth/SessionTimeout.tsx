@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from "react";
-import { useAuth } from "@/core/auth/authStore";
+import { getPrimaryRole, useAuth } from "@/core/auth/authStore";
 import { useI18n } from "@/core/i18n/i18nStore";
 import {
   AlertDialog,
@@ -14,7 +14,7 @@ import {
 
 const ACTIVITY_EVENTS = ["mousedown", "keydown", "touchstart", "scroll"] as const;
 
-function getSessionPolicy(role?: string) {
+function getSessionPolicy(role?: string | null) {
   if (role === "super_admin") {
     return { idleTimeoutMs: 10 * 60 * 1000, warningBeforeMs: 45 * 1000 };
   }
@@ -32,7 +32,7 @@ export const SessionTimeout = () => {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const warningRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const sessionPolicy = getSessionPolicy(user?.role);
+  const sessionPolicy = getSessionPolicy(getPrimaryRole(user));
 
   const clearAllTimers = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);

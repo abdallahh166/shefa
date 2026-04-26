@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useRef } from "react";
-import { useAuth } from "@/core/auth/authStore";
+import { isSuperAdmin, useAuth } from "@/core/auth/authStore";
 import type { SubscriptionSummary } from "@/domain/subscription/subscription.types";
 import { subscriptionService } from "@/services/subscription/subscription.service";
 
@@ -68,16 +68,14 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const tenantOverrideId = tenantOverride?.id;
 
   useEffect(() => {
-    // Wait for auth to finish loading before doing anything
     if (authLoading) return;
 
-    if (!isAuthenticated || !user?.tenantId) {
+    if (!isAuthenticated || !user) {
       setState({ ...defaultState, isLoading: false });
       return;
     }
 
-    // Super admins don't need subscription checks unless viewing another tenant
-    if (user.role === "super_admin" && !hasTenantOverride) {
+    if (isSuperAdmin(user) && !hasTenantOverride) {
       setState({
         plan: "enterprise",
         status: "active",
@@ -93,7 +91,11 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // Abort any previous in-flight request
+    if (!user.tenantId) {
+      setState({ ...defaultState, isLoading: false });
+      return;
+    }
+
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -101,7 +103,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     const fetchSubscription = async () => {
       setState((s) => ({ ...s, isLoading: true }));
 
-        try {
+      try {
         const targetTenantId = tenantOverrideId ?? user.tenantId;
         const data = await subscriptionService.getByTenant(targetTenantId);
 
@@ -128,7 +130,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       controller.abort();
     };
-  }, [isAuthenticated, user?.tenantId, user?.role, tenantOverrideId, hasTenantOverride, authLoading]);
+  }, [isAuthenticated, user?.tenantId, user?.globalRoles, tenantOverrideId, hasTenantOverride, authLoading]);
 
   return (
     <SubscriptionContext.Provider value={state}>

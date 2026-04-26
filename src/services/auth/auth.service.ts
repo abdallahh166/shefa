@@ -24,8 +24,9 @@ export const authService = {
         throw new AuthorizationError("Please verify your email before logging in.");
       }
       if (user) {
-        const { profile, role } = await authService.loadUserProfile(user.id);
-        if (!profile || !role) {
+        const { profile, roles } = await authService.loadUserProfile(user.id);
+        const hasAnyRole = roles.globalRoles.length > 0 || roles.tenantRoles.length > 0;
+        if (!profile || !hasAnyRole) {
           await Promise.resolve(authRepository.signOut()).catch(() => undefined);
           throw new AuthorizationError("This clinic is suspended or deactivated.");
         }
@@ -73,10 +74,17 @@ export const authService = {
     try {
       const parsedUserId = uuidSchema.parse(userId);
       const profile = await authRepository.getProfileByUserId(parsedUserId);
-      const role = await authRepository.getRoleByUserId(parsedUserId);
-      return { profile, role };
+      const roles = await authRepository.getRolesByUserId(parsedUserId);
+      return { profile, roles };
     } catch (err) {
       throw toServiceError(err, "Failed to load user profile");
+    }
+  },
+  async getMfaAssuranceLevel() {
+    try {
+      return await authRepository.getMfaAssuranceLevel();
+    } catch (err) {
+      throw toServiceError(err, "Failed to load MFA assurance level");
     }
   },
   async registerClinic(input: {

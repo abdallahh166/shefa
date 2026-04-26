@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
-import { useAuth, Permission } from "./authStore";
+import { isSuperAdmin, useAuth, Permission } from "./authStore";
 import { useFeatureAccess, type Feature } from "@/core/subscription/useFeatureAccess";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/primitives/Button";
@@ -49,7 +49,7 @@ export const ProtectedRoute = ({ children, requiredPermission, requiredFeature }
   }
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (user?.role !== "super_admin" && user?.tenantStatus !== "active") {
+  if (!isSuperAdmin(user) && user?.tenantStatus !== "active") {
     return (
       <div className="flex min-h-screen items-center justify-center px-6">
         <div className="max-w-md rounded-2xl border bg-card p-8 text-center shadow-sm">

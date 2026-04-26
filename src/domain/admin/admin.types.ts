@@ -5,9 +5,11 @@ import {
   adminOperationsAlertsResponseSchema,
   adminOperationsAlertSchema,
   adminOperationsAlertSummarySchema,
+  adminJobRetryInputSchema,
   adminPricingPlanCreateSchema,
   adminPricingPlanSchema,
   adminPricingPlanUpdateSchema,
+  adminRecentActivitySchema,
   adminRecentJobActivitySchema,
   adminRecentSystemErrorSchema,
   adminTenantFeatureFlagSchema,
@@ -15,6 +17,7 @@ import {
   adminTenantCreateSchema,
   adminSubscriptionSchema,
   adminTenantStatusUpdateSchema,
+  adminTenantUsageSchema,
   adminSubscriptionUpdateSchema,
   adminSubscriptionStatsSchema,
   adminTenantSchema,
@@ -37,6 +40,14 @@ export type AdminPricingPlan = z.infer<typeof adminPricingPlanSchema>;
 export type AdminPricingPlanCreateInput = z.infer<typeof adminPricingPlanCreateSchema>;
 export type AdminPricingPlanUpdateInput = z.infer<typeof adminPricingPlanUpdateSchema>;
 export type AdminRecentJobActivity = z.infer<typeof adminRecentJobActivitySchema>;
+export type AdminRecentActivity = z.infer<typeof adminRecentActivitySchema>;
 export type AdminRecentSystemError = z.infer<typeof adminRecentSystemErrorSchema>;
 export type AdminClientErrorTrendPoint = z.infer<typeof adminClientErrorTrendPointSchema>;
 export type AdminOperationsDashboardResponse = z.infer<typeof adminOperationsDashboardResponseSchema>;
+export type AdminTenantUsage = z.infer<typeof adminTenantUsageSchema>;
+export type AdminJobRetryInput = z.infer<typeof adminJobRetryInputSchema>;
+
+export type AdminMutationContext = {
+  requestId: string;
+  idempotencyKey: string;
+};

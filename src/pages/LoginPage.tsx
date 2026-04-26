@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/core/auth/authStore";
+import { isSuperAdmin, useAuth } from "@/core/auth/authStore";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
 import { Button } from "@/components/primitives/Button";
@@ -34,7 +34,7 @@ export const LoginPage = () => {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      if (user.role === "super_admin") {
+      if (isSuperAdmin(user)) {
         navigate("/admin", { replace: true });
       } else {
         navigate(`/tenant/${user.tenantSlug}/dashboard`, { replace: true });

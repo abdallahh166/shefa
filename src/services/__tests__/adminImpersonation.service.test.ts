@@ -21,10 +21,11 @@ const superAdmin = {
   id: "00000000-0000-0000-0000-000000000111",
   name: "Super Admin",
   email: "admin@example.com",
-  role: "super_admin" as const,
-  tenantId: "00000000-0000-0000-0000-000000000999",
-  tenantSlug: "platform",
-  tenantName: "Platform",
+  globalRoles: ["super_admin"] as const,
+  tenantRoles: [] as const,
+  tenantId: null,
+  tenantSlug: null,
+  tenantName: null,
 };
 
 const targetTenant = {
@@ -57,20 +58,20 @@ describe("adminImpersonationService", () => {
         user_id: superAdmin.id,
         action: "tenant_impersonation_started",
         request_id: "req-123",
-      })
+      }),
     );
     expect(startImpersonation).toHaveBeenCalledWith(
       targetTenant,
       expect.objectContaining({
         requestId: "req-123",
         targetTenant,
-      })
+      }),
     );
     expect(session).toEqual(
       expect.objectContaining({
         requestId: "req-123",
         targetTenant,
-      })
+      }),
     );
   });
 
@@ -87,7 +88,8 @@ describe("adminImpersonationService", () => {
           id: superAdmin.id,
           name: superAdmin.name,
           email: superAdmin.email,
-          role: superAdmin.role,
+          globalRoles: [...superAdmin.globalRoles],
+          tenantRoles: [...superAdmin.tenantRoles],
         },
         targetTenant,
       },
@@ -102,14 +104,14 @@ describe("adminImpersonationService", () => {
         tenant_id: targetTenant.id,
         action: "tenant_impersonation_ended",
         request_id: "req-123",
-      })
+      }),
     );
     expect(stopImpersonation).toHaveBeenCalledTimes(1);
     expect(result).toEqual(
       expect.objectContaining({
         requestId: "req-123",
         targetTenant,
-      })
+      }),
     );
   });
 
@@ -139,7 +141,8 @@ describe("adminImpersonationService", () => {
           id: superAdmin.id,
           name: superAdmin.name,
           email: superAdmin.email,
-          role: superAdmin.role,
+          globalRoles: [...superAdmin.globalRoles],
+          tenantRoles: [...superAdmin.tenantRoles],
         },
         targetTenant,
       },

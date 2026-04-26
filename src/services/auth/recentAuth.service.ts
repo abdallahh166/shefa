@@ -10,6 +10,11 @@ const RECENT_AUTH_WINDOWS_MS: Record<Role, number> = {
   accountant: 30 * 60 * 1000,
 };
 
+function resolvePrimaryRole(user: { globalRoles?: string[]; tenantRoles?: string[] } | null | undefined): Role | null {
+  if (user?.globalRoles?.includes("super_admin")) return "super_admin";
+  return (user?.tenantRoles?.[0] as Role | undefined) ?? null;
+}
+
 function getRequiredWindowMs(role: Role, overrideMs?: number) {
   return overrideMs ?? RECENT_AUTH_WINDOWS_MS[role];
 }
@@ -22,25 +27,28 @@ export const recentAuthService = {
   isFresh(input?: { maxAgeMs?: number }) {
     const { user, lastVerifiedAt } = useAuth.getState();
     if (!user || !lastVerifiedAt) return false;
+    const primaryRole = resolvePrimaryRole(user);
+    if (!primaryRole) return false;
     const verifiedAt = new Date(lastVerifiedAt).getTime();
     if (Number.isNaN(verifiedAt)) return false;
-    return Date.now() - verifiedAt <= getRequiredWindowMs(user.role, input?.maxAgeMs);
+    return Date.now() - verifiedAt <= getRequiredWindowMs(primaryRole, input?.maxAgeMs);
   },
 
   assertRecentAuth(input: { action: string; maxAgeMs?: number }) {
     const { user, lastVerifiedAt } = useAuth.getState();
-    if (!user || !lastVerifiedAt) {
+    const primaryRole = resolvePrimaryRole(user);
+    if (!user || !lastVerifiedAt || !primaryRole) {
       throw new AuthorizationError("Please sign in again to continue this action.", {
         code: "FRESH_AUTH_REQUIRED",
         details: {
           action: input.action,
           lastVerifiedAt,
-          maxAgeMs: user ? getRequiredWindowMs(user.role, input.maxAgeMs) : input.maxAgeMs ?? null,
+          maxAgeMs: primaryRole ? getRequiredWindowMs(primaryRole, input.maxAgeMs) : input.maxAgeMs ?? null,
         },
       });
     }
 
-    const maxAgeMs = getRequiredWindowMs(user.role, input.maxAgeMs);
+    const maxAgeMs = getRequiredWindowMs(primaryRole, input.maxAgeMs);
     const verifiedAt = new Date(lastVerifiedAt).getTime();
     if (Number.isNaN(verifiedAt) || Date.now() - verifiedAt > maxAgeMs) {
       throw new AuthorizationError("Please sign in again to continue this action.", {

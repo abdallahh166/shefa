@@ -42,7 +42,7 @@ export interface AppUser {
   id: string;
   name: string;
   email?: string;
-  role?: string;
+  displayRole?: string;
   avatar?: string;
 }
 
@@ -270,7 +270,7 @@ function AppSidebar({
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-foreground truncate">{user.name}</p>
               <p className="text-2xs text-muted-foreground capitalize truncate">
-                {user.role?.replace("_", " ")}
+                {user.displayRole?.replace("_", " ")}
               </p>
             </div>
             <SimpleTooltip content={labels.logOut} side="right">

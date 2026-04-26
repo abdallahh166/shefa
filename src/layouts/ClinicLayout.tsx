@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useAuth, type Permission } from "@/core/auth/authStore";
+import { getPrimaryRole, isSuperAdmin, useAuth, type Permission } from "@/core/auth/authStore";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
 import { NotificationCenter } from "@/shared/components/NotificationCenter";
@@ -103,7 +103,7 @@ export const ClinicLayout = () => {
     id: user.id,
     name: user.name ?? "User",
     email: user.email ?? undefined,
-    role: user.role ?? undefined,
+    displayRole: getPrimaryRole(user) ?? undefined,
   };
 
   const labels: AppLayoutLabels = {
@@ -128,7 +128,7 @@ export const ClinicLayout = () => {
         topbarStartSlot={<GlobalSearch />}
         topbarEndSlot={(
           <>
-            {user.role === "super_admin" && tenantOverride && (
+            {isSuperAdmin(user) && tenantOverride && (
               <Button
                 variant="outline"
                 size="sm"

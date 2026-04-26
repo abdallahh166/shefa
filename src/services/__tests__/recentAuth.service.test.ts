@@ -11,7 +11,7 @@ import { recentAuthService } from "@/services/auth/recentAuth.service";
 describe("recentAuthService", () => {
   it("treats recent privileged authentication as fresh", () => {
     getState.mockReturnValue({
-      user: { role: "super_admin" },
+      user: { globalRoles: ["super_admin"], tenantRoles: [] },
       lastVerifiedAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
     });
 
@@ -21,18 +21,18 @@ describe("recentAuthService", () => {
 
   it("rejects stale authentication for sensitive actions", () => {
     getState.mockReturnValue({
-      user: { role: "clinic_admin" },
+      user: { globalRoles: [], tenantRoles: ["clinic_admin"] },
       lastVerifiedAt: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
     });
 
     expect(() => recentAuthService.assertRecentAuth({ action: "subscription_update" })).toThrowError(
-      /sign in again/i
+      /sign in again/i,
     );
   });
 
   it("treats missing verification timestamp as stale", () => {
     getState.mockReturnValue({
-      user: { role: "super_admin" },
+      user: { globalRoles: ["super_admin"], tenantRoles: [] },
       lastVerifiedAt: null,
     });
 

@@ -14,7 +14,8 @@ export interface AuthRepository {
   resetPasswordForEmail(email: string, redirectTo: string): Promise<void>;
   updatePassword(password: string): Promise<void>;
   getProfileByUserId(userId: string): Promise<any | null>;
-  getRoleByUserId(userId: string): Promise<string | null>;
+  getRolesByUserId(userId: string): Promise<{ tenantRoles: string[]; globalRoles: string[] }>;
+  getMfaAssuranceLevel(): Promise<{ currentLevel: string | null; nextLevel: string | null }>;
   registerClinic(payload: Record<string, unknown>): Promise<unknown>;
 }
 
@@ -68,16 +69,44 @@ export const authRepository: AuthRepository = {
     }
     return data ?? null;
   },
-  async getRoleByUserId(userId) {
+  async getRolesByUserId(userId) {
+    const globalRoleLookup = await (supabase.from as any)("user_global_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .is("revoked_at", null);
+
+    if (globalRoleLookup.error) {
+      throw new ServiceError(globalRoleLookup.error.message ?? "Failed to load global role", {
+        code: globalRoleLookup.error.code,
+        details: globalRoleLookup.error,
+      });
+    }
+
     const { data, error } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", userId)
-      .single();
+      .eq("user_id", userId);
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load role", { code: error.code, details: error });
     }
-    return data?.role ?? null;
+
+    return {
+      tenantRoles: (data ?? []).map((row) => String(row.role)),
+      globalRoles: (globalRoleLookup.data ?? []).map((row: { role: string }) => String(row.role)),
+    };
+  },
+  async getMfaAssuranceLevel() {
+    const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to load MFA assurance level", {
+        code: error.code,
+        details: error,
+      });
+    }
+    return {
+      currentLevel: data.currentLevel ?? null,
+      nextLevel: data.nextLevel ?? null,
+    };
   },
   async registerClinic(payload) {
     const { data, error } = await supabase.functions.invoke("register-clinic", { body: payload });

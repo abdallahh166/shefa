@@ -1,7 +1,10 @@
 import type {
+  AdminJobRetryInput,
   AdminClientErrorTrendPoint,
+  AdminMutationContext,
   AdminOperationsAlertSummary,
   AdminPricingPlan,
+  AdminRecentActivity,
   AdminRecentJobActivity,
   AdminRecentSystemError,
   AdminSubscription,
@@ -10,6 +13,7 @@ import type {
   AdminTenantStatusUpdateInput,
   AdminTenantUpdateInput,
   AdminSubscriptionStats,
+  AdminTenantUsage,
 } from "@/domain/admin/admin.types";
 import type { ProfileWithRoles } from "@/domain/settings/profile.types";
 import { supabase } from "@/services/supabase/client";
@@ -47,9 +51,15 @@ export interface AdminRepository {
     plan?: AdminSubscription["plan"];
     sort?: TenantSort;
   }): Promise<{ data: AdminTenant[]; count: number }>;
-  createTenant(input: AdminTenantCreateInput): Promise<AdminTenant>;
-  updateTenant(id: string, input: AdminTenantUpdateInput): Promise<AdminTenant>;
-  updateTenantStatus(id: string, input: AdminTenantStatusUpdateInput): Promise<AdminTenant>;
+  createTenant(input: AdminTenantCreateInput, context?: AdminMutationContext, reason?: string): Promise<AdminTenant>;
+  updateTenant(id: string, input: AdminTenantUpdateInput, context?: AdminMutationContext, reason?: string): Promise<AdminTenant>;
+  updateTenantStatus(id: string, input: AdminTenantStatusUpdateInput, context?: AdminMutationContext): Promise<AdminTenant>;
+  updateTenantFeatureFlag(
+    tenantId: string,
+    featureKey: string,
+    enabled: boolean,
+    context?: AdminMutationContext,
+  ): Promise<{ id: string; feature_key: string; enabled: boolean }>;
   listProfilesWithRolesPaged(params: {
     limit: number;
     offset: number;
@@ -65,21 +75,80 @@ export interface AdminRepository {
     sort?: SubscriptionSort;
   }): Promise<{ data: AdminSubscription[]; count: number }>;
   listPricingPlans(): Promise<AdminPricingPlan[]>;
-  createPricingPlan(input: Omit<AdminPricingPlan, "id" | "created_at" | "updated_at" | "deleted_at">): Promise<AdminPricingPlan>;
+  createPricingPlan(
+    input: Omit<AdminPricingPlan, "id" | "created_at" | "updated_at" | "deleted_at">,
+    context?: AdminMutationContext,
+  ): Promise<AdminPricingPlan>;
   updatePricingPlan(
     id: string,
     input: Partial<Omit<AdminPricingPlan, "id" | "created_at" | "updated_at" | "deleted_at">>,
+    context?: AdminMutationContext,
   ): Promise<AdminPricingPlan>;
-  deletePricingPlan(id: string): Promise<void>;
+  deletePricingPlan(id: string, context?: AdminMutationContext): Promise<void>;
   updateSubscription(
     id: string,
     input: Partial<Pick<AdminSubscription, "plan" | "status" | "billing_cycle">>,
+    context?: AdminMutationContext,
   ): Promise<AdminSubscription>;
   getSubscriptionStats(): Promise<AdminSubscriptionStats>;
-  getOperationsAlertSummary(): Promise<AdminOperationsAlertSummary>;
-  getRecentJobActivity(limit?: number): Promise<AdminRecentJobActivity[]>;
-  getRecentSystemErrors(limit?: number): Promise<AdminRecentSystemError[]>;
-  getClientErrorTrend(bucketMinutes?: number, bucketCount?: number): Promise<AdminClientErrorTrendPoint[]>;
+  getOperationsAlertSummary(tenantId?: string): Promise<AdminOperationsAlertSummary>;
+  getRecentJobActivity(limit?: number, tenantId?: string): Promise<AdminRecentJobActivity[]>;
+  getRecentActivity(limit?: number, tenantId?: string): Promise<AdminRecentActivity[]>;
+  getRecentSystemErrors(limit?: number, tenantId?: string): Promise<AdminRecentSystemError[]>;
+  getClientErrorTrend(bucketMinutes?: number, bucketCount?: number, tenantId?: string): Promise<AdminClientErrorTrendPoint[]>;
+  getTenantUsage(tenantId: string): Promise<AdminTenantUsage>;
+  retryJobs(input: AdminJobRetryInput & AdminMutationContext): Promise<AdminRecentJobActivity[]>;
+}
+
+async function selectTenantById(id: string) {
+  const { data, error } = await supabase
+    .from("tenants")
+    .select(TENANT_COLUMNS)
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    throw new ServiceError(error.message ?? "Failed to load tenant", {
+      code: error.code,
+      details: error,
+    });
+  }
+
+  return mapTenantRow({ ...(data as any), tenant_status: (data as any).status ?? "active" });
+}
+
+async function selectPricingPlanById(id: string) {
+  const { data, error } = await supabase
+    .from("pricing_plans")
+    .select(PRICING_PLAN_COLUMNS)
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    throw new ServiceError(error.message ?? "Failed to load pricing plan", {
+      code: error.code,
+      details: error,
+    });
+  }
+
+  return data as AdminPricingPlan;
+}
+
+async function selectSubscriptionById(id: string) {
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .select(SUBSCRIPTION_COLUMNS)
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    throw new ServiceError(error.message ?? "Failed to load subscription", {
+      code: error.code,
+      details: error,
+    });
+  }
+
+  return data as AdminSubscription;
 }
 
 export const adminRepository: AdminRepository = {
@@ -153,22 +222,18 @@ export const adminRepository: AdminRepository = {
 
     return { data: mapped, count: count ?? 0 };
   },
-  async createTenant(input) {
-    const { data, error } = await supabase
-      .from("tenants")
-      .insert({
-        name: input.name,
-        slug: input.slug,
-        email: input.email ?? null,
-        phone: input.phone ?? null,
-        address: input.address ?? null,
-        pending_owner_email: input.pending_owner_email ?? null,
-        status: "active",
-        status_reason: null,
-        status_changed_at: new Date().toISOString(),
-      })
-      .select(TENANT_COLUMNS)
-      .single();
+  async createTenant(input, context, reason) {
+    const { data, error } = await (supabase.rpc as any)("admin_create_tenant", {
+      _name: input.name,
+      _slug: input.slug,
+      _email: input.email ?? null,
+      _phone: input.phone ?? null,
+      _address: input.address ?? null,
+      _pending_owner_email: input.pending_owner_email ?? null,
+      _request_id: context?.requestId ?? null,
+      _reason: reason ?? null,
+      _idempotency_key: context?.idempotencyKey ?? null,
+    });
 
     if (error) {
       throw new ServiceError(error.message ?? "Failed to create tenant", {
@@ -177,29 +242,22 @@ export const adminRepository: AdminRepository = {
       });
     }
 
-    return mapTenantRow({ ...(data as any), tenant_status: (data as any).status ?? "active" });
+    return await selectTenantById(data as string);
   },
-  async updateTenant(id, input) {
-    const payload: Record<string, unknown> = {};
-
-    if (input.name !== undefined) payload.name = input.name;
-    if (input.slug !== undefined) payload.slug = input.slug;
-    if (input.email !== undefined) payload.email = input.email;
-    if (input.phone !== undefined) payload.phone = input.phone;
-    if (input.address !== undefined) payload.address = input.address;
-    if (input.pending_owner_email !== undefined) payload.pending_owner_email = input.pending_owner_email;
-
-    const query = supabase.from("tenants");
-    const { data, error } = Object.keys(payload).length === 0
-      ? await query
-          .select(TENANT_COLUMNS)
-          .eq("id", id)
-          .single()
-      : await query
-          .update(payload)
-          .eq("id", id)
-          .select(TENANT_COLUMNS)
-          .single();
+  async updateTenant(id, input, context, reason) {
+    const current = await selectTenantById(id);
+    const { data, error } = await (supabase.rpc as any)("admin_update_tenant", {
+      _tenant_id: id,
+      _name: input.name ?? current.name,
+      _slug: input.slug ?? current.slug,
+      _email: input.email ?? current.email ?? null,
+      _phone: input.phone ?? current.phone ?? null,
+      _address: input.address ?? current.address ?? null,
+      _pending_owner_email: input.pending_owner_email ?? current.pending_owner_email ?? null,
+      _request_id: context?.requestId ?? null,
+      _reason: reason ?? null,
+      _idempotency_key: context?.idempotencyKey ?? null,
+    });
 
     if (error) {
       throw new ServiceError(error.message ?? "Failed to update tenant", {
@@ -208,19 +266,16 @@ export const adminRepository: AdminRepository = {
       });
     }
 
-    return mapTenantRow({ ...(data as any), tenant_status: (data as any).status ?? "active" });
+    return await selectTenantById(data as string);
   },
-  async updateTenantStatus(id, input) {
-    const { data, error } = await supabase
-      .from("tenants")
-      .update({
-        status: input.status,
-        status_reason: input.status_reason ?? null,
-        status_changed_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .select(TENANT_COLUMNS)
-      .single();
+  async updateTenantStatus(id, input, context) {
+    const { data, error } = await (supabase.rpc as any)("admin_update_tenant_status", {
+      _tenant_id: id,
+      _status: input.status,
+      _status_reason: input.status_reason ?? null,
+      _request_id: context?.requestId ?? null,
+      _idempotency_key: context?.idempotencyKey ?? null,
+    });
 
     if (error) {
       throw new ServiceError(error.message ?? "Failed to update tenant status", {
@@ -229,7 +284,38 @@ export const adminRepository: AdminRepository = {
       });
     }
 
-    return mapTenantRow({ ...(data as any), tenant_status: (data as any).status ?? "active" });
+    return await selectTenantById(data as string);
+  },
+  async updateTenantFeatureFlag(tenantId, featureKey, enabled, context) {
+    const { data, error } = await (supabase.rpc as any)("admin_upsert_tenant_feature_flag", {
+      _tenant_id: tenantId,
+      _feature_key: featureKey,
+      _enabled: enabled,
+      _request_id: context?.requestId ?? null,
+      _idempotency_key: context?.idempotencyKey ?? null,
+    });
+
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to update tenant feature flag", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    const { data: row, error: rowError } = await supabase
+      .from("feature_flags")
+      .select("id, feature_key, enabled")
+      .eq("id", data as string)
+      .single();
+
+    if (rowError) {
+      throw new ServiceError(rowError.message ?? "Failed to load tenant feature flag", {
+        code: rowError.code,
+        details: rowError,
+      });
+    }
+
+    return row as { id: string; feature_key: string; enabled: boolean };
   },
   async listProfilesWithRolesPaged({ limit, offset, search, sort }) {
     const to = Math.max(0, offset + limit - 1);
@@ -272,10 +358,28 @@ export const adminRepository: AdminRepository = {
       });
     }
 
+    const { data: globalRoles, error: globalRolesError } = await (supabase.from as any)("user_global_roles")
+      .select("user_id, role")
+      .in("user_id", userIds)
+      .is("revoked_at", null);
+
+    if (globalRolesError) {
+      throw new ServiceError(globalRolesError.message ?? "Failed to load global roles", {
+        code: globalRolesError.code,
+        details: globalRolesError,
+      });
+    }
+
     const rolesByUserId = new Map<string, ProfileWithRoles["user_roles"]>();
 
     for (const role of roles ?? []) {
-      rolesByUserId.set(role.user_id, [{ role: role.role }]);
+      const currentRoles = rolesByUserId.get(role.user_id) ?? [];
+      rolesByUserId.set(role.user_id, [...currentRoles, { role: role.role }]);
+    }
+
+    for (const role of globalRoles ?? []) {
+      const currentRoles = rolesByUserId.get(role.user_id) ?? [];
+      rolesByUserId.set(role.user_id, [...currentRoles, { role: role.role }]);
     }
 
     const data = profiles.map((profile) => ({
@@ -337,12 +441,24 @@ export const adminRepository: AdminRepository = {
 
     return (data ?? []) as AdminPricingPlan[];
   },
-  async createPricingPlan(input) {
-    const { data, error } = await supabase
-      .from("pricing_plans")
-      .insert(input as never)
-      .select(PRICING_PLAN_COLUMNS)
-      .single();
+  async createPricingPlan(input, context) {
+    const { data, error } = await (supabase.rpc as any)("admin_create_pricing_plan", {
+      _plan_code: input.plan_code,
+      _name: input.name,
+      _description: input.description ?? null,
+      _doctor_limit_label: input.doctor_limit_label,
+      _features: input.features,
+      _monthly_price: input.monthly_price,
+      _annual_price: input.annual_price,
+      _currency: input.currency,
+      _default_billing_cycle: input.default_billing_cycle,
+      _is_popular: input.is_popular,
+      _is_public: input.is_public,
+      _is_enterprise_contact: input.is_enterprise_contact,
+      _display_order: input.display_order,
+      _request_id: context?.requestId ?? null,
+      _idempotency_key: context?.idempotencyKey ?? null,
+    });
 
     if (error) {
       throw new ServiceError(error.message ?? "Failed to create pricing plan", {
@@ -351,32 +467,30 @@ export const adminRepository: AdminRepository = {
       });
     }
 
-    return data as AdminPricingPlan;
+    return await selectPricingPlanById(data as string);
   },
-  async updatePricingPlan(id, input) {
+  async updatePricingPlan(id, input, context) {
     if (Object.keys(input).length === 0) {
-      const { data, error } = await supabase
-        .from("pricing_plans")
-        .select(PRICING_PLAN_COLUMNS)
-        .eq("id", id)
-        .single();
-
-      if (error) {
-        throw new ServiceError(error.message ?? "Failed to load pricing plan", {
-          code: error.code,
-          details: error,
-        });
-      }
-
-      return data as AdminPricingPlan;
+      return await selectPricingPlanById(id);
     }
 
-    const { data, error } = await supabase
-      .from("pricing_plans")
-      .update(input)
-      .eq("id", id)
-      .select(PRICING_PLAN_COLUMNS)
-      .single();
+    const { data, error } = await (supabase.rpc as any)("admin_update_pricing_plan", {
+      _plan_id: id,
+      _name: input.name ?? null,
+      _description: input.description ?? null,
+      _doctor_limit_label: input.doctor_limit_label ?? null,
+      _features: input.features ?? null,
+      _monthly_price: input.monthly_price ?? null,
+      _annual_price: input.annual_price ?? null,
+      _currency: input.currency ?? null,
+      _default_billing_cycle: input.default_billing_cycle ?? null,
+      _is_popular: input.is_popular ?? null,
+      _is_public: input.is_public ?? null,
+      _is_enterprise_contact: input.is_enterprise_contact ?? null,
+      _display_order: input.display_order ?? null,
+      _request_id: context?.requestId ?? null,
+      _idempotency_key: context?.idempotencyKey ?? null,
+    });
 
     if (error) {
       throw new ServiceError(error.message ?? "Failed to update pricing plan", {
@@ -385,13 +499,14 @@ export const adminRepository: AdminRepository = {
       });
     }
 
-    return data as AdminPricingPlan;
+    return await selectPricingPlanById(data as string);
   },
-  async deletePricingPlan(id) {
-    const { error } = await supabase
-      .from("pricing_plans")
-      .delete()
-      .eq("id", id);
+  async deletePricingPlan(id, context) {
+    const { error } = await (supabase.rpc as any)("admin_delete_pricing_plan", {
+      _plan_id: id,
+      _request_id: context?.requestId ?? null,
+      _idempotency_key: context?.idempotencyKey ?? null,
+    });
 
     if (error) {
       throw new ServiceError(error.message ?? "Failed to delete pricing plan", {
@@ -411,8 +526,10 @@ export const adminRepository: AdminRepository = {
 
     return (data ?? {}) as AdminSubscriptionStats;
   },
-  async getOperationsAlertSummary() {
-    const { data, error } = await supabase.rpc("admin_operations_alert_summary");
+  async getOperationsAlertSummary(tenantId?: string) {
+    const { data, error } = await (supabase.rpc as any)("admin_operations_alert_summary", {
+      _tenant_id: tenantId ?? null,
+    });
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load operations alert summary", {
         code: error.code,
@@ -426,8 +543,11 @@ export const adminRepository: AdminRepository = {
 
     return ((data ?? {}) as AdminOperationsAlertSummary);
   },
-  async getRecentJobActivity(limit = 10) {
-    const { data, error } = await supabase.rpc("admin_recent_job_activity", { _limit: limit });
+  async getRecentJobActivity(limit = 10, tenantId?: string) {
+    const { data, error } = await (supabase.rpc as any)("admin_recent_job_activity", {
+      _limit: limit,
+      _tenant_id: tenantId ?? null,
+    });
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load recent job activity", {
         code: error.code,
@@ -437,8 +557,25 @@ export const adminRepository: AdminRepository = {
 
     return (Array.isArray(data) ? data : []) as AdminRecentJobActivity[];
   },
-  async getRecentSystemErrors(limit = 10) {
-    const { data, error } = await supabase.rpc("admin_recent_system_errors", { _limit: limit });
+  async getRecentActivity(limit = 20, tenantId?: string) {
+    const { data, error } = await (supabase.rpc as any)("admin_recent_activity", {
+      _limit: limit,
+      _tenant_id: tenantId ?? null,
+    });
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to load recent admin activity", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return (Array.isArray(data) ? data : []) as AdminRecentActivity[];
+  },
+  async getRecentSystemErrors(limit = 10, tenantId?: string) {
+    const { data, error } = await (supabase.rpc as any)("admin_recent_system_errors", {
+      _limit: limit,
+      _tenant_id: tenantId ?? null,
+    });
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load recent system errors", {
         code: error.code,
@@ -448,10 +585,11 @@ export const adminRepository: AdminRepository = {
 
     return (Array.isArray(data) ? data : []) as AdminRecentSystemError[];
   },
-  async getClientErrorTrend(bucketMinutes = 15, bucketCount = 6) {
-    const { data, error } = await supabase.rpc("admin_client_error_trend", {
+  async getClientErrorTrend(bucketMinutes = 15, bucketCount = 6, tenantId?: string) {
+    const { data, error } = await (supabase.rpc as any)("admin_client_error_trend", {
       _bucket_minutes: bucketMinutes,
       _bucket_count: bucketCount,
+      _tenant_id: tenantId ?? null,
     });
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load client error trend", {
@@ -462,35 +600,19 @@ export const adminRepository: AdminRepository = {
 
     return (Array.isArray(data) ? data : []) as AdminClientErrorTrendPoint[];
   },
-  async updateSubscription(id, input) {
-    const payload: Record<string, unknown> = {};
-    if (input.plan !== undefined) payload.plan = input.plan;
-    if (input.status !== undefined) payload.status = input.status;
-    if (input.billing_cycle !== undefined) payload.billing_cycle = input.billing_cycle;
-
-    if (Object.keys(payload).length === 0) {
-      const { data, error } = await supabase
-        .from("subscriptions")
-        .select(SUBSCRIPTION_COLUMNS)
-        .eq("id", id)
-        .single();
-
-      if (error) {
-        throw new ServiceError(error.message ?? "Failed to load subscription", {
-          code: error.code,
-          details: error,
-        });
-      }
-
-      return data as AdminSubscription;
+  async updateSubscription(id, input, context) {
+    if (Object.keys(input).length === 0) {
+      return await selectSubscriptionById(id);
     }
 
-    const { data, error } = await supabase
-      .from("subscriptions")
-      .update(payload)
-      .eq("id", id)
-      .select(SUBSCRIPTION_COLUMNS)
-      .single();
+    const { data, error } = await (supabase.rpc as any)("admin_update_subscription", {
+      _subscription_id: id,
+      _plan: input.plan ?? null,
+      _status: input.status ?? null,
+      _billing_cycle: input.billing_cycle ?? null,
+      _request_id: context?.requestId ?? null,
+      _idempotency_key: context?.idempotencyKey ?? null,
+    });
 
     if (error) {
       throw new ServiceError(error.message ?? "Failed to update subscription", {
@@ -499,6 +621,37 @@ export const adminRepository: AdminRepository = {
       });
     }
 
-    return data as AdminSubscription;
+    return await selectSubscriptionById(data as string);
+  },
+  async getTenantUsage(tenantId) {
+    const { data, error } = await (supabase.rpc as any)("admin_tenant_usage_summary", {
+      _tenant_id: tenantId,
+    });
+
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to load tenant usage", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return ((Array.isArray(data) ? data[0] : data) ?? {}) as AdminTenantUsage;
+  },
+  async retryJobs(input) {
+    const { data, error } = await (supabase.rpc as any)("admin_retry_jobs", {
+      _job_ids: input.job_ids,
+      _request_id: input.requestId,
+      _reason: input.reason,
+      _idempotency_key: input.idempotencyKey,
+    });
+
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to retry jobs", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return (Array.isArray(data) ? data : []) as AdminRecentJobActivity[];
   },
 };

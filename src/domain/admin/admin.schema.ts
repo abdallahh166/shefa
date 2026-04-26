@@ -141,6 +141,27 @@ export const adminRecentJobActivitySchema = z.object({
   locked_by: z.string().trim().max(120).nullable().optional(),
   run_at: dateTimeStringSchema,
   updated_at: dateTimeStringSchema,
+  initiated_by: uuidSchema.nullable().optional(),
+  initiated_as: z.enum(["super_admin", "tenant_user", "system"]).optional(),
+  last_attempt_at: dateTimeStringSchema.nullable().optional(),
+  error_code: z.string().trim().max(120).nullable().optional(),
+  error_class: z.enum(["transient", "permanent"]).nullable().optional(),
+});
+
+export const adminRecentActivitySchema = z.object({
+  id: uuidSchema,
+  tenant_id: uuidSchema.nullable().optional(),
+  tenant_name: z.string().trim().min(1).max(200).nullable().optional(),
+  actor_id: uuidSchema,
+  actor_name: z.string().trim().min(1).max(200).nullable().optional(),
+  action: z.string().trim().min(1).max(200),
+  action_type: z.string().trim().min(1).max(120),
+  resource_type: z.string().trim().min(1).max(120),
+  resource_id: uuidSchema.nullable().optional(),
+  request_id: uuidSchema.nullable().optional(),
+  is_global: z.boolean(),
+  metadata: z.record(z.unknown()).nullable().optional(),
+  created_at: dateTimeStringSchema,
 });
 
 export const adminRecentSystemErrorSchema = z.object({
@@ -164,4 +185,19 @@ export const adminOperationsDashboardResponseSchema = adminOperationsAlertsRespo
   recent_job_activity: z.array(adminRecentJobActivitySchema),
   recent_system_errors: z.array(adminRecentSystemErrorSchema),
   client_error_trend: z.array(adminClientErrorTrendPointSchema),
+});
+
+export const adminTenantUsageSchema = z.object({
+  tenant_id: uuidSchema,
+  patients_count: z.coerce.number().int().nonnegative(),
+  staff_count: z.coerce.number().int().nonnegative(),
+  storage_bytes: z.coerce.number().int().nonnegative(),
+  api_requests_30d: z.coerce.number().int().nonnegative(),
+  jobs_pending_count: z.coerce.number().int().nonnegative(),
+  jobs_failed_count: z.coerce.number().int().nonnegative(),
+});
+
+export const adminJobRetryInputSchema = z.object({
+  job_ids: z.array(uuidSchema).min(1).max(25),
+  reason: z.string().trim().min(3).max(500),
 });

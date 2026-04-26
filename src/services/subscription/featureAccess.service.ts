@@ -32,7 +32,7 @@ function computeIsExpired(status: string, expiresAt?: string | null) {
 
 async function loadSnapshot(tenantId: string): Promise<EntitlementSnapshot> {
   const { user, tenantOverride } = useAuth.getState();
-  if (user?.role === "super_admin" && !tenantOverride) {
+  if (user?.globalRoles?.includes("super_admin") && !tenantOverride) {
     return {
       plan: "enterprise",
       status: "active",

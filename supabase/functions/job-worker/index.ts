@@ -9,6 +9,37 @@ const allowedOrigins = getAllowedOriginsFromEnv();
 
 const DEFAULT_BATCH_SIZE = 10;
 
+type JobErrorClass = "transient" | "permanent";
+
+function classifyJobFailure(status?: number, message?: string | null): {
+  errorCode: string | null;
+  errorClass: JobErrorClass;
+} {
+  const normalizedMessage = (message ?? "").toLowerCase();
+
+  if (typeof status === "number") {
+    if (status === 408 || status === 425 || status === 429 || status >= 500) {
+      return { errorCode: `HTTP_${status}`, errorClass: "transient" };
+    }
+
+    if (status >= 400) {
+      return { errorCode: `HTTP_${status}`, errorClass: "permanent" };
+    }
+  }
+
+  if (
+    normalizedMessage.includes("timeout")
+    || normalizedMessage.includes("temporar")
+    || normalizedMessage.includes("network")
+    || normalizedMessage.includes("rate limit")
+    || normalizedMessage.includes("too many requests")
+  ) {
+    return { errorCode: "TRANSIENT_ERROR", errorClass: "transient" };
+  }
+
+  return { errorCode: "PERMANENT_ERROR", errorClass: "permanent" };
+}
+
 Deno.serve(async (req) => {
   initSentry();
   const { corsHeaders, errorResponse } = enforceCors(req, { allowedOrigins });
@@ -112,12 +143,22 @@ Deno.serve(async (req) => {
 
         if (!res.ok) {
           const errText = await res.text();
-          throw new Error(errText || `Job failed with status ${res.status}`);
+          const error = new Error(errText || `Job failed with status ${res.status}`) as Error & { status?: number };
+          error.status = res.status;
+          throw error;
         }
 
         await adminClient
           .from("jobs")
-          .update({ status: "completed", locked_at: null, locked_by: null })
+          .update({
+            status: "completed",
+            locked_at: null,
+            locked_by: null,
+            last_error: null,
+            last_attempt_at: new Date().toISOString(),
+            error_code: null,
+            error_class: null,
+          })
           .eq("id", job.id);
 
         await persistSystemLog(adminClient, "job-worker", "info", "job_completed", {
@@ -137,16 +178,24 @@ Deno.serve(async (req) => {
         const maxAttempts = job.max_attempts ?? 3;
         const nextAttemptAt = new Date(Date.now() + attempts * 60 * 1000).toISOString();
         const isDead = attempts >= maxAttempts;
+        const message = err instanceof Error ? err.message : String(err);
+        const status = typeof err === "object" && err !== null && "status" in err && typeof (err as { status?: unknown }).status === "number"
+          ? Number((err as { status: number }).status)
+          : undefined;
+        const classification = classifyJobFailure(status, message);
 
         await adminClient
           .from("jobs")
           .update({
             attempts,
             status: isDead ? "dead_letter" : "pending",
-            last_error: err instanceof Error ? err.message : String(err),
+            last_error: message,
             next_attempt_at: isDead ? null : nextAttemptAt,
             locked_at: null,
             locked_by: null,
+            last_attempt_at: new Date().toISOString(),
+            error_code: classification.errorCode,
+            error_class: classification.errorClass,
           })
           .eq("id", job.id);
 
@@ -160,7 +209,9 @@ Deno.serve(async (req) => {
             job_id: job.id,
             job_type: job.type,
             attempts,
-            error: err instanceof Error ? err.message : String(err),
+            error: message,
+            error_code: classification.errorCode,
+            error_class: classification.errorClass,
           },
         });
       }

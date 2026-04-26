@@ -25,7 +25,7 @@ export const auditLogService = {
     }
   },
   async logEvent(input: {
-    tenant_id: string;
+    tenant_id?: string | null;
     user_id: string;
     action: string;
     entity_type: string;

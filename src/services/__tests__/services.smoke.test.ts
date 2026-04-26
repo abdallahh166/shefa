@@ -19,9 +19,12 @@ const adminRepository = vi.hoisted(() => ({
   getSubscriptionStats: vi.fn(),
   getOperationsAlertSummary: vi.fn(),
   getRecentJobActivity: vi.fn(),
+  getRecentActivity: vi.fn(),
   getRecentSystemErrors: vi.fn(),
   getClientErrorTrend: vi.fn(),
   updateSubscription: vi.fn(),
+  getTenantUsage: vi.fn(),
+  retryJobs: vi.fn(),
 }));
 
 const clinicSlugRepository = vi.hoisted(() => ({ checkSlug: vi.fn() }));
@@ -66,7 +69,7 @@ vi.mock("@/core/auth/authStore", () => ({
   useAuth: {
     getState: () => ({
       hasPermission: () => true,
-      user: { id: userId, role: "super_admin" },
+      user: { id: userId, globalRoles: ["super_admin"], tenantRoles: [] },
       lastVerifiedAt: new Date().toISOString(),
     }),
   },
@@ -94,6 +97,11 @@ vi.mock("@/services/subscription/subscription.repository", () => ({ subscription
 vi.mock("@/services/observability/clientErrorLog.repository", () => ({ clientErrorLogRepository }));
 vi.mock("@/services/realtime/realtime.repository", () => ({ realtimeRepository }));
 vi.mock("@/services/jobs/job.repository", () => ({ jobRepository }));
+vi.mock("@/services/admin/adminSecurity.service", () => ({
+  adminSecurityService: {
+    assertAccess: vi.fn(async () => undefined),
+  },
+}));
 
 import { adminService } from "@/services/admin/admin.service";
 import { clinicSlugService } from "@/services/auth/clinicSlug.service";
@@ -188,6 +196,7 @@ describe("services smoke", () => {
       last_client_error_at: null,
     });
     adminRepository.getRecentJobActivity.mockResolvedValue([]);
+    adminRepository.getRecentActivity.mockResolvedValue([]);
     adminRepository.getRecentSystemErrors.mockResolvedValue([]);
     adminRepository.getClientErrorTrend.mockResolvedValue([]);
     adminRepository.updateSubscription.mockResolvedValue({
@@ -202,6 +211,16 @@ describe("services smoke", () => {
       created_at: now,
       tenants: { name: "Clinic", slug: "clinic" },
     });
+    adminRepository.getTenantUsage.mockResolvedValue({
+      tenant_id: tenantId,
+      patients_count: 0,
+      staff_count: 0,
+      storage_bytes: 0,
+      api_requests_30d: 0,
+      jobs_pending_count: 0,
+      jobs_failed_count: 0,
+    });
+    adminRepository.retryJobs.mockResolvedValue([]);
     clinicSlugRepository.checkSlug.mockResolvedValue({ available: true, slug: "clinic", suggestions: [] });
     notificationRepository.listByUserPaged.mockResolvedValue({ data: [], count: 0 });
     notificationRepository.markRead.mockResolvedValue(undefined);
@@ -424,7 +443,7 @@ describe("services smoke", () => {
 
     expect(queryKeys.patients.root(tenantId)).toEqual(["patients", tenantId]);
     expect(queryKeys.admin.operationsAlerts()).toEqual(["admin", "operationsAlerts"]);
-    expect(queryKeys.admin.operationsDashboard()).toEqual(["admin", "operationsDashboard"]);
+    expect(queryKeys.admin.operationsDashboard()).toEqual(["admin", "operationsDashboard", "all"]);
     expect(queryKeys.admin.pricingPlans()).toEqual(["admin", "pricingPlans"]);
     expect(servicesIndex.authService).toBeDefined();
   });

@@ -23,12 +23,19 @@ function requireCurrentUser() {
   return currentUser;
 }
 
+function toPrimaryRole(currentUser: AppUser) {
+  if (currentUser.globalRoles.includes("super_admin")) return "super_admin";
+  return currentUser.tenantRoles[0] ?? null;
+}
+
 function toActorDetails(currentUser: AppUser) {
   return {
     actor_user_id: currentUser.id,
     actor_name: currentUser.name,
     actor_email: currentUser.email,
-    actor_role: currentUser.role,
+    actor_role: toPrimaryRole(currentUser),
+    actor_global_roles: currentUser.globalRoles,
+    actor_tenant_roles: currentUser.tenantRoles,
   };
 }
 
@@ -54,7 +61,8 @@ export const adminImpersonationService = {
           id: currentUser.id,
           name: currentUser.name,
           email: currentUser.email,
-          role: currentUser.role,
+          globalRoles: currentUser.globalRoles,
+          tenantRoles: currentUser.tenantRoles,
         },
         targetTenant,
       } as const;
@@ -98,7 +106,7 @@ export const adminImpersonationService = {
       const endedAt = new Date().toISOString();
       const durationSeconds = Math.max(
         0,
-        Math.round((new Date(endedAt).getTime() - new Date(impersonationSession.startedAt).getTime()) / 1000)
+        Math.round((new Date(endedAt).getTime() - new Date(impersonationSession.startedAt).getTime()) / 1000),
       );
 
       await auditLogService.logEvent({

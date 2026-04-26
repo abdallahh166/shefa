@@ -1,6 +1,6 @@
 import type { DomainEvent, DomainEventName } from "../event-types";
 import { enqueueJob, buildJob } from "@/core/jobs";
-import { useAuth } from "@/core/auth/authStore";
+import { getPrimaryRole, useAuth } from "@/core/auth/authStore";
 
 const ANALYTICS_EVENTS: DomainEventName[] = [
   "AppointmentCreated",
@@ -15,7 +15,7 @@ export function registerAnalyticsHandlers(
 ) {
   ANALYTICS_EVENTS.forEach((name) => {
     on(name, async (event) => {
-      const role = useAuth.getState().user?.role ?? null;
+      const role = getPrimaryRole(useAuth.getState().user);
       if (role && !["clinic_admin", "super_admin"].includes(role)) {
         return;
       }

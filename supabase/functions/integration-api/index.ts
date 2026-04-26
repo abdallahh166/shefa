@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enforceCors, getAllowedOriginsFromEnv } from "../_shared/cors.ts";
 import { initSentry } from "../_shared/sentry.ts";
-import { logError, logInfo } from "../_shared/logger.ts";
+import { logError, logInfo, persistSystemLog } from "../_shared/logger.ts";
 import { createRequestId } from "../_shared/request.ts";
 
 const allowedOrigins = getAllowedOriginsFromEnv();
@@ -130,14 +130,34 @@ Deno.serve(async (req) => {
 
     logInfo("integration_api_access", {
       request_id: requestId,
+      tenant_id: keyRow.tenant_id,
       action_type: "integration_api",
       resource_type: resource,
       metadata: { tenant_id: keyRow.tenant_id },
     });
+    await persistSystemLog(adminClient, "integration-api", "info", "integration_api_access", {
+      request_id: requestId,
+      tenant_id: keyRow.tenant_id,
+      action_type: "integration_api",
+      resource_type: resource,
+      metadata: {
+        api_key_id: keyRow.id,
+        resource,
+      },
+    });
 
     return new Response(JSON.stringify({ success: true, resource, data }), { status: 200, headers: baseHeaders });
   } catch (err) {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
     logError("integration_api_failed", {
+      request_id: requestId,
+      action_type: "integration_api",
+      resource_type: "integration_api",
+      metadata: { error: err instanceof Error ? err.message : String(err) },
+    });
+    await persistSystemLog(adminClient, "integration-api", "error", "integration_api_failed", {
       request_id: requestId,
       action_type: "integration_api",
       resource_type: "integration_api",

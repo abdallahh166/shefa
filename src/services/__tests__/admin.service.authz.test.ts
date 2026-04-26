@@ -15,9 +15,12 @@ const adminRepository = vi.hoisted(() => ({
   getSubscriptionStats: vi.fn(),
   getOperationsAlertSummary: vi.fn(),
   getRecentJobActivity: vi.fn(),
+  getRecentActivity: vi.fn(),
   getRecentSystemErrors: vi.fn(),
   getClientErrorTrend: vi.fn(),
   updateSubscription: vi.fn(),
+  getTenantUsage: vi.fn(),
+  retryJobs: vi.fn(),
 }));
 
 const permissions = vi.hoisted(() => ({
@@ -37,6 +40,14 @@ vi.mock("@/services/auth/recentAuth.service", () => ({
     assertRecentAuth: vi.fn(),
   },
 }));
+vi.mock("@/services/auth/auth.service", () => ({
+  authService: {
+    getMfaAssuranceLevel: vi.fn(async () => ({
+      currentLevel: "aal2",
+      nextLevel: "aal2",
+    })),
+  },
+}));
 vi.mock("@/services/settings/audit.service", () => ({
   auditLogService: {
     logEvent: vi.fn(),
@@ -47,7 +58,8 @@ vi.mock("@/core/auth/authStore", () => ({
     getState: () => ({
       user: {
         id: "00000000-0000-0000-0000-000000000111",
-        role: "super_admin",
+        globalRoles: ["super_admin"],
+        tenantRoles: [],
       },
     }),
   },
@@ -164,5 +176,40 @@ describe("adminService authorization", () => {
     });
 
     expect(featureFlagRepository.upsert).not.toHaveBeenCalled();
+  });
+
+  it("checks for super admin access before loading tenant usage", async () => {
+    adminRepository.getTenantUsage.mockResolvedValue({
+      tenant_id: "00000000-0000-0000-0000-000000000444",
+      patients_count: 12,
+      staff_count: 3,
+      storage_bytes: 2048,
+      api_requests_30d: 50,
+      jobs_pending_count: 1,
+      jobs_failed_count: 0,
+    });
+
+    await adminService.getTenantUsage("00000000-0000-0000-0000-000000000444");
+
+    expect(permissions.assertAnyPermission).toHaveBeenCalledWith(
+      ["super_admin"],
+      "Only super admins can access admin operations",
+    );
+  });
+
+  it("blocks job retry for non-super-admin callers", async () => {
+    permissions.assertAnyPermission.mockImplementation(() => {
+      throw new AuthorizationError("Only super admins can access admin operations");
+    });
+
+    await expect(adminService.retryJobs({
+      job_ids: ["00000000-0000-0000-0000-000000000555"],
+      reason: "Retry after transient failure",
+    })).rejects.toMatchObject({
+      name: "AuthorizationError",
+      message: "Only super admins can access admin operations",
+    });
+
+    expect(adminRepository.retryJobs).not.toHaveBeenCalled();
   });
 });

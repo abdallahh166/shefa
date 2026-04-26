@@ -251,6 +251,44 @@ async function ensureProfileAndRole(adminClient, input) {
   if (roleError) throw roleError;
 }
 
+async function ensureGlobalSuperAdmin(adminClient, input) {
+  const { error: profileError } = await adminClient
+    .from("profiles")
+    .upsert(
+      {
+        user_id: input.userId,
+        tenant_id: null,
+        full_name: input.fullName,
+      },
+      { onConflict: "user_id" },
+    );
+
+  if (profileError) throw profileError;
+
+  const { error: deleteRoleError } = await adminClient
+    .from("user_roles")
+    .delete()
+    .eq("user_id", input.userId)
+    .eq("role", "super_admin");
+
+  if (deleteRoleError) throw deleteRoleError;
+
+  const { error: globalRoleError } = await adminClient
+    .from("user_global_roles")
+    .upsert(
+      {
+        user_id: input.userId,
+        role: "super_admin",
+        granted_by: null,
+        break_glass: false,
+        break_glass_reason: null,
+      },
+      { onConflict: "user_id,role" },
+    );
+
+  if (globalRoleError) throw globalRoleError;
+}
+
 async function ensureTenantOwner(adminClient, input) {
   const { error: updateTenantError } = await adminClient
     .from("tenants")
@@ -286,35 +324,19 @@ async function ensureTenantOwner(adminClient, input) {
 }
 
 async function ensureSuperAdmin(adminClient, input) {
-  const { error: updateTenantError } = await adminClient
-    .from("tenants")
-    .update({ pending_owner_email: input.email })
-    .eq("id", input.tenantId);
-
-  if (updateTenantError) throw updateTenantError;
-
   const user = await ensureAuthUser(adminClient, {
     email: input.email,
     password: input.password,
     userMetadata: {
       full_name: input.fullName,
-      tenant_id: input.tenantId,
+      tenant_id: null,
     },
   });
 
-  await ensureProfileAndRole(adminClient, {
+  await ensureGlobalSuperAdmin(adminClient, {
     userId: user.id,
-    tenantId: input.tenantId,
     fullName: input.fullName,
-    role: "super_admin",
   });
-
-  const { error: clearPendingError } = await adminClient
-    .from("tenants")
-    .update({ pending_owner_email: null })
-    .eq("id", input.tenantId);
-
-  if (clearPendingError) throw clearPendingError;
 
   return user;
 }
@@ -612,19 +634,10 @@ async function main() {
     );
   }
 
-  const superAdminTenantId = await ensureTenant(adminClient, {
-    slug: `e2e-platform-admin-${superAdminIdentity.suffix}`,
-    name: "E2E Platform Admin",
-    email: superAdminIdentity.email,
-  });
-
-  await ensurePricingPlanSubscription(adminClient, superAdminTenantId, "enterprise", "monthly");
-
   const superAdminPassword = process.env.E2E_SUPER_ADMIN_PASSWORD || DEFAULT_PASSWORD;
   const superAdminEmail = process.env.E2E_SUPER_ADMIN_EMAIL || superAdminIdentity.email;
 
   await ensureSuperAdmin(adminClient, {
-    tenantId: superAdminTenantId,
     email: superAdminEmail,
     password: superAdminPassword,
     fullName: "E2E Super Admin",

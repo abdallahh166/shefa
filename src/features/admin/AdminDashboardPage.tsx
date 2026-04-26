@@ -13,17 +13,19 @@ import { PricingPlanDialog } from "@/features/admin/PricingPlanDialog";
 import { TenantFormDialog } from "@/features/admin/TenantFormDialog";
 import { TenantModulesDialog } from "@/features/admin/TenantModulesDialog";
 import { TenantStatusDialog } from "@/features/admin/TenantStatusDialog";
+import { TenantUsageDialog } from "@/features/admin/TenantUsageDialog";
+import { JobRetryDialog } from "@/features/admin/JobRetryDialog";
 import {
   Building2, Users, CreditCard, TrendingUp,
   BarChart3, LogOut, Eye, ChevronRight, Crown, HeartPulse,
-  Activity, AlertTriangle, Server, Plus, Pencil, Trash2, PauseCircle, PlayCircle, OctagonX, Shield,
+  Activity, AlertTriangle, Server, Plus, Pencil, Trash2, PauseCircle, PlayCircle, OctagonX, Shield, RotateCcw,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate, formatNumber } from "@/shared/utils/formatDate";
 import { toast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/primitives/Inputs";
-import { adminService } from "@/services/admin/admin.service";
+import { adminService, createAdminMutationContext } from "@/services/admin/admin.service";
 import { adminImpersonationService } from "@/services/admin/adminImpersonation.service";
 import { isFreshAuthRequiredError } from "@/services/auth/recentAuth.service";
 import { queryKeys } from "@/services/queryKeys";
@@ -33,6 +35,7 @@ import type {
   AdminClientErrorTrendPoint,
   AdminTenantFeatureFlag,
   AdminPricingPlan,
+  AdminRecentActivity,
   AdminRecentJobActivity,
   AdminRecentSystemError,
   AdminTenant,
@@ -64,6 +67,7 @@ export const AdminDashboardPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
+  const [operationsTenantFilter, setOperationsTenantFilter] = useState<string>("all");
   const [clinicFilter, setClinicFilter] = useState<string | null>(null);
   const [subFilter, setSubFilter] = useState<string | null>(null);
   const [clinicPage, setClinicPage] = useState(1);
@@ -110,7 +114,11 @@ export const AdminDashboardPage = () => {
     status: "active" | "suspended" | "deactivated";
   } | null>(null);
   const [tenantStatusLoading, setTenantStatusLoading] = useState(false);
+  const [tenantUsageTarget, setTenantUsageTarget] = useState<AdminTenant | null>(null);
+  const [jobRetryTarget, setJobRetryTarget] = useState<{ ids: string[]; tenantName?: string | null } | null>(null);
+  const [jobRetryLoading, setJobRetryLoading] = useState(false);
   const pageSize = 20;
+  const operationsTenantId = operationsTenantFilter === "all" ? undefined : operationsTenantFilter;
 
   useEffect(() => {
     setClinicPage(1);
@@ -185,8 +193,17 @@ export const AdminDashboardPage = () => {
     data: operationsDashboard,
     isLoading: loadingOperationsDashboard,
   } = useQuery({
-    queryKey: queryKeys.admin.operationsDashboard(),
-    queryFn: () => adminService.getOperationsDashboard(),
+    queryKey: queryKeys.admin.operationsDashboard(operationsTenantId),
+    queryFn: () => adminService.getOperationsDashboard(operationsTenantId),
+    enabled: activeTab === "overview" || activeTab === "operations",
+  });
+
+  const {
+    data: recentAdminActivity = [],
+    isLoading: loadingRecentAdminActivity,
+  } = useQuery({
+    queryKey: queryKeys.admin.activity(operationsTenantId),
+    queryFn: () => adminService.getRecentActivity(operationsTenantId),
     enabled: activeTab === "overview" || activeTab === "operations",
   });
 
@@ -206,14 +223,26 @@ export const AdminDashboardPage = () => {
   });
 
   const { data: recentTenantsResponse } = useQuery({
-    queryKey: queryKeys.admin.tenants({ page: 1, pageSize: 5 }),
-    queryFn: () => adminService.listTenantsPaged({ page: 1, pageSize: 5 }),
+    queryKey: queryKeys.admin.tenants({ page: 1, pageSize: 100 }),
+    queryFn: () => adminService.listTenantsPaged({ page: 1, pageSize: 100 }),
+  });
+
+  const { data: tenantUsage, isLoading: loadingTenantUsage } = useQuery({
+    queryKey: tenantUsageTarget ? queryKeys.admin.tenantUsage(tenantUsageTarget.id) : ["admin", "tenantUsage", "idle"],
+    queryFn: () => adminService.getTenantUsage(tenantUsageTarget!.id),
+    enabled: !!tenantUsageTarget,
   });
 
   const tenants = tenantsResponse?.data ?? [];
   const profiles = profilesResponse?.data ?? [];
   const subscriptions = subscriptionsResponse?.data ?? [];
   const recentTenants = recentTenantsResponse?.data ?? [];
+  const retryableJobs = (operationsDashboard?.recent_job_activity ?? []).filter(
+    (job) => job.status === "dead_letter" || Boolean(job.last_error),
+  );
+  const failedJobsFeed = (operationsDashboard?.recent_job_activity ?? []).filter(
+    (job) => job.status === "dead_letter" || job.status === "failed",
+  );
 
   const totalClinics = tenantsResponse?.total ?? 0;
   const totalUsers = profilesResponse?.total ?? 0;
@@ -294,10 +323,11 @@ export const AdminDashboardPage = () => {
   const handleSubUpdate = async () => {
     if (!confirmAction) return;
     const action = confirmAction;
+    const mutationContext = createAdminMutationContext();
     setActionLoading(true);
     try {
       const updatePayload = updatePayloadFromAction(action);
-      await adminService.updateSubscription(action.id, updatePayload);
+      await adminService.updateSubscription(action.id, updatePayload, mutationContext);
       toast({
         title: t("admin.toasts.subscriptionUpdated"),
         description: t("admin.toasts.subscriptionUpdatedDescription", {
@@ -312,11 +342,12 @@ export const AdminDashboardPage = () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "tenants"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.subscriptionStats() });
+      queryClient.invalidateQueries({ queryKey: ["admin", "activity"] });
     } catch (err: any) {
       if (isFreshAuthRequiredError(err)) {
         try {
           await requestFreshAuth();
-          await adminService.updateSubscription(action.id, updatePayloadFromAction(action));
+          await adminService.updateSubscription(action.id, updatePayloadFromAction(action), mutationContext);
           toast({
             title: t("admin.toasts.subscriptionUpdated"),
             description: t("admin.toasts.subscriptionUpdatedDescription", {
@@ -331,6 +362,7 @@ export const AdminDashboardPage = () => {
           queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] });
           queryClient.invalidateQueries({ queryKey: ["admin", "tenants"] });
           queryClient.invalidateQueries({ queryKey: queryKeys.admin.subscriptionStats() });
+          queryClient.invalidateQueries({ queryKey: ["admin", "activity"] });
         } catch {
           return;
         }
@@ -360,16 +392,17 @@ export const AdminDashboardPage = () => {
   };
 
   const handleTenantSubmit = async (input: any) => {
+    const mutationContext = createAdminMutationContext();
     setTenantSaveLoading(true);
     try {
       if (tenantDialogMode === "create") {
-        await adminService.createTenant(input);
+        await adminService.createTenant(input, mutationContext);
         toast({
           title: t("admin.toasts.tenantCreated"),
           description: t("admin.toasts.tenantCreatedDescription"),
         });
       } else if (editingTenant) {
-        await adminService.updateTenant(editingTenant.id, input);
+        await adminService.updateTenant(editingTenant.id, input, mutationContext);
         toast({
           title: t("admin.toasts.tenantUpdated"),
           description: t("admin.toasts.tenantUpdatedDescription", {
@@ -381,6 +414,7 @@ export const AdminDashboardPage = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin", "tenants"] }),
         queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "activity"] }),
       ]);
 
       setTenantDialogOpen(false);
@@ -390,13 +424,14 @@ export const AdminDashboardPage = () => {
         try {
           await requestFreshAuth();
           if (tenantDialogMode === "create") {
-            await adminService.createTenant(input);
+            await adminService.createTenant(input, mutationContext);
           } else if (editingTenant) {
-            await adminService.updateTenant(editingTenant.id, input);
+            await adminService.updateTenant(editingTenant.id, input, mutationContext);
           }
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ["admin", "tenants"] }),
             queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] }),
+            queryClient.invalidateQueries({ queryKey: ["admin", "activity"] }),
           ]);
           toast({
             title: t("admin.toasts.tenantSaved"),
@@ -422,9 +457,10 @@ export const AdminDashboardPage = () => {
 
   const handleTenantStatusSubmit = async (input: { status: "active" | "suspended" | "deactivated"; status_reason: string | null }) => {
     if (!tenantStatusTarget) return;
+    const mutationContext = createAdminMutationContext();
     setTenantStatusLoading(true);
     try {
-      await adminService.updateTenantStatus(tenantStatusTarget.tenant.id, input);
+      await adminService.updateTenantStatus(tenantStatusTarget.tenant.id, input, mutationContext);
       toast({
         title: t("admin.toasts.tenantStatusUpdated"),
         description: t("admin.toasts.tenantStatusUpdatedDescription", {
@@ -435,16 +471,18 @@ export const AdminDashboardPage = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin", "tenants"] }),
         queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "activity"] }),
       ]);
       setTenantStatusTarget(null);
     } catch (err: any) {
       if (isFreshAuthRequiredError(err)) {
         try {
           await requestFreshAuth();
-          await adminService.updateTenantStatus(tenantStatusTarget.tenant.id, input);
+          await adminService.updateTenantStatus(tenantStatusTarget.tenant.id, input, mutationContext);
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ["admin", "tenants"] }),
             queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] }),
+            queryClient.invalidateQueries({ queryKey: ["admin", "activity"] }),
           ]);
           toast({
             title: t("admin.toasts.tenantStatusUpdated"),
@@ -473,12 +511,13 @@ export const AdminDashboardPage = () => {
   const handleTenantModuleToggle = async (featureKey: AdminTenantFeatureFlag["feature_key"], enabled: boolean) => {
     if (!tenantModulesTarget) return;
 
+    const mutationContext = createAdminMutationContext();
     setTenantModuleSavingKey(featureKey);
     try {
       await adminService.updateTenantFeatureFlag(tenantModulesTarget.id, {
         feature_key: featureKey,
         enabled,
-      });
+      }, mutationContext);
       toast({
         title: t("admin.toasts.tenantModuleUpdated"),
         description: t("admin.toasts.tenantModuleUpdatedDescription", {
@@ -488,6 +527,7 @@ export const AdminDashboardPage = () => {
         }),
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.admin.featureFlags(tenantModulesTarget.id) });
+      await queryClient.invalidateQueries({ queryKey: ["admin", "activity"] });
     } catch (err: any) {
       if (isFreshAuthRequiredError(err)) {
         try {
@@ -495,8 +535,9 @@ export const AdminDashboardPage = () => {
           await adminService.updateTenantFeatureFlag(tenantModulesTarget.id, {
             feature_key: featureKey,
             enabled,
-          });
+          }, mutationContext);
           await queryClient.invalidateQueries({ queryKey: queryKeys.admin.featureFlags(tenantModulesTarget.id) });
+          await queryClient.invalidateQueries({ queryKey: ["admin", "activity"] });
           toast({
             title: t("admin.toasts.tenantModuleUpdated"),
             description: t("admin.toasts.tenantModuleUpdatedDescription", {
@@ -521,6 +562,61 @@ export const AdminDashboardPage = () => {
     }
   };
 
+  const handleRetryJobs = async (reason: string) => {
+    if (!jobRetryTarget) return;
+    const mutationContext = createAdminMutationContext();
+    setJobRetryLoading(true);
+    try {
+      await adminService.retryJobs({
+        job_ids: jobRetryTarget.ids,
+        reason,
+      }, mutationContext);
+      toast({
+        title: jobRetryTarget.ids.length > 1 ? "Jobs requeued" : "Job requeued",
+        description: jobRetryTarget.ids.length > 1
+          ? `${jobRetryTarget.ids.length} jobs were requeued safely.`
+          : "The selected job was requeued safely.",
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.admin.operationsDashboard(operationsTenantId) }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "activity"] }),
+      ]);
+      setJobRetryTarget(null);
+    } catch (err: any) {
+      if (isFreshAuthRequiredError(err)) {
+        try {
+          await requestFreshAuth();
+          await adminService.retryJobs({
+            job_ids: jobRetryTarget.ids,
+            reason,
+          }, mutationContext);
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: queryKeys.admin.operationsDashboard(operationsTenantId) }),
+            queryClient.invalidateQueries({ queryKey: ["admin", "activity"] }),
+          ]);
+          toast({
+            title: jobRetryTarget.ids.length > 1 ? "Jobs requeued" : "Job requeued",
+            description: jobRetryTarget.ids.length > 1
+              ? `${jobRetryTarget.ids.length} jobs were requeued safely.`
+              : "The selected job was requeued safely.",
+          });
+          setJobRetryTarget(null);
+        } catch {
+          return;
+        }
+        return;
+      }
+
+      toast({
+        title: "Unable to retry jobs",
+        description: err?.message || "The selected jobs could not be retried.",
+        variant: "destructive",
+      });
+    } finally {
+      setJobRetryLoading(false);
+    }
+  };
+
   const availablePlanCodes = PLAN_OPTIONS.filter(
     (planCode) => !pricingPlans.some((plan) => plan.plan_code === planCode),
   );
@@ -538,16 +634,17 @@ export const AdminDashboardPage = () => {
   };
 
   const handlePricingPlanSubmit = async (input: any) => {
+    const mutationContext = createAdminMutationContext();
     setPricingSaveLoading(true);
     try {
       if (pricingDialogMode === "create") {
-        await adminService.createPricingPlan(input);
+        await adminService.createPricingPlan(input, mutationContext);
         toast({
           title: t("admin.toasts.pricingPlanCreated"),
           description: t("admin.toasts.pricingPlanCreatedDescription"),
         });
       } else if (editingPricingPlan) {
-        await adminService.updatePricingPlan(editingPricingPlan.id, input);
+        await adminService.updatePricingPlan(editingPricingPlan.id, input, mutationContext);
         toast({
           title: t("admin.toasts.pricingUpdated"),
           description: t("admin.toasts.pricingUpdatedDescription"),
@@ -559,6 +656,7 @@ export const AdminDashboardPage = () => {
         queryClient.invalidateQueries({ queryKey: queryKeys.pricing.public() }),
         queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] }),
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.subscriptionStats() }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "activity"] }),
       ]);
 
       setPricingDialogOpen(false);
@@ -568,9 +666,9 @@ export const AdminDashboardPage = () => {
         try {
           await requestFreshAuth();
           if (pricingDialogMode === "create") {
-            await adminService.createPricingPlan(input);
+            await adminService.createPricingPlan(input, mutationContext);
           } else if (editingPricingPlan) {
-            await adminService.updatePricingPlan(editingPricingPlan.id, input);
+            await adminService.updatePricingPlan(editingPricingPlan.id, input, mutationContext);
           }
 
           await Promise.all([
@@ -578,6 +676,7 @@ export const AdminDashboardPage = () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.pricing.public() }),
             queryClient.invalidateQueries({ queryKey: ["admin", "subscriptions"] }),
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.subscriptionStats() }),
+            queryClient.invalidateQueries({ queryKey: ["admin", "activity"] }),
           ]);
 
           toast({
@@ -605,9 +704,10 @@ export const AdminDashboardPage = () => {
   const handleDeletePricingPlan = async () => {
     if (!pricingDeletePlan) return;
 
+    const mutationContext = createAdminMutationContext();
     setPricingDeleteLoading(true);
     try {
-      await adminService.deletePricingPlan(pricingDeletePlan.id);
+      await adminService.deletePricingPlan(pricingDeletePlan.id, mutationContext);
       toast({
         title: t("admin.toasts.pricingDeleted"),
         description: t("admin.toasts.pricingDeletedDescription", {
@@ -617,16 +717,18 @@ export const AdminDashboardPage = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.pricingPlans() }),
         queryClient.invalidateQueries({ queryKey: queryKeys.pricing.public() }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "activity"] }),
       ]);
       setPricingDeletePlan(null);
     } catch (err: any) {
       if (isFreshAuthRequiredError(err)) {
         try {
           await requestFreshAuth();
-          await adminService.deletePricingPlan(pricingDeletePlan.id);
+          await adminService.deletePricingPlan(pricingDeletePlan.id, mutationContext);
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.pricingPlans() }),
             queryClient.invalidateQueries({ queryKey: queryKeys.pricing.public() }),
+            queryClient.invalidateQueries({ queryKey: ["admin", "activity"] }),
           ]);
           toast({
             title: t("admin.toasts.pricingDeleted"),
@@ -710,6 +812,16 @@ export const AdminDashboardPage = () => {
           onClick={() => openEditTenant(c)}
         >
           <Pencil className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="View usage"
+          title="View usage"
+          data-testid={`admin-clinic-usage-${c.id}`}
+          onClick={() => setTenantUsageTarget(c)}
+        >
+          <Activity className="h-4 w-4" />
         </Button>
         <Button
           variant="ghost"
@@ -936,18 +1048,65 @@ export const AdminDashboardPage = () => {
       render: (job) => `${job.attempts}/${job.max_attempts}`,
     },
     {
+      key: "error_class",
+      header: "Failure class",
+      render: (job) => (
+        <div className="space-y-1">
+          <StatusBadge
+            variant={job.error_class === "permanent" ? "destructive" : job.error_class === "transient" ? "warning" : "default"}
+          >
+            {job.error_class ?? "unclassified"}
+          </StatusBadge>
+          <p className="text-xs text-muted-foreground">
+            {job.initiated_as ? `Initiated as ${job.initiated_as.replace("_", " ")}` : "Initiator not recorded"}
+          </p>
+        </div>
+      ),
+    },
+    {
       key: "last_error",
       header: t("admin.operations.lastErrorColumn"),
       render: (job) => (
-        <span className="line-clamp-2 max-w-[320px] text-sm text-muted-foreground">
-          {job.last_error || t("admin.operations.noErrorMessage")}
-        </span>
+        <div className="max-w-[320px] space-y-1">
+          <p className="line-clamp-2 text-sm text-muted-foreground">
+            {job.last_error || t("admin.operations.noErrorMessage")}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {job.error_code ? `Code: ${job.error_code}` : "No error code"}
+          </p>
+        </div>
       ),
     },
     {
       key: "updated_at",
       header: t("admin.dashboard.updated"),
-      render: (job) => formatDate(job.updated_at, locale, "datetime"),
+      render: (job) => (
+        <div className="space-y-1">
+          <p>{formatDate(job.updated_at, locale, "datetime")}</p>
+          <p className="text-xs text-muted-foreground">
+            {job.last_attempt_at ? `Last attempt ${formatDate(job.last_attempt_at, locale, "datetime")}` : "No attempt timestamp"}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "actions",
+      header: "",
+      render: (job) => {
+        const retryable = job.status === "dead_letter" || Boolean(job.last_error);
+        if (!retryable) return null;
+
+        return (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setJobRetryTarget({ ids: [job.id], tenantName: job.tenant_name })}
+          >
+            <RotateCcw className="h-4 w-4" />
+            Retry
+          </Button>
+        );
+      },
     },
   ];
 
@@ -984,6 +1143,59 @@ export const AdminDashboardPage = () => {
       key: "created_at",
       header: t("admin.dashboard.created"),
       render: (log) => formatDate(log.created_at, locale, "datetime"),
+    },
+  ];
+
+  const adminActivityColumns: Column<AdminRecentActivity>[] = [
+    {
+      key: "action_type",
+      header: "Action",
+      render: (entry) => (
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <p className="font-medium">{entry.action_type.replace(/_/g, " ")}</p>
+            <StatusBadge variant={entry.is_global ? "info" : "default"}>
+              {entry.is_global ? "Global" : entry.tenant_name ?? "Tenant"}
+            </StatusBadge>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {entry.actor_name ?? entry.actor_id}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "resource_type",
+      header: "Resource",
+      render: (entry) => (
+        <div className="space-y-1">
+          <p className="font-medium">{entry.resource_type}</p>
+          <p className="font-mono text-xs text-muted-foreground">
+            {entry.resource_id ?? "No resource id"}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "request_id",
+      header: "Request",
+      render: (entry) => (
+        <div className="space-y-1">
+          <p className="font-mono text-xs">{entry.request_id ?? "No request id"}</p>
+          <p className="text-xs text-muted-foreground">
+            {entry.metadata
+              && typeof (entry.metadata as Record<string, unknown>).reason === "string"
+              && ((entry.metadata as Record<string, unknown>).reason as string).trim().length > 0
+              ? ((entry.metadata as Record<string, unknown>).reason as string)
+              : entry.action}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "created_at",
+      header: t("admin.dashboard.created"),
+      render: (entry) => formatDate(entry.created_at, locale, "datetime"),
     },
   ];
 
@@ -1211,6 +1423,42 @@ export const AdminDashboardPage = () => {
 
         {activeTab === "operations" && (
           <div className="space-y-6 animate-fade-in">
+            <div className="flex flex-col gap-3 rounded-2xl border bg-card p-5 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-1">
+                <h3 className="font-semibold">Operations drill-down</h3>
+                <p className="text-sm text-muted-foreground">
+                  Filter the platform signals by tenant before retrying background work.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Select value={operationsTenantFilter} onValueChange={setOperationsTenantFilter}>
+                  <SelectTrigger className="w-[220px]">
+                    <SelectValue placeholder="All tenants" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All tenants</SelectItem>
+                    {recentTenants.map((tenant) => (
+                      <SelectItem key={tenant.id} value={tenant.id}>
+                        {tenant.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  disabled={retryableJobs.length === 0}
+                  onClick={() => setJobRetryTarget({
+                    ids: retryableJobs.map((job) => job.id),
+                    tenantName: operationsTenantId
+                      ? recentTenants.find((tenant) => tenant.id === operationsTenantId)?.name
+                      : null,
+                  })}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Retry visible jobs
+                </Button>
+              </div>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               <StatCard
                 title={t("admin.operations.pendingJobs")}
@@ -1259,14 +1507,21 @@ export const AdminDashboardPage = () => {
                       {t("admin.operations.recentJobFailuresDescription")}
                     </p>
                   </div>
-                  <StatusBadge variant={operationsSeverityVariant as "success" | "warning" | "destructive"}>
-                    {translateSeverity(operationsDashboard?.overall_severity)}
-                  </StatusBadge>
+                  <div className="flex items-center gap-2">
+                    {operationsTenantId ? (
+                      <StatusBadge variant="default">
+                        {recentTenants.find((tenant) => tenant.id === operationsTenantId)?.name ?? "Tenant filter"}
+                      </StatusBadge>
+                    ) : null}
+                    <StatusBadge variant={operationsSeverityVariant as "success" | "warning" | "destructive"}>
+                      {translateSeverity(operationsDashboard?.overall_severity)}
+                    </StatusBadge>
+                  </div>
                 </div>
 
                 <DataTable
                   columns={jobActivityColumns}
-                  data={operationsDashboard?.recent_job_activity ?? []}
+                  data={failedJobsFeed}
                   keyExtractor={(job) => job.id}
                   emptyMessage={t("admin.operations.recentJobFailuresEmpty")}
                   tableLabel={t("admin.operations.recentJobFailuresTable")}
@@ -1324,6 +1579,31 @@ export const AdminDashboardPage = () => {
                 keyExtractor={(log) => log.id}
                 emptyMessage={t("admin.operations.recentSystemErrorsEmpty")}
                 tableLabel={t("admin.operations.recentSystemErrorsTable")}
+              />
+            </div>
+
+            <div className="rounded-2xl border bg-card p-5 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold">Admin activity stream</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Recent super-admin actions with request IDs for incident correlation.
+                  </p>
+                </div>
+                {operationsTenantId ? (
+                  <StatusBadge variant="default">
+                    {recentTenants.find((tenant) => tenant.id === operationsTenantId)?.name ?? "Tenant filter"}
+                  </StatusBadge>
+                ) : null}
+              </div>
+
+              <DataTable
+                columns={adminActivityColumns}
+                data={recentAdminActivity}
+                keyExtractor={(entry) => entry.id}
+                emptyMessage={loadingRecentAdminActivity ? "Loading recent admin activity..." : "No recent admin activity."}
+                tableLabel="Recent admin activity"
+                isLoading={loadingRecentAdminActivity}
               />
             </div>
           </div>
@@ -1640,6 +1920,23 @@ export const AdminDashboardPage = () => {
         saving={tenantStatusLoading}
         onClose={() => setTenantStatusTarget(null)}
         onSubmit={handleTenantStatusSubmit}
+      />
+
+      <TenantUsageDialog
+        open={!!tenantUsageTarget}
+        tenant={tenantUsageTarget}
+        usage={tenantUsage ?? null}
+        loading={loadingTenantUsage}
+        onClose={() => setTenantUsageTarget(null)}
+      />
+
+      <JobRetryDialog
+        open={!!jobRetryTarget}
+        jobCount={jobRetryTarget?.ids.length ?? 0}
+        tenantName={jobRetryTarget?.tenantName}
+        loading={jobRetryLoading}
+        onClose={() => setJobRetryTarget(null)}
+        onSubmit={handleRetryJobs}
       />
 
       <ConfirmDialog

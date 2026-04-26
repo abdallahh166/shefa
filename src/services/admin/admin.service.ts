@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  adminJobRetryInputSchema,
   adminClientErrorTrendPointSchema,
   adminOperationsDashboardResponseSchema,
   adminOperationsAlertsResponseSchema,
@@ -7,6 +8,7 @@ import {
   adminPricingPlanCreateSchema,
   adminPricingPlanSchema,
   adminPricingPlanUpdateSchema,
+  adminRecentActivitySchema,
   adminRecentJobActivitySchema,
   adminRecentSystemErrorSchema,
   adminSubscriptionSchema,
@@ -16,6 +18,7 @@ import {
   adminTenantFeatureFlagUpdateSchema,
   adminTenantCreateSchema,
   adminTenantSchema,
+  adminTenantUsageSchema,
   adminTenantStatusUpdateSchema,
   adminTenantUpdateSchema,
   operationsAlertSeverityEnum,
@@ -24,26 +27,27 @@ import {
 } from "@/domain/admin/admin.schema";
 import type {
   AdminClientErrorTrendPoint,
+  AdminMutationContext,
   AdminOperationsAlert,
   AdminOperationsAlertSummary,
   AdminPricingPlanCreateInput,
   AdminPricingPlanUpdateInput,
+  AdminRecentActivity,
   AdminTenantFeatureFlagUpdateInput,
   AdminTenantCreateInput,
   AdminTenantStatusUpdateInput,
   AdminSubscriptionUpdateInput,
   AdminTenantUpdateInput,
+  AdminTenantUsage,
   AdminRecentJobActivity,
   AdminRecentSystemError,
 } from "@/domain/admin/admin.types";
 import { profileWithRolesSchema } from "@/domain/settings/profile.schema";
 import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import { toServiceError } from "@/services/supabase/errors";
-import { assertAnyPermission } from "@/services/supabase/permissions";
-import { useAuth } from "@/core/auth/authStore";
-import { auditLogService } from "@/services/settings/audit.service";
-import { recentAuthService } from "@/services/auth/recentAuth.service";
 import { featureFlagRepository } from "@/services/featureFlags/featureFlag.repository";
+import { createRequestId } from "@/core/observability/requestId";
+import { adminSecurityService } from "./adminSecurity.service";
 import { adminRepository } from "./admin.repository";
 
 const paginationSchema = z.object({
@@ -178,12 +182,12 @@ function sortRecentSystemErrors(rows: AdminRecentSystemError[]) {
   return [...rows].sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime());
 }
 
-function sortClientErrorTrend(rows: AdminClientErrorTrendPoint[]) {
-  return [...rows].sort((left, right) => new Date(left.bucket_start).getTime() - new Date(right.bucket_start).getTime());
+function sortRecentAdminActivity(rows: AdminRecentActivity[]) {
+  return [...rows].sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime());
 }
 
-function assertSuperAdminAccess() {
-  assertAnyPermission(["super_admin"], "Only super admins can access admin operations");
+function sortClientErrorTrend(rows: AdminClientErrorTrendPoint[]) {
+  return [...rows].sort((left, right) => new Date(left.bucket_start).getTime() - new Date(right.bucket_start).getTime());
 }
 
 const ADMIN_TENANT_FEATURE_KEYS = [
@@ -192,6 +196,14 @@ const ADMIN_TENANT_FEATURE_KEYS = [
   "pharmacy_module",
   "insurance_module",
 ] as const;
+
+export function createAdminMutationContext(existing?: Partial<AdminMutationContext>): AdminMutationContext {
+  const requestId = existing?.requestId ?? createRequestId();
+  return {
+    requestId,
+    idempotencyKey: existing?.idempotencyKey ?? requestId,
+  };
+}
 
 export const adminService = {
   async listTenantsPaged(input?: {
@@ -202,7 +214,7 @@ export const adminService = {
     sort?: { column: "name" | "created_at"; direction?: "asc" | "desc" };
   }) {
     try {
-      assertSuperAdminAccess();
+      await adminSecurityService.assertAccess({ action: "admin_list_tenants" });
       const parsed = paginationSchema
         .pick({ page: true, pageSize: true, search: true, plan: true })
         .extend({ sort: tenantSortSchema })
@@ -228,7 +240,7 @@ export const adminService = {
     sort?: { column: "full_name" | "created_at"; direction?: "asc" | "desc" };
   }) {
     try {
-      assertSuperAdminAccess();
+      await adminSecurityService.assertAccess({ action: "admin_list_profiles" });
       const parsed = paginationSchema
         .pick({ page: true, pageSize: true, search: true })
         .extend({ sort: profileSortSchema })
@@ -246,76 +258,42 @@ export const adminService = {
       throw toServiceError(err, "Failed to load profiles");
     }
   },
-  async createTenant(input: AdminTenantCreateInput) {
+  async createTenant(input: AdminTenantCreateInput, context?: AdminMutationContext) {
     try {
-      assertSuperAdminAccess();
-      recentAuthService.assertRecentAuth({ action: "tenant_lifecycle_update" });
+      await adminSecurityService.assertAccess({
+        action: "tenant_create",
+        requireRecentAuth: true,
+      });
       const parsed = adminTenantCreateSchema.parse(input);
-      const result = await adminRepository.createTenant(parsed);
-      const currentUser = useAuth.getState().user;
-      if (currentUser?.tenantId) {
-        await auditLogService.logEvent({
-          tenant_id: currentUser.tenantId,
-          user_id: currentUser.id,
-          action: "admin_tenant_created",
-          action_type: "tenant_create",
-          entity_type: "tenant",
-          entity_id: result.id,
-          details: { slug: result.slug, tenant_status: result.tenant_status, actor_role: currentUser.role },
-        });
-      }
+      const result = await adminRepository.createTenant(parsed, createAdminMutationContext(context));
       return adminTenantSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to create tenant");
     }
   },
-  async updateTenant(id: string, input: AdminTenantUpdateInput) {
+  async updateTenant(id: string, input: AdminTenantUpdateInput, context?: AdminMutationContext) {
     try {
-      assertSuperAdminAccess();
-      recentAuthService.assertRecentAuth({ action: "tenant_lifecycle_update" });
+      await adminSecurityService.assertAccess({
+        action: "tenant_update",
+        requireRecentAuth: true,
+      });
       const parsedId = uuidSchema.parse(id);
       const parsed = adminTenantUpdateSchema.parse(input);
-      const result = await adminRepository.updateTenant(parsedId, parsed);
-      const currentUser = useAuth.getState().user;
-      if (currentUser?.tenantId) {
-        await auditLogService.logEvent({
-          tenant_id: currentUser.tenantId,
-          user_id: currentUser.id,
-          action: "admin_tenant_updated",
-          action_type: "tenant_update",
-          entity_type: "tenant",
-          entity_id: result.id,
-          details: { changes: parsed, actor_role: currentUser.role },
-        });
-      }
+      const result = await adminRepository.updateTenant(parsedId, parsed, createAdminMutationContext(context));
       return adminTenantSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to update tenant");
     }
   },
-  async updateTenantStatus(id: string, input: AdminTenantStatusUpdateInput) {
+  async updateTenantStatus(id: string, input: AdminTenantStatusUpdateInput, context?: AdminMutationContext) {
     try {
-      assertSuperAdminAccess();
-      recentAuthService.assertRecentAuth({ action: "tenant_lifecycle_update" });
+      await adminSecurityService.assertAccess({
+        action: "tenant_status_update",
+        requireRecentAuth: true,
+      });
       const parsedId = uuidSchema.parse(id);
       const parsed = adminTenantStatusUpdateSchema.parse(input);
-      const result = await adminRepository.updateTenantStatus(parsedId, parsed);
-      const currentUser = useAuth.getState().user;
-      if (currentUser?.tenantId) {
-        await auditLogService.logEvent({
-          tenant_id: currentUser.tenantId,
-          user_id: currentUser.id,
-          action: "admin_tenant_status_updated",
-          action_type: "tenant_status_update",
-          entity_type: "tenant",
-          entity_id: result.id,
-          details: {
-            tenant_status: result.tenant_status,
-            status_reason: result.status_reason,
-            actor_role: currentUser.role,
-          },
-        });
-      }
+      const result = await adminRepository.updateTenantStatus(parsedId, parsed, createAdminMutationContext(context));
       return adminTenantSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to update tenant status");
@@ -323,7 +301,7 @@ export const adminService = {
   },
   async listTenantFeatureFlags(tenantId: string) {
     try {
-      assertSuperAdminAccess();
+      await adminSecurityService.assertAccess({ action: "admin_list_tenant_feature_flags" });
       const parsedTenantId = uuidSchema.parse(tenantId);
       const rows = await featureFlagRepository.listByTenant(parsedTenantId);
       const rowsByKey = new Map(rows.map((row) => [row.feature_key, row.enabled]));
@@ -338,29 +316,24 @@ export const adminService = {
       throw toServiceError(err, "Failed to load tenant feature flags");
     }
   },
-  async updateTenantFeatureFlag(tenantId: string, input: AdminTenantFeatureFlagUpdateInput) {
+  async updateTenantFeatureFlag(
+    tenantId: string,
+    input: AdminTenantFeatureFlagUpdateInput,
+    context?: AdminMutationContext,
+  ) {
     try {
-      assertSuperAdminAccess();
-      recentAuthService.assertRecentAuth({ action: "tenant_feature_flag_update" });
+      await adminSecurityService.assertAccess({
+        action: "tenant_feature_flag_update",
+        requireRecentAuth: true,
+      });
       const parsedTenantId = uuidSchema.parse(tenantId);
       const parsed = adminTenantFeatureFlagUpdateSchema.parse(input);
-      const result = await featureFlagRepository.upsert(parsedTenantId, parsed);
-      const currentUser = useAuth.getState().user;
-      if (currentUser) {
-        await auditLogService.logEvent({
-          tenant_id: parsedTenantId,
-          user_id: currentUser.id,
-          action: "admin_tenant_feature_flag_updated",
-          action_type: "tenant_feature_flag_update",
-          entity_type: "feature_flags",
-          entity_id: result.id,
-          details: {
-            feature_key: result.feature_key,
-            enabled: result.enabled,
-            actor_role: currentUser.role,
-          },
-        });
-      }
+      const result = await adminRepository.updateTenantFeatureFlag(
+        parsedTenantId,
+        parsed.feature_key,
+        parsed.enabled,
+        createAdminMutationContext(context),
+      );
       return adminTenantFeatureFlagSchema.parse({
         feature_key: result.feature_key,
         enabled: result.enabled,
@@ -378,7 +351,7 @@ export const adminService = {
     sort?: { column: "plan" | "status" | "amount" | "expires_at" | "created_at"; direction?: "asc" | "desc" };
   }) {
     try {
-      assertSuperAdminAccess();
+      await adminSecurityService.assertAccess({ action: "admin_list_subscriptions" });
       const parsed = paginationSchema
         .pick({ page: true, pageSize: true, search: true, plan: true, status: true })
         .extend({ sort: subscriptionSortSchema })
@@ -400,34 +373,36 @@ export const adminService = {
   },
   async getSubscriptionStats() {
     try {
-      assertSuperAdminAccess();
+      await adminSecurityService.assertAccess({ action: "admin_subscription_stats" });
       const result = await adminRepository.getSubscriptionStats();
       return adminSubscriptionStatsSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to load subscription stats");
     }
   },
-  async getOperationsAlerts() {
+  async getOperationsAlerts(tenantId?: string) {
     try {
-      assertSuperAdminAccess();
-      const summary = adminOperationsAlertSummarySchema.parse(await adminRepository.getOperationsAlertSummary());
+      await adminSecurityService.assertAccess({ action: "admin_operations_alerts" });
+      const parsedTenantId = tenantId ? uuidSchema.parse(tenantId) : undefined;
+      const summary = adminOperationsAlertSummarySchema.parse(await adminRepository.getOperationsAlertSummary(parsedTenantId));
       return buildOperationsAlertResponse(summary);
     } catch (err) {
       throw toServiceError(err, "Failed to load operations alerts");
     }
   },
-  async getOperationsDashboard() {
+  async getOperationsDashboard(tenantId?: string) {
     try {
-      assertSuperAdminAccess();
-      const summary = adminOperationsAlertSummarySchema.parse(await adminRepository.getOperationsAlertSummary());
+      await adminSecurityService.assertAccess({ action: "admin_operations_dashboard" });
+      const parsedTenantId = tenantId ? uuidSchema.parse(tenantId) : undefined;
+      const summary = adminOperationsAlertSummarySchema.parse(await adminRepository.getOperationsAlertSummary(parsedTenantId));
       const recentJobActivity = sortRecentJobActivity(
-        z.array(adminRecentJobActivitySchema).parse(await adminRepository.getRecentJobActivity(8)),
+        z.array(adminRecentJobActivitySchema).parse(await adminRepository.getRecentJobActivity(25, parsedTenantId)),
       );
       const recentSystemErrors = sortRecentSystemErrors(
-        z.array(adminRecentSystemErrorSchema).parse(await adminRepository.getRecentSystemErrors(8)),
+        z.array(adminRecentSystemErrorSchema).parse(await adminRepository.getRecentSystemErrors(8, parsedTenantId)),
       );
       const clientErrorTrend = sortClientErrorTrend(
-        z.array(adminClientErrorTrendPointSchema).parse(await adminRepository.getClientErrorTrend(15, 6)),
+        z.array(adminClientErrorTrendPointSchema).parse(await adminRepository.getClientErrorTrend(15, 6, parsedTenantId)),
       );
       const alertResponse = buildOperationsAlertResponse(summary);
 
@@ -441,25 +416,26 @@ export const adminService = {
       throw toServiceError(err, "Failed to load operations dashboard");
     }
   },
-  async updateSubscription(id: string, input: AdminSubscriptionUpdateInput) {
+  async getRecentActivity(tenantId?: string) {
     try {
-      assertSuperAdminAccess();
-      recentAuthService.assertRecentAuth({ action: "subscription_update" });
+      await adminSecurityService.assertAccess({ action: "admin_activity_stream" });
+      const parsedTenantId = tenantId ? uuidSchema.parse(tenantId) : undefined;
+      return z.array(adminRecentActivitySchema).parse(
+        sortRecentAdminActivity(await adminRepository.getRecentActivity(25, parsedTenantId)),
+      );
+    } catch (err) {
+      throw toServiceError(err, "Failed to load recent admin activity");
+    }
+  },
+  async updateSubscription(id: string, input: AdminSubscriptionUpdateInput, context?: AdminMutationContext) {
+    try {
+      await adminSecurityService.assertAccess({
+        action: "subscription_update",
+        requireRecentAuth: true,
+      });
       const parsedId = uuidSchema.parse(id);
       const parsed = adminSubscriptionUpdateSchema.parse(input);
-      const result = await adminRepository.updateSubscription(parsedId, parsed);
-      const currentUser = useAuth.getState().user;
-      if (currentUser) {
-        await auditLogService.logEvent({
-          tenant_id: result.tenant_id,
-          user_id: currentUser.id,
-          action: "admin_subscription_updated",
-          action_type: "subscription_update",
-          entity_type: "subscription",
-          entity_id: result.id,
-          details: { changes: parsed, actor_role: currentUser.role },
-        });
-      }
+      const result = await adminRepository.updateSubscription(parsedId, parsed, createAdminMutationContext(context));
       return adminSubscriptionSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to update subscription");
@@ -467,80 +443,77 @@ export const adminService = {
   },
   async listPricingPlans() {
     try {
-      assertSuperAdminAccess();
+      await adminSecurityService.assertAccess({ action: "admin_list_pricing_plans" });
       const result = await adminRepository.listPricingPlans();
       return z.array(adminPricingPlanSchema).parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to load pricing plans");
     }
   },
-  async createPricingPlan(input: AdminPricingPlanCreateInput) {
+  async createPricingPlan(input: AdminPricingPlanCreateInput, context?: AdminMutationContext) {
     try {
-      assertSuperAdminAccess();
-      recentAuthService.assertRecentAuth({ action: "pricing_plan_update" });
+      await adminSecurityService.assertAccess({
+        action: "pricing_plan_create",
+        requireRecentAuth: true,
+      });
       const parsed = adminPricingPlanCreateSchema.parse(input);
-      const result = await adminRepository.createPricingPlan(parsed);
-      const currentUser = useAuth.getState().user;
-      if (currentUser?.tenantId) {
-        await auditLogService.logEvent({
-          tenant_id: currentUser.tenantId,
-          user_id: currentUser.id,
-          action: "admin_pricing_plan_created",
-          action_type: "pricing_plan_create",
-          entity_type: "pricing_plan",
-          entity_id: result.id,
-          details: { plan_code: result.plan_code, actor_role: currentUser.role },
-        });
-      }
+      const result = await adminRepository.createPricingPlan(parsed, createAdminMutationContext(context));
       return adminPricingPlanSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to create pricing plan");
     }
   },
-  async updatePricingPlan(id: string, input: AdminPricingPlanUpdateInput) {
+  async updatePricingPlan(id: string, input: AdminPricingPlanUpdateInput, context?: AdminMutationContext) {
     try {
-      assertSuperAdminAccess();
-      recentAuthService.assertRecentAuth({ action: "pricing_plan_update" });
+      await adminSecurityService.assertAccess({
+        action: "pricing_plan_update",
+        requireRecentAuth: true,
+      });
       const parsedId = uuidSchema.parse(id);
       const parsed = adminPricingPlanUpdateSchema.parse(input);
-      const result = await adminRepository.updatePricingPlan(parsedId, parsed);
-      const currentUser = useAuth.getState().user;
-      if (currentUser?.tenantId) {
-        await auditLogService.logEvent({
-          tenant_id: currentUser.tenantId,
-          user_id: currentUser.id,
-          action: "admin_pricing_plan_updated",
-          action_type: "pricing_plan_update",
-          entity_type: "pricing_plan",
-          entity_id: result.id,
-          details: { changes: parsed, actor_role: currentUser.role },
-        });
-      }
+      const result = await adminRepository.updatePricingPlan(parsedId, parsed, createAdminMutationContext(context));
       return adminPricingPlanSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to update pricing plan");
     }
   },
-  async deletePricingPlan(id: string) {
+  async deletePricingPlan(id: string, context?: AdminMutationContext) {
     try {
-      assertSuperAdminAccess();
-      recentAuthService.assertRecentAuth({ action: "pricing_plan_update" });
+      await adminSecurityService.assertAccess({
+        action: "pricing_plan_delete",
+        requireRecentAuth: true,
+      });
       const parsedId = uuidSchema.parse(id);
-      await adminRepository.deletePricingPlan(parsedId);
-      const currentUser = useAuth.getState().user;
-      if (currentUser?.tenantId) {
-        await auditLogService.logEvent({
-          tenant_id: currentUser.tenantId,
-          user_id: currentUser.id,
-          action: "admin_pricing_plan_deleted",
-          action_type: "pricing_plan_delete",
-          entity_type: "pricing_plan",
-          entity_id: parsedId,
-          details: { actor_role: currentUser.role },
-        });
-      }
+      await adminRepository.deletePricingPlan(parsedId, createAdminMutationContext(context));
     } catch (err) {
       throw toServiceError(err, "Failed to delete pricing plan");
+    }
+  },
+  async getTenantUsage(tenantId: string): Promise<AdminTenantUsage> {
+    try {
+      await adminSecurityService.assertAccess({ action: "admin_tenant_usage" });
+      const parsedTenantId = uuidSchema.parse(tenantId);
+      const result = await adminRepository.getTenantUsage(parsedTenantId);
+      return adminTenantUsageSchema.parse(result);
+    } catch (err) {
+      throw toServiceError(err, "Failed to load tenant usage");
+    }
+  },
+  async retryJobs(input: { job_ids: string[]; reason: string }, context?: AdminMutationContext) {
+    try {
+      await adminSecurityService.assertAccess({
+        action: input.job_ids.length > 1 ? "job_retry_bulk" : "job_retry",
+        requireRecentAuth: true,
+      });
+      const parsed = adminJobRetryInputSchema.parse(input);
+      return z.array(adminRecentJobActivitySchema).parse(
+        await adminRepository.retryJobs({
+          ...parsed,
+          ...createAdminMutationContext(context),
+        }),
+      );
+    } catch (err) {
+      throw toServiceError(err, "Failed to retry jobs");
     }
   },
 };

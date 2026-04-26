@@ -18,6 +18,11 @@ const permissions = vi.hoisted(() => ({
 
 vi.mock("@/services/admin/admin.repository", () => ({ adminRepository }));
 vi.mock("@/services/supabase/permissions", () => permissions);
+vi.mock("@/services/admin/adminSecurity.service", () => ({
+  adminSecurityService: {
+    assertAccess: vi.fn(async () => undefined),
+  },
+}));
 
 import { adminService } from "@/services/admin/admin.service";
 

@@ -57,53 +57,12 @@ async function getUserByEmail(adminClient, email) {
   throw new Error("User search exceeded paging limit (too many users).");
 }
 
-async function ensurePlatformTenant(adminClient, { slug, name }) {
-  const { data: existing, error: existingErr } = await adminClient
-    .from("tenants")
-    .select("id, slug, pending_owner_email")
-    .eq("slug", slug)
-    .maybeSingle();
-
-  if (existingErr) throw existingErr;
-  if (existing?.id) return existing;
-
-  const { data: created, error: createErr } = await adminClient
-    .from("tenants")
-    .insert({ name, slug, pending_owner_email: null })
-    .select("id, slug, pending_owner_email")
-    .single();
-
-  if (createErr) throw createErr;
-
-  // Best-effort: ensure a subscription exists (if the subscriptions table is present).
-  try {
-    const { error: subErr } = await adminClient.from("subscriptions").upsert(
-      {
-        tenant_id: created.id,
-        plan: "free",
-        status: "active",
-        amount: 0,
-        currency: "EGP",
-        billing_cycle: "monthly",
-      },
-      { onConflict: "tenant_id", ignoreDuplicates: true },
-    );
-    void subErr;
-  } catch {
-    // Ignore: subscriptions may not exist yet in some environments.
-  }
-
-  return created;
-}
-
 async function seed() {
   const supabaseUrl = requiredEnv("SUPABASE_URL");
   const email = requiredEnv("SUPER_ADMIN_EMAIL").trim().toLowerCase();
   const password = requiredEnv("SUPER_ADMIN_PASSWORD");
 
   const fullName = optionalEnv("SUPER_ADMIN_FULL_NAME") ?? "Super Admin";
-  const tenantSlug = optionalEnv("SUPER_ADMIN_TENANT_SLUG") ?? "platform-admin";
-  const tenantName = optionalEnv("SUPER_ADMIN_TENANT_NAME") ?? "Platform Admin";
 
   let serviceRoleKey = optionalEnv("SUPABASE_SERVICE_ROLE_KEY");
   if (!serviceRoleKey) {
@@ -116,57 +75,68 @@ async function seed() {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 
-  const tenant = await ensurePlatformTenant(adminClient, { slug: tenantSlug, name: tenantName });
-
   let user = await getUserByEmail(adminClient, email);
   if (!user) {
-    // Prefer the secure "founding owner" flow. If the tenant is already owned (pending_owner_email cleared),
-    // set pending_owner_email for this one-time seed; otherwise fall back to an invite_code claim.
-    const pending = String(tenant.pending_owner_email ?? "").trim().toLowerCase();
-    let userMetadata = { full_name: fullName, tenant_id: tenant.id };
-
-    if (!pending || pending === email) {
-      const { error: updErr } = await adminClient
-        .from("tenants")
-        .update({ pending_owner_email: email })
-        .eq("id", tenant.id);
-
-      if (updErr) throw updErr;
-    } else {
-      const inviteCode = crypto.randomUUID();
-      const { error: inviteErr } = await adminClient.from("user_invites").insert({
-        tenant_id: tenant.id,
-        email,
-        role: "clinic_admin",
-        invite_code: inviteCode,
-        invited_by_user_id: "00000000-0000-0000-0000-000000000000",
-      });
-      if (inviteErr) throw inviteErr;
-      userMetadata = { ...userMetadata, invite_code: inviteCode };
-    }
-
     const { data: created, error: createErr } = await adminClient.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
-      user_metadata: userMetadata,
+      user_metadata: { full_name: fullName, tenant_id: null },
     });
 
     if (createErr) throw createErr;
     user = created?.user ?? null;
     if (!user?.id) throw new Error("User creation succeeded but no user id was returned.");
+  } else {
+    const { data: updated, error: updateErr } = await adminClient.auth.admin.updateUserById(user.id, {
+      password,
+      email_confirm: true,
+      user_metadata: {
+        ...(user.user_metadata ?? {}),
+        full_name: fullName,
+        tenant_id: null,
+      },
+    });
+    if (updateErr) throw updateErr;
+    user = updated?.user ?? user;
   }
 
-  // Promote to super_admin (single-role model).
-  const { error: roleErr } = await adminClient
-    .from("user_roles")
-    .update({ role: "super_admin" })
-    .eq("user_id", user.id);
-  if (roleErr) throw roleErr;
+  const { error: profileErr } = await adminClient
+    .from("profiles")
+    .upsert(
+      {
+        user_id: user.id,
+        tenant_id: null,
+        full_name: fullName,
+      },
+      { onConflict: "user_id" },
+    );
+  if (profileErr) throw profileErr;
 
-  // Verify role.
-  const { data: roleRow, error: verifyErr } = await adminClient
+  // Super admins are global-only and must not retain a tenant-scoped role.
+  const { error: deleteTenantRoleErr } = await adminClient
     .from("user_roles")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("role", "super_admin");
+  if (deleteTenantRoleErr) throw deleteTenantRoleErr;
+
+  const { error: globalRoleErr } = await adminClient
+    .from("user_global_roles")
+    .upsert(
+      {
+        user_id: user.id,
+        role: "super_admin",
+        granted_by: null,
+        break_glass: false,
+        break_glass_reason: null,
+      },
+      { onConflict: "user_id,role" },
+    );
+  if (globalRoleErr) throw globalRoleErr;
+
+  const { data: roleRow, error: verifyErr } = await adminClient
+    .from("user_global_roles")
     .select("role")
     .eq("user_id", user.id)
     .single();
@@ -181,8 +151,7 @@ async function seed() {
         action: "seed_super_admin",
         email,
         user_id: user.id,
-        tenant_id: tenant.id,
-        tenant_slug: tenantSlug,
+        tenant_id: null,
         role: "super_admin",
       },
       null,

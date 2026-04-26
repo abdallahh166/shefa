@@ -12,7 +12,8 @@ vi.mock("@/services/auth/auth.repository", () => ({
     resetPasswordForEmail: vi.fn(),
     updatePassword: vi.fn(),
     getProfileByUserId: vi.fn(),
-    getRoleByUserId: vi.fn(),
+    getRolesByUserId: vi.fn(),
+    getMfaAssuranceLevel: vi.fn(),
     registerClinic: vi.fn(),
   },
 }));
@@ -39,7 +40,7 @@ describe("authService.login", () => {
     } as any);
 
     await expect(authService.login("user@example.com", "password")).rejects.toThrow(
-      "Please verify your email"
+      "Please verify your email",
     );
     expect(repo.signOut).toHaveBeenCalled();
   });
@@ -57,7 +58,10 @@ describe("authService.login", () => {
       full_name: "Demo User",
       tenants: { name: "Clinic", slug: "clinic", status: "active", status_reason: null },
     } as any);
-    repo.getRoleByUserId.mockResolvedValue("clinic_admin");
+    repo.getRolesByUserId.mockResolvedValue({
+      tenantRoles: ["clinic_admin"],
+      globalRoles: [],
+    });
 
     await expect(authService.login("user@example.com", "password")).resolves.toBeUndefined();
     expect(repo.signOut).not.toHaveBeenCalled();

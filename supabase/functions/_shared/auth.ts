@@ -25,13 +25,25 @@ export async function requireAdmin(req: Request) {
   const userId = claimsData.claims.sub as string;
   const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-  const { data: roleData } = await adminClient
+  const { data: globalRoleData } = await adminClient
+    .from("user_global_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .is("revoked_at", null)
+    ;
+
+  const { data: tenantRoleData } = await adminClient
     .from("user_roles")
     .select("role")
     .eq("user_id", userId)
-    .maybeSingle();
+    ;
 
-  if (!roleData || !["clinic_admin", "super_admin"].includes(roleData.role)) {
+  const globalRoles = (globalRoleData ?? []).map((entry) => entry.role);
+  const tenantRoles = (tenantRoleData ?? []).map((entry) => entry.role);
+  const isSuperAdmin = globalRoles.includes("super_admin");
+  const isClinicAdmin = tenantRoles.includes("clinic_admin");
+
+  if (!isSuperAdmin && !isClinicAdmin) {
     return { error: new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 }) };
   }
 
@@ -40,6 +52,10 @@ export async function requireAdmin(req: Request) {
     .select("tenant_id")
     .eq("user_id", userId)
     .maybeSingle();
+
+  if (isSuperAdmin) {
+    return { adminClient, userId, tenantId: null };
+  }
 
   if (!profile?.tenant_id) {
     return { error: new Response(JSON.stringify({ error: "Tenant not found" }), { status: 400 }) };

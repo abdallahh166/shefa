@@ -1,6 +1,6 @@
 ﻿import { useState } from "react";
 import { useSubscription } from "./SubscriptionContext";
-import { useAuth } from "@/core/auth/authStore";
+import { isSuperAdmin, useAuth } from "@/core/auth/authStore";
 import { useNavigate } from "react-router-dom";
 import { X, Sparkles } from "lucide-react";
 import { Button } from "@/components/primitives/Button";
@@ -11,7 +11,7 @@ export const UpgradeBanner = () => {
   const navigate = useNavigate();
   const [dismissed, setDismissed] = useState(false);
 
-  if (isLoading || dismissed || plan !== "free" || user?.role === "super_admin") return null;
+  if (isLoading || dismissed || plan !== "free" || isSuperAdmin(user)) return null;
 
   return (
     <div className="bg-warning/15 border-b border-warning/30 px-4 py-2.5 flex items-center justify-between gap-3">
