@@ -50,6 +50,11 @@ TO authenticated
 USING (false)
 WITH CHECK (false);
 
+-- The previous migration makes audit logs immutable via trigger.
+-- Temporarily remove that trigger so we can safely backfill new columns,
+-- then restore it immediately after the backfill finishes.
+DROP TRIGGER IF EXISTS prevent_audit_log_update ON public.audit_logs;
+
 ALTER TABLE public.audit_logs
   ADD COLUMN IF NOT EXISTS is_global boolean NOT NULL DEFAULT false;
 
@@ -68,6 +73,11 @@ ALTER TABLE public.audit_logs
   ALTER COLUMN action_type SET NOT NULL,
   ALTER COLUMN is_global SET DEFAULT false,
   ALTER COLUMN is_global SET NOT NULL;
+
+CREATE TRIGGER prevent_audit_log_update
+BEFORE UPDATE OR DELETE ON public.audit_logs
+FOR EACH ROW
+EXECUTE FUNCTION public.prevent_audit_log_mutation();
 
 DO $$
 BEGIN
