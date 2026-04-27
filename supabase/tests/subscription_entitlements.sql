@@ -8,6 +8,145 @@ select set_config('request.jwt.claim.sub', '', true);
 select set_config('request.jwt.claims', '', true);
 select set_config('request.jwt.claim.role', '', true);
 
+truncate storage.objects;
+
+truncate
+  public.insurance_claim_attachments,
+  public.insurance_claims,
+  public.lab_orders,
+  public.medications,
+  public.invoices,
+  public.doctors,
+  public.patient_accounts,
+  public.patients,
+  public.feature_flags,
+  public.subscriptions,
+  public.user_global_roles,
+  public.user_roles,
+  public.profiles,
+  public.tenants
+restart identity cascade;
+
+insert into auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+)
+values
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '20000000-0000-0000-0000-000000000001',
+    'authenticated',
+    'authenticated',
+    'free-admin-ent@test.com',
+    '',
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '20000000-0000-0000-0000-000000000002',
+    'authenticated',
+    'authenticated',
+    'starter-admin-ent@test.com',
+    '',
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '20000000-0000-0000-0000-000000000003',
+    'authenticated',
+    'authenticated',
+    'pro-admin-ent@test.com',
+    '',
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '20000000-0000-0000-0000-000000000004',
+    'authenticated',
+    'authenticated',
+    'pro-lab-disabled-ent@test.com',
+    '',
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '20000000-0000-0000-0000-000000000005',
+    'authenticated',
+    'authenticated',
+    'enterprise-admin-ent@test.com',
+    '',
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '20000000-0000-0000-0000-000000000099',
+    'authenticated',
+    'authenticated',
+    'superadmin-ent@test.com',
+    '',
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '30000000-0000-0000-0000-000000000001',
+    'authenticated',
+    'authenticated',
+    'portal-free-ent@test.com',
+    '',
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '30000000-0000-0000-0000-000000000004',
+    'authenticated',
+    'authenticated',
+    'portal-lab-disabled-ent@test.com',
+    '',
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  )
+on conflict (id) do nothing;
+
 insert into public.tenants (id, name, slug)
 values
   ('10000000-0000-0000-0000-000000000001', 'Free Clinic', 'free-clinic-ent'),
@@ -58,6 +197,7 @@ set
 
 insert into public.feature_flags (tenant_id, feature_key, enabled)
 values
+  ('10000000-0000-0000-0000-000000000002', 'billing', true),
   ('10000000-0000-0000-0000-000000000002', 'advanced_reports', false),
   ('10000000-0000-0000-0000-000000000003', 'pharmacy_module', false),
   ('10000000-0000-0000-0000-000000000003', 'lab_module', true),

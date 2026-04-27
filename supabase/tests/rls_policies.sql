@@ -9,6 +9,48 @@ select set_config('request.jwt.claim.sub', '', true);
 select set_config('request.jwt.claims', '', true);
 select set_config('request.jwt.claim.role', '', true);
 
+insert into auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+)
+values
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '00000000-0000-0000-0000-000000000011',
+    'authenticated',
+    'authenticated',
+    'tenant-one@test.com',
+    '',
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '00000000-0000-0000-0000-000000000012',
+    'authenticated',
+    'authenticated',
+    'tenant-two@test.com',
+    '',
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  )
+on conflict (id) do nothing;
+
 TRUNCATE
   public.audit_logs,
   public.feature_flags,
@@ -39,6 +81,11 @@ insert into public.user_roles (id, user_id, role)
 values
   ('00000000-0000-0000-0000-000000000201', '00000000-0000-0000-0000-000000000011', 'clinic_admin'),
   ('00000000-0000-0000-0000-000000000202', '00000000-0000-0000-0000-000000000012', 'clinic_admin');
+
+insert into public.subscriptions (tenant_id, plan, status, amount, currency, billing_cycle, started_at)
+values
+  ('00000000-0000-0000-0000-000000000001', 'enterprise', 'active', 500, 'EGP', 'monthly', now()),
+  ('00000000-0000-0000-0000-000000000002', 'enterprise', 'active', 500, 'EGP', 'monthly', now());
 
 set local session_replication_role = origin;
 
@@ -124,10 +171,21 @@ values
   ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000012', 'Error Two');
 set local session_replication_role = origin;
 
-insert into public.audit_logs (tenant_id, user_id, action, entity_type, entity_id)
-values
-  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000011', 'update', 'patients', (select id from public.patients where tenant_id = '00000000-0000-0000-0000-000000000001' limit 1)),
-  ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000012', 'update', 'patients', (select id from public.patients where tenant_id = '00000000-0000-0000-0000-000000000002' limit 1));
+select public.log_audit_event(
+  '00000000-0000-0000-0000-000000000001',
+  '00000000-0000-0000-0000-000000000011',
+  'update',
+  'patients',
+  (select id from public.patients where tenant_id = '00000000-0000-0000-0000-000000000001' limit 1)
+);
+
+select public.log_audit_event(
+  '00000000-0000-0000-0000-000000000002',
+  '00000000-0000-0000-0000-000000000012',
+  'update',
+  'patients',
+  (select id from public.patients where tenant_id = '00000000-0000-0000-0000-000000000002' limit 1)
+);
 
 -- Switch into an authenticated context for RLS tests.
 set local role authenticated;

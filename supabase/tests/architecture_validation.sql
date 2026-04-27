@@ -47,7 +47,7 @@ select is(
 -- 3. Tenant isolation policies include get_user_tenant_id for core tables
 select is(
   (
-    select count(*)
+    select count(distinct tablename)
     from pg_policies
     where schemaname = 'public'
       and tablename in (

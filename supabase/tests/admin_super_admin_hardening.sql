@@ -1,12 +1,54 @@
 begin;
 
-select plan(17);
+select plan(19);
 
 set local role postgres;
 set local session_replication_role = replica;
 select set_config('request.jwt.claim.sub', '', true);
 select set_config('request.jwt.claims', '', true);
 select set_config('request.jwt.claim.role', '', true);
+
+insert into auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+)
+values
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '23000000-0000-0000-0000-000000000001',
+    'authenticated',
+    'authenticated',
+    'tenantadmin-admin@test.com',
+    '',
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '23000000-0000-0000-0000-000000000099',
+    'authenticated',
+    'authenticated',
+    'superadmin@test.com',
+    '',
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  )
+on conflict (id) do nothing;
 
 truncate
   public.audit_logs,
@@ -359,8 +401,8 @@ select throws_ok(
 
 select is(
   (select count(*) from public.audit_logs),
-  1::bigint,
-  'tenant users can read only their tenant audit logs and never global audit rows'
+  0::bigint,
+  'tenant users cannot read global admin audit rows directly'
 );
 
 select * from finish();

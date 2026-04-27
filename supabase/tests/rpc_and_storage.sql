@@ -5,6 +5,62 @@ select plan(11);
 set local role postgres;
 set local session_replication_role = replica;
 
+truncate storage.objects;
+
+truncate
+  public.insurance_claims,
+  public.medications,
+  public.invoices,
+  public.feature_flags,
+  public.subscriptions,
+  public.patients,
+  public.user_roles,
+  public.profiles,
+  public.tenants
+restart identity cascade;
+
+insert into auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+)
+values
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '00000000-0000-0000-0000-000000000011',
+    'authenticated',
+    'authenticated',
+    'rpc-tenant-one@test.com',
+    '',
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '00000000-0000-0000-0000-000000000022',
+    'authenticated',
+    'authenticated',
+    'rpc-tenant-two@test.com',
+    '',
+    now(),
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  )
+on conflict (id) do nothing;
+
 insert into public.tenants (id, name, slug)
 values
   ('00000000-0000-0000-0000-000000000011', 'Tenant One', 'tenant-one'),
@@ -20,6 +76,19 @@ values
   ('00000000-0000-0000-0000-000000000211', '00000000-0000-0000-0000-000000000011', 'clinic_admin'),
   ('00000000-0000-0000-0000-000000000222', '00000000-0000-0000-0000-000000000022', 'clinic_admin');
 
+insert into public.subscriptions (tenant_id, plan, status, amount, currency, billing_cycle, started_at)
+values
+  ('00000000-0000-0000-0000-000000000011', 'enterprise', 'active', 500, 'EGP', 'monthly', now()),
+  ('00000000-0000-0000-0000-000000000022', 'starter', 'active', 100, 'EGP', 'monthly', now());
+
+insert into public.feature_flags (tenant_id, feature_key, enabled)
+values
+  ('00000000-0000-0000-0000-000000000011', 'billing', true),
+  ('00000000-0000-0000-0000-000000000011', 'pharmacy_module', true),
+  ('00000000-0000-0000-0000-000000000011', 'insurance_module', true)
+on conflict (tenant_id, feature_key) do update
+set enabled = excluded.enabled;
+
 insert into public.patients (id, tenant_id, patient_code, full_name, status)
 values
   ('00000000-0000-0000-0000-000000001111', '00000000-0000-0000-0000-000000000011', 'PT-1001', 'Patient One', 'active'),
@@ -27,9 +96,41 @@ values
 
 insert into public.invoices (tenant_id, patient_id, invoice_code, service, amount, status)
 values
-  ('00000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000001111', 'INV-A', 'Consult', 100, 'paid'),
-  ('00000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000001111', 'INV-B', 'Consult', 50, 'pending'),
-  ('00000000-0000-0000-0000-000000000022', '00000000-0000-0000-0000-000000002222', 'INV-C', 'Consult', 500, 'paid');
+  (
+    '00000000-0000-0000-0000-000000000011',
+    '00000000-0000-0000-0000-000000001111',
+    'INV-A',
+    'Consult',
+    100,
+    'paid'
+  ),
+  (
+    '00000000-0000-0000-0000-000000000011',
+    '00000000-0000-0000-0000-000000001111',
+    'INV-B',
+    'Consult',
+    50,
+    'pending'
+  ),
+  (
+    '00000000-0000-0000-0000-000000000022',
+    '00000000-0000-0000-0000-000000002222',
+    'INV-C',
+    'Consult',
+    500,
+    'paid'
+  );
+
+update public.invoices
+set
+  amount_paid = case
+    when invoice_code in ('INV-A', 'INV-C') then amount
+    else 0
+  end,
+  balance_due = case
+    when invoice_code in ('INV-A', 'INV-C') then 0
+    else amount
+  end;
 
 insert into public.medications (tenant_id, name, category, stock, unit, price, status)
 values
