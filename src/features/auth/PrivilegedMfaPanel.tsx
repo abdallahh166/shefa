@@ -41,7 +41,9 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [code, setCode] = useState("");
+  const [sessionCode, setSessionCode] = useState("");
   const [enrollment, setEnrollment] = useState<EnrollmentState | null>(null);
+  const [sessionVerificationFactorId, setSessionVerificationFactorId] = useState<string | null>(null);
   const [removingFactorId, setRemovingFactorId] = useState<string | null>(null);
 
   const reloadState = async () => {
@@ -142,6 +144,38 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
     }
   };
 
+  const handleVerifyCurrentSession = async () => {
+    if (!sessionVerificationFactorId) return;
+    setVerifying(true);
+    try {
+      await authService.verifyTotpFactor({ factorId: sessionVerificationFactorId, code: sessionCode });
+      await privilegedSessionService.refresh();
+      await reloadState();
+      await auditLogService.logEvent({
+        tenant_id: toAuditTenantId(user),
+        user_id: user.id,
+        action: "privileged_mfa_session_verified",
+        action_type: "privileged_mfa_session_verified",
+        entity_type: "auth_mfa_factor",
+        entity_id: sessionVerificationFactorId,
+        resource_type: "auth_mfa_factor",
+        details: {
+          role_tier: privilegedSession.roleTier,
+          factor_type: "totp",
+          assurance_level: "aal2",
+        },
+      });
+      setSessionCode("");
+      setSessionVerificationFactorId(null);
+      toast({ title: "Privileged session verified" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("common.error");
+      toast({ title: t("common.error"), description: message, variant: "destructive" });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   const handleRemoveFactor = async (factorId: string) => {
     setRemovingFactorId(factorId);
     try {
@@ -160,6 +194,10 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
           role_tier: privilegedSession.roleTier,
         },
       });
+      if (sessionVerificationFactorId === factorId) {
+        setSessionCode("");
+        setSessionVerificationFactorId(null);
+      }
       toast({ title: "Multi-factor authentication factor removed" });
     } catch (err) {
       const message = err instanceof Error ? err.message : t("common.error");
@@ -234,7 +272,13 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
                 <p className="text-sm text-muted-foreground">
                   No MFA factor is enrolled yet. Privileged actions stay blocked until TOTP enrollment is complete.
                 </p>
-                <Button type="button" className="mt-4" onClick={handleStartEnrollment} disabled={loading}>
+                <Button
+                  type="button"
+                  className="mt-4"
+                  onClick={handleStartEnrollment}
+                  disabled={loading}
+                  data-testid="privileged-mfa-start-enrollment"
+                >
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
                   Set up TOTP MFA
                 </Button>
@@ -247,20 +291,74 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
                   <div>
                     <div className="font-medium">{factor.friendly_name || "Authenticator app"}</div>
                     <div className="text-sm text-muted-foreground">
-                      {factor.factor_type.toUpperCase()} • {factor.status}
+                      {factor.factor_type.toUpperCase()} - {factor.status}
                     </div>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => void handleRemoveFactor(factor.id)}
-                    disabled={removingFactorId === factor.id}
-                    className="text-destructive"
-                  >
-                    {removingFactorId === factor.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                    Remove
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {factor.status === "verified" && privilegedSession.aal !== "aal2" ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setSessionVerificationFactorId(factor.id);
+                          setSessionCode("");
+                        }}
+                        disabled={verifying}
+                        data-testid={`privileged-mfa-session-start-${factor.id}`}
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        Verify this session
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => void handleRemoveFactor(factor.id)}
+                      disabled={removingFactorId === factor.id}
+                      className="text-destructive"
+                    >
+                      {removingFactorId === factor.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      Remove
+                    </Button>
+                  </div>
                 </div>
+                {sessionVerificationFactorId === factor.id ? (
+                  <div className="mt-4 rounded-2xl border border-primary/20 bg-muted/30 p-4">
+                    <div className="space-y-2">
+                      <Label htmlFor={`mfa-session-code-${factor.id}`}>One-time code</Label>
+                      <Input
+                        id={`mfa-session-code-${factor.id}`}
+                        value={sessionCode}
+                        onChange={(event) => setSessionCode(event.target.value.replace(/\s+/g, ""))}
+                        placeholder="123456"
+                        inputMode="numeric"
+                        data-testid="privileged-mfa-session-code"
+                      />
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <Button
+                        type="button"
+                        onClick={handleVerifyCurrentSession}
+                        disabled={verifying || sessionCode.trim().length < 6}
+                        data-testid="privileged-mfa-session-verify"
+                      >
+                        {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                        Verify session
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setSessionCode("");
+                          setSessionVerificationFactorId(null);
+                        }}
+                        disabled={verifying}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ))}
 
@@ -272,12 +370,18 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
                       src={toQrCodeDataUrl(enrollment.qrCode)}
                       alt="MFA QR code"
                       className="mx-auto h-48 w-48"
+                      data-testid="privileged-mfa-qr"
                     />
                   </div>
                   <div className="space-y-4">
                     <div>
                       <div className="text-sm text-muted-foreground">Manual secret</div>
-                      <code className="mt-1 block rounded-xl bg-muted px-3 py-2 text-sm">{enrollment.secret}</code>
+                      <code
+                        className="mt-1 block rounded-xl bg-muted px-3 py-2 text-sm"
+                        data-testid="privileged-mfa-secret"
+                      >
+                        {enrollment.secret}
+                      </code>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="mfa-code">Verification code</Label>
@@ -287,10 +391,16 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
                         onChange={(event) => setCode(event.target.value.replace(/\s+/g, ""))}
                         placeholder="123456"
                         inputMode="numeric"
+                        data-testid="privileged-mfa-enrollment-code"
                       />
                     </div>
                     <div className="flex gap-2">
-                      <Button type="button" onClick={handleVerifyEnrollment} disabled={verifying || code.trim().length < 6}>
+                      <Button
+                        type="button"
+                        onClick={handleVerifyEnrollment}
+                        disabled={verifying || code.trim().length < 6}
+                        data-testid="privileged-mfa-enrollment-verify"
+                      >
                         {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                         Verify and enable
                       </Button>

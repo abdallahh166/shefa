@@ -11,7 +11,7 @@ const projectRoot = process.cwd();
 loadLocalEnv(projectRoot, [".env", ".env.local"]);
 
 const DEFAULT_PASSWORD = "MedFlowE2E!2026";
-const DEFAULT_EMAIL_DOMAIN = process.env.E2E_EMAIL_DOMAIN?.trim() || "mailinator.com";
+const DEFAULT_EMAIL_DOMAIN = process.env.E2E_EMAIL_DOMAIN?.trim() || "example.com";
 
 function readProjectRef() {
   if (process.env.VITE_SUPABASE_PROJECT_ID) {
@@ -280,8 +280,9 @@ async function ensureGlobalSuperAdmin(adminClient, input) {
         user_id: input.userId,
         role: "super_admin",
         granted_by: null,
-        break_glass: false,
+        is_break_glass: false,
         break_glass_reason: null,
+        requires_mfa: true,
       },
       { onConflict: "user_id,role" },
     );
@@ -681,6 +682,10 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
+  if (error instanceof Error) {
+    console.error(error.message);
+  } else {
+    console.error(JSON.stringify(error, null, 2));
+  }
   process.exitCode = 1;
 });
