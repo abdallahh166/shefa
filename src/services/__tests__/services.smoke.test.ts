@@ -53,6 +53,7 @@ const subscriptionRepository = vi.hoisted(() => ({ getByTenant: vi.fn() }));
 const clientErrorLogRepository = vi.hoisted(() => ({ insert: vi.fn() }));
 const realtimeRepository = vi.hoisted(() => ({ subscribeToTenantTables: vi.fn() }));
 const jobRepository = vi.hoisted(() => ({ invoke: vi.fn(), enqueue: vi.fn() }));
+const privilegedAccessService = vi.hoisted(() => ({ assertAction: vi.fn() }));
 
 vi.mock("@/core/env/env", () => ({
   env: {
@@ -99,9 +100,10 @@ vi.mock("@/services/realtime/realtime.repository", () => ({ realtimeRepository }
 vi.mock("@/services/jobs/job.repository", () => ({ jobRepository }));
 vi.mock("@/services/admin/adminSecurity.service", () => ({
   adminSecurityService: {
-    assertAccess: vi.fn(async () => undefined),
+    assertAccess: vi.fn(async () => ({ stepUpGrantId: null })),
   },
 }));
+vi.mock("@/services/auth/privilegedAccess.service", () => ({ privilegedAccessService }));
 
 import { adminService } from "@/services/admin/admin.service";
 import { clinicSlugService } from "@/services/auth/clinicSlug.service";
@@ -125,6 +127,7 @@ import * as servicesIndex from "@/services";
 describe("services smoke", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    privilegedAccessService.assertAction.mockResolvedValue({ stepUpGrantId: null });
     adminRepository.listTenantsPaged.mockResolvedValue({ data: [], count: 0 });
     adminRepository.createTenant.mockResolvedValue({
       id: recordId,

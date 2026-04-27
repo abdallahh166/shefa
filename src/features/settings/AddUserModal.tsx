@@ -7,6 +7,8 @@ import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } 
 import { toast } from "@/hooks/use-toast";
 import { userInviteService } from "@/services/settings/userInvite.service";
 import type { InviteStaffInput } from "@/domain/settings/invite.types";
+import { isFreshAuthRequiredError } from "@/services/auth/recentAuth.service";
+import { requestReauthentication } from "@/features/auth/reauthPrompt";
 
 interface AddUserModalProps {
   open: boolean;
@@ -33,7 +35,7 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
 
   if (!open) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, allowRetry = true) => {
     e.preventDefault();
 
     const fullName = form.full_name.trim();
@@ -60,6 +62,20 @@ export const AddUserModal = ({ open, onClose, onSuccess }: AddUserModalProps) =>
       onClose();
       setForm({ full_name: "", email: "", role: "doctor" });
     } catch (err) {
+      if (allowRetry && isFreshAuthRequiredError(err)) {
+        try {
+          await requestReauthentication({
+            title: t("auth.reauthTitle"),
+            description: t("auth.reauthAdminActionDesc"),
+            actionLabel: t("auth.reauthAction"),
+            cancelLabel: t("common.cancel"),
+          });
+          await handleSubmit(e, false);
+        } catch {
+          return;
+        }
+        return;
+      }
       const message = err instanceof Error ? err.message : t("common.error");
       toast({ title: t("common.error"), description: message, variant: "destructive" });
     } finally {

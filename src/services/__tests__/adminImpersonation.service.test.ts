@@ -1,15 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AuthorizationError, BusinessRuleError } from "@/services/supabase/errors";
+import { AuthorizationError, ServiceError } from "@/services/supabase/errors";
 
 const createRequestId = vi.hoisted(() => vi.fn());
-const logEvent = vi.hoisted(() => vi.fn());
 const startImpersonation = vi.hoisted(() => vi.fn());
 const stopImpersonation = vi.hoisted(() => vi.fn());
 const getState = vi.hoisted(() => vi.fn());
+const privilegedAccessService = vi.hoisted(() => ({
+  assertAction: vi.fn(),
+}));
+const rpc = vi.hoisted(() => vi.fn());
 
 vi.mock("@/core/observability/requestId", () => ({ createRequestId }));
-vi.mock("@/services/settings/audit.service", () => ({
-  auditLogService: { logEvent },
+vi.mock("@/services/auth/privilegedAccess.service", () => ({ privilegedAccessService }));
+vi.mock("@/services/supabase/client", () => ({
+  supabase: { rpc },
 }));
 vi.mock("@/core/auth/authStore", () => ({
   useAuth: { getState },
@@ -37,52 +41,58 @@ const targetTenant = {
 describe("adminImpersonationService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    createRequestId.mockReturnValue("req-123");
+    createRequestId.mockReturnValue("00000000-0000-0000-0000-000000000123");
+    privilegedAccessService.assertAction.mockResolvedValue({ stepUpGrantId: "grant-123" });
   });
 
-  it("starts impersonation only after the audit log succeeds", async () => {
+  it("starts impersonation only after the server RPC succeeds", async () => {
     getState.mockReturnValue({
       user: superAdmin,
-      hasPermission: () => true,
-      lastVerifiedAt: new Date().toISOString(),
       impersonationSession: null,
       startImpersonation,
     });
-    logEvent.mockResolvedValue(undefined);
+    rpc.mockResolvedValue({
+      data: {
+        request_id: "00000000-0000-0000-0000-000000000123",
+        started_at: "2026-04-15T00:00:00.000Z",
+        target_tenant_id: targetTenant.id,
+        target_tenant_name: targetTenant.name,
+        target_tenant_slug: targetTenant.slug,
+      },
+      error: null,
+    });
 
     const session = await adminImpersonationService.start(targetTenant);
 
-    expect(logEvent).toHaveBeenCalledWith(
+    expect(privilegedAccessService.assertAction).toHaveBeenCalledWith(
       expect.objectContaining({
-        tenant_id: targetTenant.id,
-        user_id: superAdmin.id,
-        action: "tenant_impersonation_started",
-        request_id: "req-123",
+        action: "tenant_impersonation_start",
+        roleTier: "super_admin",
+        requireStepUp: true,
       }),
     );
+    expect(rpc).toHaveBeenCalledWith("admin_start_tenant_impersonation", expect.any(Object));
     expect(startImpersonation).toHaveBeenCalledWith(
       targetTenant,
       expect.objectContaining({
-        requestId: "req-123",
+        requestId: "00000000-0000-0000-0000-000000000123",
         targetTenant,
       }),
     );
     expect(session).toEqual(
       expect.objectContaining({
-        requestId: "req-123",
+        requestId: "00000000-0000-0000-0000-000000000123",
         targetTenant,
       }),
     );
   });
 
-  it("ends impersonation only after the audit log succeeds", async () => {
+  it("ends impersonation only after the server RPC succeeds", async () => {
     getState.mockReturnValue({
       user: superAdmin,
-      hasPermission: () => true,
-      lastVerifiedAt: new Date().toISOString(),
       tenantOverride: targetTenant,
       impersonationSession: {
-        requestId: "req-123",
+        requestId: "00000000-0000-0000-0000-000000000123",
         startedAt: "2026-04-15T00:00:00.000Z",
         actor: {
           id: superAdmin.id,
@@ -95,21 +105,26 @@ describe("adminImpersonationService", () => {
       },
       stopImpersonation,
     });
-    logEvent.mockResolvedValue(undefined);
+    rpc.mockResolvedValue({
+      data: {
+        request_id: "00000000-0000-0000-0000-000000000123",
+        started_at: "2026-04-15T00:00:00.000Z",
+        ended_at: "2026-04-15T00:10:00.000Z",
+        duration_seconds: 600,
+        target_tenant_id: targetTenant.id,
+        target_tenant_name: targetTenant.name,
+        target_tenant_slug: targetTenant.slug,
+      },
+      error: null,
+    });
 
     const result = await adminImpersonationService.stop();
 
-    expect(logEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        tenant_id: targetTenant.id,
-        action: "tenant_impersonation_ended",
-        request_id: "req-123",
-      }),
-    );
+    expect(rpc).toHaveBeenCalledWith("admin_stop_tenant_impersonation", expect.any(Object));
     expect(stopImpersonation).toHaveBeenCalledTimes(1);
     expect(result).toEqual(
       expect.objectContaining({
-        requestId: "req-123",
+        requestId: "00000000-0000-0000-0000-000000000123",
         targetTenant,
       }),
     );
@@ -118,22 +133,20 @@ describe("adminImpersonationService", () => {
   it("blocks non-super-admin users", async () => {
     getState.mockReturnValue({
       user: superAdmin,
-      hasPermission: () => false,
-      lastVerifiedAt: new Date().toISOString(),
       impersonationSession: null,
       startImpersonation,
     });
+    privilegedAccessService.assertAction.mockRejectedValue(
+      new AuthorizationError("Only super admins can impersonate clinics"),
+    );
 
     await expect(adminImpersonationService.start(targetTenant)).rejects.toBeInstanceOf(AuthorizationError);
-    expect(logEvent).not.toHaveBeenCalled();
     expect(startImpersonation).not.toHaveBeenCalled();
   });
 
   it("blocks nested impersonation sessions", async () => {
     getState.mockReturnValue({
       user: superAdmin,
-      hasPermission: () => true,
-      lastVerifiedAt: new Date().toISOString(),
       impersonationSession: {
         requestId: "req-existing",
         startedAt: "2026-04-15T00:00:00.000Z",
@@ -149,8 +162,7 @@ describe("adminImpersonationService", () => {
       startImpersonation,
     });
 
-    await expect(adminImpersonationService.start(targetTenant)).rejects.toBeInstanceOf(BusinessRuleError);
-    expect(logEvent).not.toHaveBeenCalled();
+    await expect(adminImpersonationService.start(targetTenant)).rejects.toBeInstanceOf(ServiceError);
     expect(startImpersonation).not.toHaveBeenCalled();
   });
 });

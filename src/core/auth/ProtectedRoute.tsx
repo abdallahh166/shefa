@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
-import { isSuperAdmin, useAuth, Permission } from "./authStore";
+import { buildPrivilegedSession, isSuperAdmin, useAuth, type Permission, type PrivilegedRoleTier } from "./authStore";
 import { useFeatureAccess, type Feature } from "@/core/subscription/useFeatureAccess";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/primitives/Button";
@@ -9,6 +9,7 @@ interface ProtectedRouteProps {
   children: ReactNode;
   requiredPermission?: Permission;
   requiredFeature?: Feature;
+  requiredPrivilegedRole?: PrivilegedRoleTier;
 }
 
 const LoadingSkeleton = () => (
@@ -40,9 +41,15 @@ const LoadingSkeleton = () => (
   </div>
 );
 
-export const ProtectedRoute = ({ children, requiredPermission, requiredFeature }: ProtectedRouteProps) => {
-  const { isAuthenticated, isLoading, hasPermission, user } = useAuth();
+export const ProtectedRoute = ({
+  children,
+  requiredPermission,
+  requiredFeature,
+  requiredPrivilegedRole,
+}: ProtectedRouteProps) => {
+  const { isAuthenticated, isLoading, hasPermission, user, lastVerifiedAt, privilegedAuth } = useAuth();
   const { hasFeature, requiredPlan, isLoading: featureLoading } = useFeatureAccess();
+  const privilegedSession = buildPrivilegedSession({ user, lastVerifiedAt, privilegedAuth });
 
   if (isLoading || (requiredFeature && featureLoading)) {
     return <LoadingSkeleton />;
@@ -75,6 +82,23 @@ export const ProtectedRoute = ({ children, requiredPermission, requiredFeature }
         </div>
       </div>
     );
+  }
+
+  if (requiredPrivilegedRole) {
+    if (privilegedSession.roleTier !== requiredPrivilegedRole) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <h1 className="text-2xl font-semibold mb-2">Privileged Access Required</h1>
+            <p className="text-muted-foreground">This page is reserved for elevated platform administrators.</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (privilegedSession.requiresMfaEnrollment || privilegedSession.aal !== "aal2") {
+      return <Navigate to="/security/privileged" replace />;
+    }
   }
 
   if (requiredFeature && !hasFeature(requiredFeature)) {

@@ -1,4 +1,5 @@
 import { useI18n } from "@/core/i18n/i18nStore";
+import { buildPrivilegedSession, useAuth } from "@/core/auth/authStore";
 import { Button } from "@/components/primitives/Button";
 import { PermissionGuard } from "@/core/auth/PermissionGuard";
 import { UserPlus } from "lucide-react";
@@ -36,6 +37,10 @@ export const UsersTab = ({
   onSortChange,
 }: UsersTabProps) => {
   const { t } = useI18n();
+  const { user, lastVerifiedAt, privilegedAuth } = useAuth();
+  const privilegedSession = buildPrivilegedSession({ user, lastVerifiedAt, privilegedAuth });
+  const privilegedInviteBlocked =
+    privilegedSession.roleTier === "clinic_admin" && !privilegedSession.canAccessPrivilegedRoutes;
 
   const columns: Column<ProfileWithRoles>[] = [
     {
@@ -80,11 +85,16 @@ export const UsersTab = ({
           <p className="text-sm text-muted-foreground">{t("settings.manageStaff")}</p>
         </div>
         <PermissionGuard permission="manage_users">
-          <Button onClick={onAddUser} size="sm">
+          <Button onClick={onAddUser} size="sm" disabled={privilegedInviteBlocked}>
             <UserPlus className="h-4 w-4" /> {t("settings.addUser")}
           </Button>
         </PermissionGuard>
       </div>
+      {privilegedInviteBlocked ? (
+        <p className="text-sm text-amber-700">
+          Finish TOTP MFA setup in the Security tab before inviting or managing clinic-wide users.
+        </p>
+      ) : null}
       <PermissionGuard
         permission="manage_users"
         fallback={<p className="text-muted-foreground">{t("settings.noPermission")}</p>}

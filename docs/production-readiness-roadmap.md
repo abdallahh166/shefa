@@ -50,11 +50,15 @@ Target outcome:
 
 Priority: `P0`
 
+Status update:
+- core privileged-session hardening landed on `2026-04-27`, including TOTP MFA gating for privileged roles, server-issued single-use step-up grants for sensitive RPCs, and server-bound impersonation session controls
+- remaining follow-up work should focus on E2E coverage, operator recovery workflow polish, and production monitoring of privileged-denial/audit events
+
 Tasks:
-- add MFA for `super_admin`, `clinic_admin`, and other privileged roles
-- tighten session timeout and re-authentication rules for sensitive actions
-- add admin impersonation audit trail and review logging
-- document privileged-access policy in the repo docs
+- add end-to-end tests for privileged enrollment, step-up, and degradation flows
+- tighten operator recovery and MFA reset workflow
+- add alerting or dashboards for privileged denials and impersonation activity
+- validate linked DB privileged tests continuously in CI
 
 Estimate:
 - `L`
@@ -66,8 +70,8 @@ Dependencies:
 
 Exit criteria:
 - privileged users must complete MFA
-- impersonation events are auditable
-- session-sensitive actions require fresh auth when appropriate
+- impersonation events are auditable and limited to one active session per actor
+- session-sensitive actions require scoped server-issued step-up grants when appropriate
 
 ### Workstream B: Production Alerting and Operational Visibility
 

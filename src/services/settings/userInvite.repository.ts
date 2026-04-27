@@ -3,7 +3,7 @@ import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
 
 export interface UserInviteRepository {
-  inviteStaff(input: InviteStaffInput): Promise<void>;
+  inviteStaff(input: InviteStaffInput & { stepUpGrantId: string }): Promise<void>;
 }
 
 export const userInviteRepository: UserInviteRepository = {

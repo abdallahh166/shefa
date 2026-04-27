@@ -87,6 +87,42 @@ export const authService = {
       throw toServiceError(err, "Failed to load MFA assurance level");
     }
   },
+  async listMfaFactors() {
+    try {
+      return await authRepository.listMfaFactors();
+    } catch (err) {
+      throw toServiceError(err, "Failed to load MFA factors");
+    }
+  },
+  async enrollTotpFactor(input?: { friendlyName?: string; issuer?: string }) {
+    try {
+      return await authRepository.enrollTotpFactor(input);
+    } catch (err) {
+      throw toServiceError(err, "Failed to enroll MFA factor");
+    }
+  },
+  async verifyTotpFactor(input: { factorId: string; code: string }) {
+    try {
+      const factorId = uuidSchema.parse(input.factorId);
+      const code = z.string().trim().min(6).max(8).parse(input.code);
+      const challenge = await authRepository.challengeMfaFactor(factorId);
+      await authRepository.verifyTotpFactor({
+        factorId,
+        challengeId: challenge.id,
+        code,
+      });
+    } catch (err) {
+      throw toServiceError(err, "Failed to verify MFA factor");
+    }
+  },
+  async removeMfaFactor(factorId: string) {
+    try {
+      const parsedFactorId = uuidSchema.parse(factorId);
+      await authRepository.unenrollMfaFactor(parsedFactorId);
+    } catch (err) {
+      throw toServiceError(err, "Failed to remove MFA factor");
+    }
+  },
   async registerClinic(input: {
     clinicName: string;
     fullName: string;

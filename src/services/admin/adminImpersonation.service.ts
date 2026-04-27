@@ -1,11 +1,10 @@
 import { z } from "zod";
 import { createRequestId } from "@/core/observability/requestId";
-import { useAuth, type AppUser, type TenantOverride } from "@/core/auth/authStore";
+import { useAuth, type TenantOverride } from "@/core/auth/authStore";
 import { uuidSchema } from "@/domain/shared/identifiers.schema";
-import { auditLogService } from "@/services/settings/audit.service";
-import { BusinessRuleError, ServiceError, toServiceError } from "@/services/supabase/errors";
-import { assertAnyPermission } from "@/services/supabase/permissions";
-import { recentAuthService } from "@/services/auth/recentAuth.service";
+import { supabase } from "@/services/supabase/client";
+import { ServiceError, toServiceError } from "@/services/supabase/errors";
+import { privilegedAccessService } from "@/services/auth/privilegedAccess.service";
 
 const tenantOverrideSchema = z.object({
   id: uuidSchema,
@@ -15,6 +14,24 @@ const tenantOverrideSchema = z.object({
 
 type TargetTenant = Exclude<TenantOverride, null>;
 
+const impersonationStartResponseSchema = z.object({
+  request_id: uuidSchema,
+  started_at: z.string(),
+  target_tenant_id: uuidSchema,
+  target_tenant_name: z.string().trim().min(1),
+  target_tenant_slug: z.string().trim().min(1),
+});
+
+const impersonationStopResponseSchema = z.object({
+  request_id: uuidSchema,
+  started_at: z.string(),
+  ended_at: z.string(),
+  duration_seconds: z.number().int().nonnegative(),
+  target_tenant_id: uuidSchema,
+  target_tenant_name: z.string().trim().min(1),
+  target_tenant_slug: z.string().trim().min(1),
+});
+
 function requireCurrentUser() {
   const currentUser = useAuth.getState().user;
   if (!currentUser) {
@@ -23,40 +40,47 @@ function requireCurrentUser() {
   return currentUser;
 }
 
-function toPrimaryRole(currentUser: AppUser) {
-  if (currentUser.globalRoles.includes("super_admin")) return "super_admin";
-  return currentUser.tenantRoles[0] ?? null;
-}
-
-function toActorDetails(currentUser: AppUser) {
-  return {
-    actor_user_id: currentUser.id,
-    actor_name: currentUser.name,
-    actor_email: currentUser.email,
-    actor_role: toPrimaryRole(currentUser),
-    actor_global_roles: currentUser.globalRoles,
-    actor_tenant_roles: currentUser.tenantRoles,
-  };
-}
-
 export const adminImpersonationService = {
   async start(input: TargetTenant) {
     try {
-      assertAnyPermission(["super_admin"], "Only super admins can impersonate clinics");
-      recentAuthService.assertRecentAuth({ action: "tenant_impersonation_start" });
       const currentUser = requireCurrentUser();
       const targetTenant = tenantOverrideSchema.parse(input);
       const { impersonationSession, startImpersonation } = useAuth.getState();
 
       if (impersonationSession) {
-        throw new BusinessRuleError("Finish the active impersonation session before starting another one");
+        throw new ServiceError("Finish the active impersonation session before starting another one", {
+          code: "ACTIVE_IMPERSONATION_EXISTS",
+        });
       }
 
       const requestId = createRequestId();
-      const startedAt = new Date().toISOString();
-      const session = {
+      const access = await privilegedAccessService.assertAction({
+        action: "tenant_impersonation_start",
+        roleTier: "super_admin",
+        requireStepUp: true,
+        tenantId: targetTenant.id,
+        resourceId: targetTenant.id,
         requestId,
-        startedAt,
+      });
+      const stepUpGrantId = access?.stepUpGrantId ?? null;
+
+      const { data, error } = await (supabase.rpc as any)("admin_start_tenant_impersonation", {
+        _target_tenant_id: targetTenant.id,
+        _request_id: requestId,
+        _step_up_grant_id: stepUpGrantId,
+      });
+
+      if (error) {
+        throw new ServiceError(error.message ?? "Failed to start tenant impersonation", {
+          code: error.code,
+          details: error,
+        });
+      }
+
+      const payload = impersonationStartResponseSchema.parse(Array.isArray(data) ? data[0] : data);
+      const session = {
+        requestId: payload.request_id,
+        startedAt: payload.started_at,
         actor: {
           id: currentUser.id,
           name: currentUser.name,
@@ -64,28 +88,14 @@ export const adminImpersonationService = {
           globalRoles: currentUser.globalRoles,
           tenantRoles: currentUser.tenantRoles,
         },
-        targetTenant,
+        targetTenant: {
+          id: payload.target_tenant_id,
+          slug: payload.target_tenant_slug,
+          name: payload.target_tenant_name,
+        },
       } as const;
 
-      await auditLogService.logEvent({
-        tenant_id: targetTenant.id,
-        user_id: currentUser.id,
-        action: "tenant_impersonation_started",
-        action_type: "tenant_impersonation_start",
-        entity_type: "tenant",
-        entity_id: targetTenant.id,
-        resource_type: "tenant",
-        request_id: requestId,
-        details: {
-          ...toActorDetails(currentUser),
-          target_tenant_id: targetTenant.id,
-          target_tenant_slug: targetTenant.slug,
-          target_tenant_name: targetTenant.name,
-          started_at: startedAt,
-        },
-      });
-
-      startImpersonation(targetTenant, session);
+      startImpersonation(session.targetTenant, session);
       return session;
     } catch (err) {
       throw toServiceError(err, "Failed to start tenant impersonation");
@@ -94,47 +104,45 @@ export const adminImpersonationService = {
 
   async stop() {
     try {
-      assertAnyPermission(["super_admin"], "Only super admins can end clinic impersonation");
-      recentAuthService.assertRecentAuth({ action: "tenant_impersonation_end" });
-      const currentUser = requireCurrentUser();
       const { impersonationSession, tenantOverride, stopImpersonation } = useAuth.getState();
-
       if (!impersonationSession || !tenantOverride) {
-        throw new BusinessRuleError("No active impersonation session");
+        throw new ServiceError("No active impersonation session");
       }
 
-      const endedAt = new Date().toISOString();
-      const durationSeconds = Math.max(
-        0,
-        Math.round((new Date(endedAt).getTime() - new Date(impersonationSession.startedAt).getTime()) / 1000),
-      );
+      const access = await privilegedAccessService.assertAction({
+        action: "tenant_impersonation_end",
+        roleTier: "super_admin",
+        requireStepUp: true,
+        tenantId: tenantOverride.id,
+        resourceId: tenantOverride.id,
+        requestId: impersonationSession.requestId,
+      });
+      const stepUpGrantId = access?.stepUpGrantId ?? null;
 
-      await auditLogService.logEvent({
-        tenant_id: tenantOverride.id,
-        user_id: currentUser.id,
-        action: "tenant_impersonation_ended",
-        action_type: "tenant_impersonation_end",
-        entity_type: "tenant",
-        entity_id: tenantOverride.id,
-        resource_type: "tenant",
-        request_id: impersonationSession.requestId,
-        details: {
-          ...toActorDetails(currentUser),
-          target_tenant_id: tenantOverride.id,
-          target_tenant_slug: tenantOverride.slug,
-          target_tenant_name: tenantOverride.name,
-          started_at: impersonationSession.startedAt,
-          ended_at: endedAt,
-          duration_seconds: durationSeconds,
-        },
+      const { data, error } = await (supabase.rpc as any)("admin_stop_tenant_impersonation", {
+        _request_id: impersonationSession.requestId,
+        _step_up_grant_id: stepUpGrantId,
       });
 
+      if (error) {
+        throw new ServiceError(error.message ?? "Failed to stop tenant impersonation", {
+          code: error.code,
+          details: error,
+        });
+      }
+
+      const payload = impersonationStopResponseSchema.parse(Array.isArray(data) ? data[0] : data);
       stopImpersonation();
+
       return {
-        requestId: impersonationSession.requestId,
-        endedAt,
-        durationSeconds,
-        targetTenant: tenantOverride,
+        requestId: payload.request_id,
+        endedAt: payload.ended_at,
+        durationSeconds: payload.duration_seconds,
+        targetTenant: {
+          id: payload.target_tenant_id,
+          slug: payload.target_tenant_slug,
+          name: payload.target_tenant_name,
+        },
       };
     } catch (err) {
       throw toServiceError(err, "Failed to stop tenant impersonation");

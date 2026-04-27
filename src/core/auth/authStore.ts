@@ -6,7 +6,9 @@ import { authService } from "@/services/auth/auth.service";
 export type GlobalRole = "super_admin";
 export type TenantRole = "clinic_admin" | "doctor" | "receptionist" | "nurse" | "accountant";
 export type Role = GlobalRole | TenantRole;
+export type PrivilegedRoleTier = GlobalRole | "clinic_admin";
 export type TenantStatus = "active" | "suspended" | "deactivated";
+export type AuthenticatorAssuranceLevel = "aal1" | "aal2" | null;
 
 type SupaUser = {
   id: string;
@@ -83,6 +85,25 @@ export type ImpersonationSession = {
   targetTenant: Exclude<TenantOverride, null>;
 } | null;
 
+export type PrivilegedAuthState = {
+  currentLevel: AuthenticatorAssuranceLevel;
+  nextLevel: AuthenticatorAssuranceLevel;
+  verifiedFactorCount: number;
+  unverifiedFactorCount: number;
+  loadedAt: string | null;
+};
+
+export type PrivilegedSession = {
+  roleTier: PrivilegedRoleTier | null;
+  isPrivileged: boolean;
+  aal: AuthenticatorAssuranceLevel;
+  isMfaEnrolled: boolean;
+  isRecentAuthValid: boolean;
+  requiresMfaEnrollment: boolean;
+  requiresStepUp: boolean;
+  canAccessPrivilegedRoutes: boolean;
+};
+
 interface AuthState {
   user: AppUser | null;
   supabaseUser: SupaUser | null;
@@ -91,8 +112,11 @@ interface AuthState {
   tenantOverride: TenantOverride;
   impersonationSession: ImpersonationSession;
   lastVerifiedAt: string | null;
+  privilegedAuth: PrivilegedAuthState;
   setUser: (user: AppUser | null, supabaseUser?: SupaUser | null) => void;
   setLoading: (loading: boolean) => void;
+  setPrivilegedAuth: (state: Partial<PrivilegedAuthState>) => void;
+  clearPrivilegedAuth: () => void;
   logout: () => Promise<void>;
   hasPermission: (permission: Permission) => boolean;
   hasRole: (role: Role) => boolean;
@@ -117,9 +141,70 @@ export function getPrimaryRole(user?: Pick<AppUser, "tenantRoles" | "globalRoles
   return getPrimaryTenantRole(user as Pick<AppUser, "tenantRoles"> | null);
 }
 
+export function getPrivilegedRoleTier(
+  user?: Pick<AppUser, "tenantRoles" | "globalRoles"> | null,
+): PrivilegedRoleTier | null {
+  if (isSuperAdmin(user as Pick<AppUser, "globalRoles"> | null)) return "super_admin";
+  return user?.tenantRoles?.includes("clinic_admin") ? "clinic_admin" : null;
+}
+
 function getEffectiveRoles(user?: Pick<AppUser, "tenantRoles" | "globalRoles"> | null): Role[] {
   if (!user) return [];
   return [...(user.globalRoles ?? []), ...(user.tenantRoles ?? [])];
+}
+
+function getDefaultPrivilegedAuthState(): PrivilegedAuthState {
+  return {
+    currentLevel: null,
+    nextLevel: null,
+    verifiedFactorCount: 0,
+    unverifiedFactorCount: 0,
+    loadedAt: null,
+  };
+}
+
+function isRecentAuthStillValid(user: AppUser | null, lastVerifiedAt: string | null) {
+  if (!user || !lastVerifiedAt) return false;
+  const primaryRole = getPrimaryRole(user);
+  if (!primaryRole) return false;
+  const verifiedAt = new Date(lastVerifiedAt).getTime();
+  if (Number.isNaN(verifiedAt)) return false;
+
+  const windowsMs: Record<Role, number> = {
+    super_admin: 10 * 60 * 1000,
+    clinic_admin: 15 * 60 * 1000,
+    doctor: 30 * 60 * 1000,
+    receptionist: 30 * 60 * 1000,
+    nurse: 30 * 60 * 1000,
+    accountant: 30 * 60 * 1000,
+  };
+
+  return Date.now() - verifiedAt <= windowsMs[primaryRole];
+}
+
+export function buildPrivilegedSession(input: {
+  user: AppUser | null;
+  lastVerifiedAt: string | null;
+  privilegedAuth: PrivilegedAuthState;
+}): PrivilegedSession {
+  const roleTier = getPrivilegedRoleTier(input.user);
+  const isPrivileged = roleTier !== null;
+  const isMfaEnrolled = input.privilegedAuth.verifiedFactorCount > 0;
+  const aal = input.privilegedAuth.currentLevel;
+  const isRecentAuthValid = isRecentAuthStillValid(input.user, input.lastVerifiedAt);
+  const requiresMfaEnrollment = isPrivileged && !isMfaEnrolled;
+  const canAccessPrivilegedRoutes = !isPrivileged || (isMfaEnrolled && aal === "aal2");
+
+  return {
+    roleTier,
+    isPrivileged,
+    aal,
+    isMfaEnrolled,
+    isRecentAuthValid,
+    requiresMfaEnrollment,
+    requiresStepUp: isPrivileged && !isRecentAuthValid,
+    canAccessPrivilegedRoutes,
+  };
 }
 
 export const useAuth = create<AuthState>()(
@@ -132,6 +217,7 @@ export const useAuth = create<AuthState>()(
       tenantOverride: null,
       impersonationSession: null,
       lastVerifiedAt: null,
+      privilegedAuth: getDefaultPrivilegedAuthState(),
       setUser: (user, supabaseUser) => set({
         user,
         supabaseUser: supabaseUser ?? null,
@@ -142,6 +228,13 @@ export const useAuth = create<AuthState>()(
         lastVerifiedAt: user ? get().lastVerifiedAt : null,
       }),
       setLoading: (isLoading) => set({ isLoading }),
+      setPrivilegedAuth: (state) => set((current) => ({
+        privilegedAuth: {
+          ...current.privilegedAuth,
+          ...state,
+        },
+      })),
+      clearPrivilegedAuth: () => set({ privilegedAuth: getDefaultPrivilegedAuthState() }),
       logout: async () => {
         await authService.logout();
         set({
@@ -151,6 +244,7 @@ export const useAuth = create<AuthState>()(
           tenantOverride: null,
           impersonationSession: null,
           lastVerifiedAt: null,
+          privilegedAuth: getDefaultPrivilegedAuthState(),
         });
       },
       hasPermission: (permission) => {
@@ -214,6 +308,7 @@ export const useAuth = create<AuthState>()(
               tenantOverride: null,
               impersonationSession: null,
               lastVerifiedAt: null,
+              privilegedAuth: getDefaultPrivilegedAuthState(),
             });
           }
         } catch {
@@ -224,6 +319,7 @@ export const useAuth = create<AuthState>()(
             tenantOverride: null,
             impersonationSession: null,
             lastVerifiedAt: null,
+            privilegedAuth: getDefaultPrivilegedAuthState(),
           });
         } finally {
           set({ isLoading: false });
@@ -299,6 +395,7 @@ async function loadUserProfile(
       tenantOverride: null,
       impersonationSession: null,
       lastVerifiedAt: null,
+      privilegedAuth: getDefaultPrivilegedAuthState(),
     });
   }
 }

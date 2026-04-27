@@ -9,6 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { securityService } from "@/services/settings/security.service";
 import { isFreshAuthRequiredError } from "@/services/auth/recentAuth.service";
 import { requestReauthentication } from "@/features/auth/reauthPrompt";
+import { PrivilegedMfaPanel } from "@/features/auth/PrivilegedMfaPanel";
 
 export const SecurityTab = () => {
   const { t } = useI18n();
@@ -57,6 +58,8 @@ export const SecurityTab = () => {
 
   return (
     <div className="space-y-6">
+      <PrivilegedMfaPanel />
+
       <h3 className="font-semibold text-lg">{t("settings.changePassword")}</h3>
       <div className="space-y-4 max-w-sm">
         <div className="space-y-2">

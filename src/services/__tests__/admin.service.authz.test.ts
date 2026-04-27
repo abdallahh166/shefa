@@ -23,54 +23,25 @@ const adminRepository = vi.hoisted(() => ({
   retryJobs: vi.fn(),
 }));
 
-const permissions = vi.hoisted(() => ({
-  assertAnyPermission: vi.fn(),
-}));
-
 const featureFlagRepository = vi.hoisted(() => ({
   listByTenant: vi.fn(),
   upsert: vi.fn(),
 }));
 
 vi.mock("@/services/admin/admin.repository", () => ({ adminRepository }));
-vi.mock("@/services/supabase/permissions", () => permissions);
 vi.mock("@/services/featureFlags/featureFlag.repository", () => ({ featureFlagRepository }));
-vi.mock("@/services/auth/recentAuth.service", () => ({
-  recentAuthService: {
-    assertRecentAuth: vi.fn(),
-  },
+const adminSecurityService = vi.hoisted(() => ({
+  assertAccess: vi.fn(),
 }));
-vi.mock("@/services/auth/auth.service", () => ({
-  authService: {
-    getMfaAssuranceLevel: vi.fn(async () => ({
-      currentLevel: "aal2",
-      nextLevel: "aal2",
-    })),
-  },
-}));
-vi.mock("@/services/settings/audit.service", () => ({
-  auditLogService: {
-    logEvent: vi.fn(),
-  },
-}));
-vi.mock("@/core/auth/authStore", () => ({
-  useAuth: {
-    getState: () => ({
-      user: {
-        id: "00000000-0000-0000-0000-000000000111",
-        globalRoles: ["super_admin"],
-        tenantRoles: [],
-      },
-    }),
-  },
-}));
+
+vi.mock("@/services/admin/adminSecurity.service", () => ({ adminSecurityService }));
 
 import { adminService } from "@/services/admin/admin.service";
 
 describe("adminService authorization", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    permissions.assertAnyPermission.mockReturnValue(undefined);
+    adminSecurityService.assertAccess.mockResolvedValue({ stepUpGrantId: null });
   });
 
   it("checks for super admin access before listing tenants", async () => {
@@ -78,16 +49,13 @@ describe("adminService authorization", () => {
 
     await adminService.listTenantsPaged({ page: 1, pageSize: 20 });
 
-    expect(permissions.assertAnyPermission).toHaveBeenCalledWith(
-      ["super_admin"],
-      "Only super admins can access admin operations",
-    );
+    expect(adminSecurityService.assertAccess).toHaveBeenCalledWith({ action: "admin_list_tenants" });
   });
 
   it("rejects non-super-admin callers before hitting admin queries", async () => {
-    permissions.assertAnyPermission.mockImplementation(() => {
-      throw new AuthorizationError("Only super admins can access admin operations");
-    });
+    adminSecurityService.assertAccess.mockRejectedValue(
+      new AuthorizationError("Only super admins can access admin operations"),
+    );
 
     await expect(adminService.getSubscriptionStats()).rejects.toMatchObject({
       name: "AuthorizationError",
@@ -102,16 +70,13 @@ describe("adminService authorization", () => {
 
     await adminService.listPricingPlans();
 
-    expect(permissions.assertAnyPermission).toHaveBeenCalledWith(
-      ["super_admin"],
-      "Only super admins can access admin operations",
-    );
+    expect(adminSecurityService.assertAccess).toHaveBeenCalledWith({ action: "admin_list_pricing_plans" });
   });
 
   it("blocks pricing plan creation for non-super-admin callers", async () => {
-    permissions.assertAnyPermission.mockImplementation(() => {
-      throw new AuthorizationError("Only super admins can access admin operations");
-    });
+    adminSecurityService.assertAccess.mockRejectedValue(
+      new AuthorizationError("Only super admins can access admin operations"),
+    );
 
     await expect(adminService.createPricingPlan({
       plan_code: "pro",
@@ -136,9 +101,9 @@ describe("adminService authorization", () => {
   });
 
   it("blocks tenant lifecycle changes for non-super-admin callers", async () => {
-    permissions.assertAnyPermission.mockImplementation(() => {
-      throw new AuthorizationError("Only super admins can access admin operations");
-    });
+    adminSecurityService.assertAccess.mockRejectedValue(
+      new AuthorizationError("Only super admins can access admin operations"),
+    );
 
     await expect(adminService.updateTenantStatus(
       "00000000-0000-0000-0000-000000000444",
@@ -156,16 +121,13 @@ describe("adminService authorization", () => {
 
     await adminService.listTenantFeatureFlags("00000000-0000-0000-0000-000000000444");
 
-    expect(permissions.assertAnyPermission).toHaveBeenCalledWith(
-      ["super_admin"],
-      "Only super admins can access admin operations",
-    );
+    expect(adminSecurityService.assertAccess).toHaveBeenCalledWith({ action: "admin_list_tenant_feature_flags" });
   });
 
   it("blocks tenant feature flag changes for non-super-admin callers", async () => {
-    permissions.assertAnyPermission.mockImplementation(() => {
-      throw new AuthorizationError("Only super admins can access admin operations");
-    });
+    adminSecurityService.assertAccess.mockRejectedValue(
+      new AuthorizationError("Only super admins can access admin operations"),
+    );
 
     await expect(adminService.updateTenantFeatureFlag(
       "00000000-0000-0000-0000-000000000444",
@@ -191,16 +153,13 @@ describe("adminService authorization", () => {
 
     await adminService.getTenantUsage("00000000-0000-0000-0000-000000000444");
 
-    expect(permissions.assertAnyPermission).toHaveBeenCalledWith(
-      ["super_admin"],
-      "Only super admins can access admin operations",
-    );
+    expect(adminSecurityService.assertAccess).toHaveBeenCalledWith({ action: "admin_tenant_usage" });
   });
 
   it("blocks job retry for non-super-admin callers", async () => {
-    permissions.assertAnyPermission.mockImplementation(() => {
-      throw new AuthorizationError("Only super admins can access admin operations");
-    });
+    adminSecurityService.assertAccess.mockRejectedValue(
+      new AuthorizationError("Only super admins can access admin operations"),
+    );
 
     await expect(adminService.retryJobs({
       job_ids: ["00000000-0000-0000-0000-000000000555"],

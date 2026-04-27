@@ -233,6 +233,7 @@ export const adminRepository: AdminRepository = {
       _request_id: context?.requestId ?? null,
       _reason: reason ?? null,
       _idempotency_key: context?.idempotencyKey ?? null,
+      _step_up_grant_id: context?.stepUpGrantId ?? null,
     });
 
     if (error) {
@@ -257,6 +258,7 @@ export const adminRepository: AdminRepository = {
       _request_id: context?.requestId ?? null,
       _reason: reason ?? null,
       _idempotency_key: context?.idempotencyKey ?? null,
+      _step_up_grant_id: context?.stepUpGrantId ?? null,
     });
 
     if (error) {
@@ -275,6 +277,7 @@ export const adminRepository: AdminRepository = {
       _status_reason: input.status_reason ?? null,
       _request_id: context?.requestId ?? null,
       _idempotency_key: context?.idempotencyKey ?? null,
+      _step_up_grant_id: context?.stepUpGrantId ?? null,
     });
 
     if (error) {
@@ -293,6 +296,7 @@ export const adminRepository: AdminRepository = {
       _enabled: enabled,
       _request_id: context?.requestId ?? null,
       _idempotency_key: context?.idempotencyKey ?? null,
+      _step_up_grant_id: context?.stepUpGrantId ?? null,
     });
 
     if (error) {
@@ -458,6 +462,7 @@ export const adminRepository: AdminRepository = {
       _display_order: input.display_order,
       _request_id: context?.requestId ?? null,
       _idempotency_key: context?.idempotencyKey ?? null,
+      _step_up_grant_id: context?.stepUpGrantId ?? null,
     });
 
     if (error) {
@@ -490,6 +495,7 @@ export const adminRepository: AdminRepository = {
       _display_order: input.display_order ?? null,
       _request_id: context?.requestId ?? null,
       _idempotency_key: context?.idempotencyKey ?? null,
+      _step_up_grant_id: context?.stepUpGrantId ?? null,
     });
 
     if (error) {
@@ -506,6 +512,7 @@ export const adminRepository: AdminRepository = {
       _plan_id: id,
       _request_id: context?.requestId ?? null,
       _idempotency_key: context?.idempotencyKey ?? null,
+      _step_up_grant_id: context?.stepUpGrantId ?? null,
     });
 
     if (error) {
@@ -612,6 +619,7 @@ export const adminRepository: AdminRepository = {
       _billing_cycle: input.billing_cycle ?? null,
       _request_id: context?.requestId ?? null,
       _idempotency_key: context?.idempotencyKey ?? null,
+      _step_up_grant_id: context?.stepUpGrantId ?? null,
     });
 
     if (error) {
@@ -643,6 +651,7 @@ export const adminRepository: AdminRepository = {
       _request_id: input.requestId,
       _reason: input.reason,
       _idempotency_key: input.idempotencyKey,
+      _step_up_grant_id: input.stepUpGrantId ?? null,
     });
 
     if (error) {

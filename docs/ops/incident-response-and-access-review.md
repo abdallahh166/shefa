@@ -8,6 +8,7 @@ Related docs:
 - [backup-and-restore.md](c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/backup-and-restore.md)
 - [backup-restore-validation-checklist.md](c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/backup-restore-validation-checklist.md)
 - [phi-retention-and-deletion.md](c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/phi-retention-and-deletion.md)
+- [privileged-access-policy.md](c:/Users/Boo/Desktop/Shefaa/shefaa/docs/ops/privileged-access-policy.md)
 
 ## Purpose
 
@@ -88,6 +89,7 @@ Primary sources in this repository:
 - `jobs`
 - report refresh status and stale/failing report indicators
 - audit logs, including impersonation start/end
+- privileged step-up issuance and denial events
 - user-reported incidents from clinic staff or patients
 
 Expected first checks by incident type:
@@ -311,11 +313,12 @@ For each reviewed account or access path, confirm:
 3. Their tenant scope is correct.
 4. They do not hold stronger access than required.
 5. MFA status is known and tracked, even if enforcement is still in progress.
-6. Recent impersonation or other privileged actions are explainable.
-7. No shared accounts are in use for privileged workflows.
-8. Vendor-console access is limited to the minimum required maintainers.
-9. Secret rotation ownership is assigned and current.
-10. Access removal or downgrade actions are completed immediately when no longer justified.
+6. Privileged users remain enrolled in TOTP MFA and can reach `aal2`.
+7. Recent impersonation, step-up denial, or other privileged actions are explainable.
+8. No shared accounts are in use for privileged workflows.
+9. Vendor-console access is limited to the minimum required maintainers.
+10. Secret rotation ownership is assigned and current.
+11. Access removal or downgrade actions are completed immediately when no longer justified.
 
 ## Access Review Evidence
 
@@ -348,7 +351,6 @@ Rules:
 ## Current Gaps
 
 This runbook closes the documentation baseline for incident response and access review, but these product gaps still remain:
-- MFA is not yet enforced for privileged roles
 - access review is documented but not automated in-product
 - vendor-console review still depends on manual inventory and external systems
 - breach-notification workflow outside engineering must still be finalized with legal/compliance owners

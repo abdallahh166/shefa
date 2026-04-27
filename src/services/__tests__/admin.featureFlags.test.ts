@@ -5,6 +5,7 @@ const adminRepository = vi.hoisted(() => ({
   createTenant: vi.fn(),
   updateTenant: vi.fn(),
   updateTenantStatus: vi.fn(),
+  updateTenantFeatureFlag: vi.fn(),
   listProfilesWithRolesPaged: vi.fn(),
   listSubscriptionsPaged: vi.fn(),
   listPricingPlans: vi.fn(),
@@ -19,45 +20,25 @@ const adminRepository = vi.hoisted(() => ({
   updateSubscription: vi.fn(),
 }));
 
-const permissions = vi.hoisted(() => ({
-  assertAnyPermission: vi.fn(),
-}));
-
 const featureFlagRepository = vi.hoisted(() => ({
   listByTenant: vi.fn(),
   upsert: vi.fn(),
 }));
 
-const auditLogService = vi.hoisted(() => ({
-  logEvent: vi.fn(),
+vi.mock("@/services/admin/admin.repository", () => ({ adminRepository }));
+vi.mock("@/services/featureFlags/featureFlag.repository", () => ({ featureFlagRepository }));
+const adminSecurityService = vi.hoisted(() => ({
+  assertAccess: vi.fn(),
 }));
 
-vi.mock("@/services/admin/admin.repository", () => ({ adminRepository }));
-vi.mock("@/services/supabase/permissions", () => permissions);
-vi.mock("@/services/featureFlags/featureFlag.repository", () => ({ featureFlagRepository }));
-vi.mock("@/services/settings/audit.service", () => ({ auditLogService }));
-vi.mock("@/services/auth/recentAuth.service", () => ({
-  recentAuthService: {
-    assertRecentAuth: vi.fn(),
-  },
-}));
-vi.mock("@/core/auth/authStore", () => ({
-  useAuth: {
-    getState: () => ({
-      user: {
-        id: "00000000-0000-0000-0000-000000000111",
-        role: "super_admin",
-      },
-    }),
-  },
-}));
+vi.mock("@/services/admin/adminSecurity.service", () => ({ adminSecurityService }));
 
 import { adminService } from "@/services/admin/admin.service";
 
 describe("adminService tenant feature flags", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    permissions.assertAnyPermission.mockReturnValue(undefined);
+    adminSecurityService.assertAccess.mockResolvedValue({ stepUpGrantId: null });
   });
 
   it("merges missing flag rows as enabled by default", async () => {
@@ -82,12 +63,10 @@ describe("adminService tenant feature flags", () => {
   });
 
   it("audits super-admin feature flag changes against the target tenant", async () => {
-    featureFlagRepository.upsert.mockResolvedValue({
+    adminRepository.updateTenantFeatureFlag.mockResolvedValue({
       id: "00000000-0000-0000-0000-000000000202",
-      tenant_id: "00000000-0000-0000-0000-000000000444",
       feature_key: "lab_module",
       enabled: false,
-      created_at: "2026-04-24T18:00:00.000Z",
     });
 
     const result = await adminService.updateTenantFeatureFlag(
@@ -96,15 +75,11 @@ describe("adminService tenant feature flags", () => {
     );
 
     expect(result).toEqual({ feature_key: "lab_module", enabled: false });
-    expect(auditLogService.logEvent).toHaveBeenCalledWith(
+    expect(adminSecurityService.assertAccess).toHaveBeenCalledWith(
       expect.objectContaining({
-        tenant_id: "00000000-0000-0000-0000-000000000444",
-        entity_type: "feature_flags",
-        details: expect.objectContaining({
-          feature_key: "lab_module",
-          enabled: false,
-          actor_role: "super_admin",
-        }),
+        action: "tenant_feature_flag_update",
+        requireRecentAuth: true,
+        tenantId: "00000000-0000-0000-0000-000000000444",
       }),
     );
   });

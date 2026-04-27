@@ -18,7 +18,7 @@ Operational policy references now include [phi-retention-and-deletion.md](/c:/Us
 
 | Feature | Overall Result | Key Reason |
 | --- | --- | --- |
-| Authentication & Access | Near ready | Strong RBAC and auth flows, but MFA and stronger session governance are still missing. |
+| Authentication & Access | Near ready | Strong RBAC, MFA gating for privileged roles, and step-up session hardening are now in place; broader end-to-end coverage is still missing. |
 | Dashboard | Partial | Useful overview exists, but test depth and observability are limited. |
 | Patient Management | Near ready | Strong core workflow, tenant controls, and document support; compliance and audit depth still need work. |
 | Doctor Management | Near ready | Profiles and schedules are present, but leave/recurrence and deeper operational controls are missing. |
@@ -30,8 +30,8 @@ Operational policy references now include [phi-retention-and-deletion.md](/c:/Us
 | Insurance Claims | Partial | Claim lifecycle exists, but operational coverage and testing are still modest. |
 | Reports & Analytics | Near ready | Broad reporting exists with guarded access, but resiliency and production monitoring need more work. |
 | Notifications & Reminders | Partial | In-app notifications are real; reminders/email/WhatsApp readiness is not yet fully proven. |
-| Settings, Users & Audit | Near ready | Good admin surface and audit visibility, but advanced security controls are still missing. |
-| Admin Console | Near ready | Strong platform admin capabilities, though governance and audit depth can improve. |
+| Settings, Users & Audit | Near ready | Good admin surface, MFA gating, and audit visibility are in place; broader UI coverage and recovery polish remain. |
+| Admin Console | Near ready | Strong platform admin capabilities now include scoped step-up grants and server-bound impersonation, though monitoring depth can improve. |
 | Subscription & Feature Flags | Near ready | Feature entitlements and paywall flows are present and reasonably mature. |
 | Patient Portal | Partial | Read-only portal exists with invite-only auth, but capabilities and coverage are still limited. |
 | Telemedicine | Partial | Session and token foundations exist with a call page, but operational readiness is still limited. |
@@ -46,13 +46,13 @@ Operational policy references now include [phi-retention-and-deletion.md](/c:/Us
 Overall result: `Near ready`
 
 - Functionality completeness: Login, logout, reset password, protected routes, role model, and tenant-aware session initialization are implemented. Missing pieces are MFA, richer device/session management, and stronger admin auth workflows.
-- Security hardening: Strong baseline. RBAC is implemented, routes are protected, tenant context is enforced, and public onboarding functions are hardened with CAPTCHA/rate limiting. The main gap is lack of MFA and limited session governance for privileged users.
+- Security hardening: Strong baseline. RBAC is implemented, routes are protected, tenant context is enforced, and public onboarding functions are hardened with CAPTCHA/rate limiting. Privileged roles now require TOTP MFA plus scoped step-up for sensitive actions. The main remaining gap is broader end-to-end verification and monitoring of privileged-denial events.
 - Performance optimization: Good. Auth flows are lightweight and mostly remote-call bound. No significant performance concern is visible.
 - Error handling: Good. Service-layer error mapping exists and auth timeouts are handled defensively.
 - Testing coverage: Moderate. `auth.service.test.ts`, tenant-context tests, service smoke tests, and service-role audit help, but there is no broader end-to-end auth suite.
 - Monitoring & observability: Moderate. Client errors, edge logging, and audit infrastructure exist, but auth-specific dashboards and alerts are not evident.
-- Compliance readiness: Moderate to good. Least-privilege and tenant scoping are present, but MFA, access review, and privileged session controls are still needed for strong healthcare posture.
-- Priority actions: Add MFA for privileged roles, add auth event alerting, add end-to-end sign-in/reset coverage.
+- Compliance readiness: Good technically. Least-privilege, tenant scoping, privileged MFA, and server-side step-up controls are present. Remaining gaps are operational review automation, recovery workflows, and richer auth monitoring.
+- Priority actions: Add auth event alerting, add end-to-end sign-in/reset and privileged-step-up coverage, and validate privileged-session telemetry.
 
 ## 2. Dashboard
 
@@ -207,21 +207,21 @@ Overall result: `Near ready`
 - Error handling: Good. Standard service-layer patterns and toasts are used consistently.
 - Testing coverage: Moderate. Service smoke and repository tests support many settings workflows, but feature-level UI tests are limited.
 - Monitoring & observability: Moderate. Audit logs are a strong foundation, though settings-specific anomaly alerts are not obvious.
-- Compliance readiness: Moderate to good. Audit visibility is important and present, but privileged access review, MFA, and policy enforcement still need work.
-- Priority actions: Add MFA, expand audit coverage, and add UI smoke tests for user and admin settings flows.
+- Compliance readiness: Good technically. Audit visibility is important and present, and privileged users are now gated behind MFA with step-up-sensitive flows. Remaining work is recovery governance and broader UI smoke coverage.
+- Priority actions: Expand audit coverage review, add UI smoke tests for user and admin settings flows, and monitor privileged denial events.
 
 ## 14. Admin Console
 
 Overall result: `Near ready`
 
 - Functionality completeness: Super-admin overview, clinics, users, subscriptions, and tenant impersonation are implemented.
-- Security hardening: Good but sensitive. Admin-only route protection and tenant override exist, but this area carries high blast radius and should have the strongest controls.
+- Security hardening: Good and significantly strengthened. Admin-only route protection, privileged MFA gating, scoped single-use step-up grants, and server-bound impersonation controls exist. This area still carries high blast radius and should keep the strongest monitoring.
 - Performance optimization: Good. Admin pages use paginated queries and summary endpoints.
 - Error handling: Good. Query invalidation and change confirmation patterns are present.
 - Testing coverage: Moderate. Repository and service coverage exist, but admin-specific end-to-end safety tests are not visible.
 - Monitoring & observability: Moderate. Admin actions should ideally generate stronger audit and event trails than are currently evident.
-- Compliance readiness: Moderate. This feature requires strong operational controls, access review, and admin-session protections beyond what is currently visible.
-- Priority actions: Add MFA requirement for super admins, expand admin audit telemetry, add impersonation governance.
+- Compliance readiness: Good technically. This feature now has stronger admin-session protection and impersonation governance. Remaining work is operational review automation and richer privileged activity monitoring.
+- Priority actions: Expand admin audit telemetry, add E2E safety coverage, and operationalize periodic privileged-access review.
 
 ## 15. Subscription & Feature Flags
 
@@ -345,7 +345,7 @@ Most important gaps before broader clinic rollout:
 
 ## Recommended Next Wave
 
-1. Harden privileged access with MFA, admin-session policies, and access review.
+1. Extend privileged-access hardening with E2E coverage, monitoring, and operational review automation.
 2. Add end-to-end tests for appointments, portal login, reminders, and telemedicine join flow.
 3. Operationalize observability with alerting on queue backlog, edge-function failures, and report-refresh failures.
 4. Complete compliance controls around vendor review, retention enforcement, and clinical audit policy.

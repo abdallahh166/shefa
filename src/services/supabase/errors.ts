@@ -52,6 +52,12 @@ export class BusinessRuleError extends ServiceError {
 function mapServiceError(err: ServiceError) {
   if (err.code === "23505") return new ConflictError(err.message, { code: err.code, details: err.details });
   if (err.code === "23P01") return new ConflictError(err.message, { code: err.code, details: err.details });
+  if (
+    err.message.toLowerCase().includes("recent password authentication is required")
+    || err.message.toLowerCase().includes("privileged step-up grant required")
+  ) {
+    return new AuthorizationError(err.message, { code: "FRESH_AUTH_REQUIRED", details: err.details });
+  }
   if (err.code === "42501" || err.code === "PGRST301") {
     return new AuthorizationError(err.message, { code: err.code, details: err.details });
   }

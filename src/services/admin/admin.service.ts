@@ -202,7 +202,12 @@ export function createAdminMutationContext(existing?: Partial<AdminMutationConte
   return {
     requestId,
     idempotencyKey: existing?.idempotencyKey ?? requestId,
+    stepUpGrantId: existing?.stepUpGrantId ?? null,
   };
+}
+
+function extractStepUpGrantId(access: { stepUpGrantId?: string | null } | null | undefined) {
+  return access?.stepUpGrantId ?? null;
 }
 
 export const adminService = {
@@ -260,12 +265,18 @@ export const adminService = {
   },
   async createTenant(input: AdminTenantCreateInput, context?: AdminMutationContext) {
     try {
-      await adminSecurityService.assertAccess({
+      const mutationContext = createAdminMutationContext(context);
+      const access = await adminSecurityService.assertAccess({
         action: "tenant_create",
         requireRecentAuth: true,
+        requestId: mutationContext.requestId,
       });
+      const stepUpGrantId = extractStepUpGrantId(access);
       const parsed = adminTenantCreateSchema.parse(input);
-      const result = await adminRepository.createTenant(parsed, createAdminMutationContext(context));
+      const result = await adminRepository.createTenant(parsed, {
+        ...mutationContext,
+        stepUpGrantId,
+      });
       return adminTenantSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to create tenant");
@@ -273,13 +284,20 @@ export const adminService = {
   },
   async updateTenant(id: string, input: AdminTenantUpdateInput, context?: AdminMutationContext) {
     try {
-      await adminSecurityService.assertAccess({
+      const parsedId = uuidSchema.parse(id);
+      const mutationContext = createAdminMutationContext(context);
+      const access = await adminSecurityService.assertAccess({
         action: "tenant_update",
         requireRecentAuth: true,
+        resourceId: parsedId,
+        requestId: mutationContext.requestId,
       });
-      const parsedId = uuidSchema.parse(id);
+      const stepUpGrantId = extractStepUpGrantId(access);
       const parsed = adminTenantUpdateSchema.parse(input);
-      const result = await adminRepository.updateTenant(parsedId, parsed, createAdminMutationContext(context));
+      const result = await adminRepository.updateTenant(parsedId, parsed, {
+        ...mutationContext,
+        stepUpGrantId,
+      });
       return adminTenantSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to update tenant");
@@ -287,13 +305,21 @@ export const adminService = {
   },
   async updateTenantStatus(id: string, input: AdminTenantStatusUpdateInput, context?: AdminMutationContext) {
     try {
-      await adminSecurityService.assertAccess({
+      const parsedId = uuidSchema.parse(id);
+      const mutationContext = createAdminMutationContext(context);
+      const access = await adminSecurityService.assertAccess({
         action: "tenant_status_update",
         requireRecentAuth: true,
+        tenantId: parsedId,
+        resourceId: parsedId,
+        requestId: mutationContext.requestId,
       });
-      const parsedId = uuidSchema.parse(id);
+      const stepUpGrantId = extractStepUpGrantId(access);
       const parsed = adminTenantStatusUpdateSchema.parse(input);
-      const result = await adminRepository.updateTenantStatus(parsedId, parsed, createAdminMutationContext(context));
+      const result = await adminRepository.updateTenantStatus(parsedId, parsed, {
+        ...mutationContext,
+        stepUpGrantId,
+      });
       return adminTenantSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to update tenant status");
@@ -320,19 +346,26 @@ export const adminService = {
     tenantId: string,
     input: AdminTenantFeatureFlagUpdateInput,
     context?: AdminMutationContext,
-  ) {
+    ) {
     try {
-      await adminSecurityService.assertAccess({
+      const parsedTenantId = uuidSchema.parse(tenantId);
+      const mutationContext = createAdminMutationContext(context);
+      const access = await adminSecurityService.assertAccess({
         action: "tenant_feature_flag_update",
         requireRecentAuth: true,
+        tenantId: parsedTenantId,
+        requestId: mutationContext.requestId,
       });
-      const parsedTenantId = uuidSchema.parse(tenantId);
+      const stepUpGrantId = extractStepUpGrantId(access);
       const parsed = adminTenantFeatureFlagUpdateSchema.parse(input);
       const result = await adminRepository.updateTenantFeatureFlag(
         parsedTenantId,
         parsed.feature_key,
         parsed.enabled,
-        createAdminMutationContext(context),
+        {
+          ...mutationContext,
+          stepUpGrantId,
+        },
       );
       return adminTenantFeatureFlagSchema.parse({
         feature_key: result.feature_key,
@@ -429,13 +462,20 @@ export const adminService = {
   },
   async updateSubscription(id: string, input: AdminSubscriptionUpdateInput, context?: AdminMutationContext) {
     try {
-      await adminSecurityService.assertAccess({
+      const parsedId = uuidSchema.parse(id);
+      const mutationContext = createAdminMutationContext(context);
+      const access = await adminSecurityService.assertAccess({
         action: "subscription_update",
         requireRecentAuth: true,
+        resourceId: parsedId,
+        requestId: mutationContext.requestId,
       });
-      const parsedId = uuidSchema.parse(id);
+      const stepUpGrantId = extractStepUpGrantId(access);
       const parsed = adminSubscriptionUpdateSchema.parse(input);
-      const result = await adminRepository.updateSubscription(parsedId, parsed, createAdminMutationContext(context));
+      const result = await adminRepository.updateSubscription(parsedId, parsed, {
+        ...mutationContext,
+        stepUpGrantId,
+      });
       return adminSubscriptionSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to update subscription");
@@ -452,12 +492,18 @@ export const adminService = {
   },
   async createPricingPlan(input: AdminPricingPlanCreateInput, context?: AdminMutationContext) {
     try {
-      await adminSecurityService.assertAccess({
+      const mutationContext = createAdminMutationContext(context);
+      const access = await adminSecurityService.assertAccess({
         action: "pricing_plan_create",
         requireRecentAuth: true,
+        requestId: mutationContext.requestId,
       });
+      const stepUpGrantId = extractStepUpGrantId(access);
       const parsed = adminPricingPlanCreateSchema.parse(input);
-      const result = await adminRepository.createPricingPlan(parsed, createAdminMutationContext(context));
+      const result = await adminRepository.createPricingPlan(parsed, {
+        ...mutationContext,
+        stepUpGrantId,
+      });
       return adminPricingPlanSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to create pricing plan");
@@ -465,13 +511,20 @@ export const adminService = {
   },
   async updatePricingPlan(id: string, input: AdminPricingPlanUpdateInput, context?: AdminMutationContext) {
     try {
-      await adminSecurityService.assertAccess({
+      const parsedId = uuidSchema.parse(id);
+      const mutationContext = createAdminMutationContext(context);
+      const access = await adminSecurityService.assertAccess({
         action: "pricing_plan_update",
         requireRecentAuth: true,
+        resourceId: parsedId,
+        requestId: mutationContext.requestId,
       });
-      const parsedId = uuidSchema.parse(id);
+      const stepUpGrantId = extractStepUpGrantId(access);
       const parsed = adminPricingPlanUpdateSchema.parse(input);
-      const result = await adminRepository.updatePricingPlan(parsedId, parsed, createAdminMutationContext(context));
+      const result = await adminRepository.updatePricingPlan(parsedId, parsed, {
+        ...mutationContext,
+        stepUpGrantId,
+      });
       return adminPricingPlanSchema.parse(result);
     } catch (err) {
       throw toServiceError(err, "Failed to update pricing plan");
@@ -479,12 +532,19 @@ export const adminService = {
   },
   async deletePricingPlan(id: string, context?: AdminMutationContext) {
     try {
-      await adminSecurityService.assertAccess({
+      const parsedId = uuidSchema.parse(id);
+      const mutationContext = createAdminMutationContext(context);
+      const access = await adminSecurityService.assertAccess({
         action: "pricing_plan_delete",
         requireRecentAuth: true,
+        resourceId: parsedId,
+        requestId: mutationContext.requestId,
       });
-      const parsedId = uuidSchema.parse(id);
-      await adminRepository.deletePricingPlan(parsedId, createAdminMutationContext(context));
+      const stepUpGrantId = extractStepUpGrantId(access);
+      await adminRepository.deletePricingPlan(parsedId, {
+        ...mutationContext,
+        stepUpGrantId,
+      });
     } catch (err) {
       throw toServiceError(err, "Failed to delete pricing plan");
     }
@@ -501,15 +561,20 @@ export const adminService = {
   },
   async retryJobs(input: { job_ids: string[]; reason: string }, context?: AdminMutationContext) {
     try {
-      await adminSecurityService.assertAccess({
+      const mutationContext = createAdminMutationContext(context);
+      const parsed = adminJobRetryInputSchema.parse(input);
+      const access = await adminSecurityService.assertAccess({
         action: input.job_ids.length > 1 ? "job_retry_bulk" : "job_retry",
         requireRecentAuth: true,
+        resourceId: parsed.job_ids[0] ?? null,
+        requestId: mutationContext.requestId,
       });
-      const parsed = adminJobRetryInputSchema.parse(input);
+      const stepUpGrantId = extractStepUpGrantId(access);
       return z.array(adminRecentJobActivitySchema).parse(
         await adminRepository.retryJobs({
           ...parsed,
-          ...createAdminMutationContext(context),
+          ...mutationContext,
+          stepUpGrantId,
         }),
       );
     } catch (err) {

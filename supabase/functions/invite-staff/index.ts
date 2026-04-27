@@ -114,6 +114,8 @@ Deno.serve(async (req) => {
     }
 
     const callerId = claimsData.claims.sub;
+    const callerSessionId = claimsData.claims.session_id;
+    const callerAal = claimsData.claims.aal;
 
     const { data: roleData } = await adminClient
       .from("user_roles")
@@ -144,10 +146,37 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { email, full_name, role } = await req.json();
-    if (!email || !full_name || !role) {
+    const { email, full_name, role, stepUpGrantId } = await req.json();
+    if (!email || !full_name || !role || !stepUpGrantId) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
+        headers: baseHeaders,
+      });
+    }
+
+    if (callerAal !== "aal2") {
+      return new Response(JSON.stringify({ error: "Clinic admin MFA is required for this action" }), {
+        status: 403,
+        headers: baseHeaders,
+      });
+    }
+
+    const { error: stepUpError } = await adminClient.rpc(
+      "consume_privileged_step_up_grant_for_actor",
+      {
+        _actor_id: callerId,
+        _session_id: callerSessionId ?? null,
+        _grant_id: stepUpGrantId,
+        _role_tier: "clinic_admin",
+        _action_key: "staff_invite",
+        _tenant_id: callerProfile.tenant_id,
+        _resource_id: null,
+      },
+    );
+
+    if (stepUpError) {
+      return new Response(JSON.stringify({ error: stepUpError.message ?? "Valid privileged step-up grant required for this action" }), {
+        status: 403,
         headers: baseHeaders,
       });
     }
@@ -249,7 +278,16 @@ Deno.serve(async (req) => {
       _action: "staff_invited",
       _entity_type: "user_invite",
       _entity_id: inviteUserData.user?.id ?? null,
-      _details: { email: normalizedEmail, role, invited_by: callerId },
+      _details: {
+        email: normalizedEmail,
+        role,
+        invited_by: callerId,
+        role_tier: "clinic_admin",
+        request_id: requestId,
+      },
+      _request_id: requestId,
+      _action_type: "staff_invite",
+      _resource_type: "user_invite",
     });
 
     return new Response(

@@ -29,6 +29,7 @@ const AdminDashboardPage = lazyPage(() => import("./features/admin/AdminDashboar
 const LoginPage = lazyPage(() => import("./pages/LoginPage"), (m) => m.LoginPage, ["common", "auth"]);
 const ForgotPasswordPage = lazyPage(() => import("./pages/ForgotPasswordPage"), (m) => m.ForgotPasswordPage, ["common", "auth"]);
 const ResetPasswordPage = lazyPage(() => import("./pages/ResetPasswordPage"), (m) => m.ResetPasswordPage, ["common", "auth"]);
+const PrivilegedSecurityPage = lazyPage(() => import("./pages/PrivilegedSecurityPage"), (m) => m.PrivilegedSecurityPage, ["common", "auth", "settings"]);
 const TutorialPage = lazyPage(() => import("./pages/TutorialPage"), (m) => m.TutorialPage, ["common", "tutorial"]);
 const PricingPage = lazyPage(() => import("./pages/PricingPage"), (m) => m.PricingPage, ["common", "landing"]);
 const ClinicLayout = lazyPage(() => import("./layouts/ClinicLayout"), (m) => m.ClinicLayout, ["common", "auth"]);
@@ -76,6 +77,7 @@ const App = () => (
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/security/privileged" element={<ProtectedRoute><PrivilegedSecurityPage /></ProtectedRoute>} />
                 <Route path="/tutorial" element={<TutorialPage />} />
                 <Route path="/pricing" element={<PricingPage />} />
                 <Route path="/" element={<LandingPage />} />
@@ -83,7 +85,7 @@ const App = () => (
                 <Route
                   path="/admin"
                   element={
-                    <ProtectedRoute requiredPermission="super_admin">
+                    <ProtectedRoute requiredPermission="super_admin" requiredPrivilegedRole="super_admin">
                       <AdminDashboardPage />
                     </ProtectedRoute>
                   }

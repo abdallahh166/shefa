@@ -1,4 +1,9 @@
-import type { User as SupabaseUser } from "@supabase/supabase-js";
+import type {
+  AuthMFAEnrollTOTPResponse,
+  ChallengeAndVerifyParams,
+  Factor,
+  User as SupabaseUser,
+} from "@supabase/supabase-js";
 import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
 
@@ -16,6 +21,11 @@ export interface AuthRepository {
   getProfileByUserId(userId: string): Promise<any | null>;
   getRolesByUserId(userId: string): Promise<{ tenantRoles: string[]; globalRoles: string[] }>;
   getMfaAssuranceLevel(): Promise<{ currentLevel: string | null; nextLevel: string | null }>;
+  listMfaFactors(): Promise<{ all: Factor[]; verified: Factor[]; unverified: Factor[] }>;
+  enrollTotpFactor(input?: { friendlyName?: string; issuer?: string }): Promise<NonNullable<AuthMFAEnrollTOTPResponse["data"]>>;
+  challengeMfaFactor(factorId: string): Promise<{ id: string }>;
+  verifyTotpFactor(input: { factorId: string; challengeId: string; code: string }): Promise<void>;
+  unenrollMfaFactor(factorId: string): Promise<void>;
   registerClinic(payload: Record<string, unknown>): Promise<unknown>;
 }
 
@@ -107,6 +117,78 @@ export const authRepository: AuthRepository = {
       currentLevel: data.currentLevel ?? null,
       nextLevel: data.nextLevel ?? null,
     };
+  },
+  async listMfaFactors() {
+    const { data, error } = await supabase.auth.mfa.listFactors();
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to load MFA factors", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    const totpFactors = [
+      ...(data.totp ?? []),
+      ...(data.phone ?? []),
+      ...(data.webauthn ?? []),
+    ] as Factor[];
+
+    return {
+      all: totpFactors,
+      verified: totpFactors.filter((factor) => factor.status === "verified"),
+      unverified: totpFactors.filter((factor) => factor.status !== "verified"),
+    };
+  },
+  async enrollTotpFactor(input) {
+    const { data, error } = await supabase.auth.mfa.enroll({
+      factorType: "totp",
+      friendlyName: input?.friendlyName,
+      issuer: input?.issuer,
+    });
+
+    if (error || !data) {
+      throw new ServiceError(error?.message ?? "Failed to enroll MFA factor", {
+        code: error?.code,
+        details: error,
+      });
+    }
+
+    return data;
+  },
+  async challengeMfaFactor(factorId) {
+    const { data, error } = await supabase.auth.mfa.challenge({ factorId });
+    if (error || !data?.id) {
+      throw new ServiceError(error?.message ?? "Failed to challenge MFA factor", {
+        code: error?.code,
+        details: error,
+      });
+    }
+
+    return { id: data.id };
+  },
+  async verifyTotpFactor(input) {
+    const params: ChallengeAndVerifyParams = {
+      factorId: input.factorId,
+      challengeId: input.challengeId,
+      code: input.code,
+    };
+
+    const { error } = await supabase.auth.mfa.verify(params);
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to verify MFA factor", {
+        code: error.code,
+        details: error,
+      });
+    }
+  },
+  async unenrollMfaFactor(factorId) {
+    const { error } = await supabase.auth.mfa.unenroll({ factorId });
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to remove MFA factor", {
+        code: error.code,
+        details: error,
+      });
+    }
   },
   async registerClinic(payload) {
     const { data, error } = await supabase.functions.invoke("register-clinic", { body: payload });

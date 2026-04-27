@@ -50,4 +50,5 @@ export type AdminJobRetryInput = z.infer<typeof adminJobRetryInputSchema>;
 export type AdminMutationContext = {
   requestId: string;
   idempotencyKey: string;
+  stepUpGrantId?: string | null;
 };
