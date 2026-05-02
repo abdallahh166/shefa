@@ -92,15 +92,19 @@ async function loadNamespaceResource(
     return {};
   }
 
+  const legacyNamespace = getLegacyNamespace(locale, namespace);
   const modulePath = `./locales/${locale}/${namespace}.json`;
   const loader = localeModules[modulePath];
 
   if (loader) {
     const loaded = (await loader()) as { default: Record<string, unknown> };
-    return loaded.default;
+    return {
+      ...legacyNamespace,
+      ...loaded.default,
+    };
   }
 
-  return getLegacyNamespace(locale, namespace);
+  return legacyNamespace;
 }
 
 const initPromise = i18n
@@ -179,8 +183,8 @@ export function syncDocumentLanguage(locale: Locale) {
     return;
   }
 
-  const { direction, fontHref } = localeMetadata[locale];
-  document.documentElement.lang = locale;
+  const { direction, fontHref, tag } = localeMetadata[locale];
+  document.documentElement.lang = tag;
   document.documentElement.dir = direction;
   document.documentElement.dataset.locale = locale;
   document.documentElement.dataset.font = locale === "ar" ? "arabic" : "latin";

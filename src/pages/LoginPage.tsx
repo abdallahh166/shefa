@@ -18,7 +18,7 @@ type SlugStatus = "idle" | "checking" | "available" | "taken" | "invalid";
 
 export const LoginPage = () => {
   const { isAuthenticated, user } = useAuth();
-  const { t } = useI18n();
+  const { t } = useI18n(["auth"]);
   const navigate = useNavigate();
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
@@ -129,9 +129,9 @@ export const LoginPage = () => {
       <div className="hidden lg:flex lg:w-1/2 bg-primary relative items-center justify-center">
         <div className="text-primary-foreground text-center px-12">
           <div className="h-16 w-16 rounded-2xl bg-primary-foreground/20 flex items-center justify-center text-3xl font-bold mx-auto mb-6">
-            M
+            {t("common.appName").charAt(0)}
           </div>
-          <h2 className="text-3xl font-bold mb-4">MedFlow</h2>
+          <h2 className="text-3xl font-bold mb-4">{t("common.appName")}</h2>
           <p className="text-primary-foreground/80 text-lg">{t("auth.heroSubtitle")}</p>
           <div className="mt-12 grid grid-cols-2 gap-4 text-sm text-primary-foreground/70">
             <div className="bg-primary-foreground/10 rounded-lg p-4">{t("auth.featureMultiTenant")}</div>
@@ -166,7 +166,7 @@ export const LoginPage = () => {
                   <Input
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Dr. John Smith"
+                    placeholder={t("auth.login.fullNamePlaceholder")}
                   />
                 </div>
                 <ClinicNameField
@@ -185,7 +185,7 @@ export const LoginPage = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder={t("auth.login.emailPlaceholder")}
                 data-testid="login-email"
               />
             </div>
@@ -195,7 +195,7 @@ export const LoginPage = () => {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder={t("auth.login.passwordPlaceholder")}
                 data-testid="login-password"
               />
               {mode === "signup" && <PasswordStrength password={password} t={t} />}
@@ -264,7 +264,7 @@ export const LoginPage = () => {
               onClick={() => navigate("/tutorial")}
               className="gap-1.5 text-sm text-primary font-medium"
             >
-              ðŸ“– {t("auth.howToUse")}
+              {t("auth.howToUse")}
             </Button>
           </div>
 

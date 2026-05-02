@@ -76,7 +76,7 @@ export function DataTable<T>({
   onRowClick,
   tableLabel,
 }: DataTableProps<T>) {
-  const { t } = useI18n();
+  const { dir, t } = useI18n();
   const [localSearch, setLocalSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -375,7 +375,7 @@ export function DataTable<T>({
                 disabled={currentPage <= 1}
                 aria-label={t("common.previous")}
               >
-                <ChevronLeft className="h-4 w-4" />
+                  {dir === "rtl" ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
               </Button>
               <span className="px-2 font-medium tabular-nums">
                 {currentPage} / {totalPages}
@@ -387,7 +387,7 @@ export function DataTable<T>({
                 disabled={currentPage >= totalPages}
                 aria-label={t("common.next")}
               >
-                <ChevronRight className="h-4 w-4" />
+                  {dir === "rtl" ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </Button>
             </div>
           </div>

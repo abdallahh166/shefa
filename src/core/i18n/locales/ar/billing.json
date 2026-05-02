@@ -1,0 +1,14 @@
+{
+  "form": {
+    "createDescription": "أنشئ فاتورة جديدة للمريض.",
+    "servicePlaceholder": "استشارة قلبية",
+    "amountLabel": "المبلغ",
+    "amountPlaceholder": "350.00",
+    "dueDate": "تاريخ الاستحقاق"
+  },
+  "payment": {
+    "title": "تسجيل دفعة",
+    "history": "سجل الدفعات",
+    "emptyHistory": "لا توجد دفعات مسجلة بعد."
+  }
+}

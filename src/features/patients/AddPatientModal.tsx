@@ -14,7 +14,7 @@ interface AddPatientModalProps {
 }
 
 export const AddPatientModal = ({ open, onClose, onSuccess }: AddPatientModalProps) => {
-  const { t } = useI18n();
+  const { t } = useI18n(["patients"]);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     full_name: "",
@@ -31,7 +31,7 @@ export const AddPatientModal = ({ open, onClose, onSuccess }: AddPatientModalPro
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.full_name) {
-      toast({ title: "Name required", variant: "destructive" });
+      toast({ title: t("patients.form.nameRequired"), variant: "destructive" });
       return;
     }
     setLoading(true);
@@ -46,12 +46,19 @@ export const AddPatientModal = ({ open, onClose, onSuccess }: AddPatientModalPro
         email: form.email || null,
         insurance_provider: form.insurance_provider || null,
       });
-      toast({ title: t("patients.addPatient"), description: "Patient added successfully" });
+      toast({
+        title: t("patients.addPatient"),
+        description: t("patients.form.saveSuccess"),
+      });
       onSuccess();
       onClose();
       setForm({ full_name: "", date_of_birth: "", gender: "male", blood_type: "", phone: "", email: "", insurance_provider: "" });
     } catch (err: any) {
-      toast({ title: "Error", description: err?.message ?? "Failed to add patient", variant: "destructive" });
+      toast({
+        title: t("common.error"),
+        description: err?.message ?? t("patients.form.saveFailed"),
+        variant: "destructive",
+      });
     }
     setLoading(false);
   };
@@ -62,7 +69,7 @@ export const AddPatientModal = ({ open, onClose, onSuccess }: AddPatientModalPro
         <DialogHeader>
           <DialogTitle>{t("patients.addPatient")}</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            {t("patients.addPatient")}
+            {t("patients.form.addDescription")}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -93,7 +100,11 @@ export const AddPatientModal = ({ open, onClose, onSuccess }: AddPatientModalPro
             </div>
             <div className="space-y-2">
               <Label>{t("patients.bloodType")}</Label>
-              <Input value={form.blood_type} onChange={(e) => setForm({ ...form, blood_type: e.target.value })} placeholder="A+" />
+              <Input
+                value={form.blood_type}
+                onChange={(e) => setForm({ ...form, blood_type: e.target.value })}
+                placeholder={t("patients.form.bloodTypePlaceholder")}
+              />
             </div>
             <div className="space-y-2">
               <Label>{t("common.phone")}</Label>

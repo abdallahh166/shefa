@@ -20,7 +20,7 @@ interface NewInvoiceModalProps {
 }
 
 export const NewInvoiceModal = ({ open, onClose, onSuccess }: NewInvoiceModalProps) => {
-  const { t } = useI18n();
+  const { t } = useI18n(["billing"]);
   const { user } = useAuth();
   const tenantId = user?.tenantId;
   const [loading, setLoading] = useState(false);
@@ -93,7 +93,7 @@ export const NewInvoiceModal = ({ open, onClose, onSuccess }: NewInvoiceModalPro
         <DialogHeader>
           <DialogTitle>{t("billing.newInvoice")}</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            {t("billing.newInvoice")}
+            {t("billing.form.createDescription")}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -122,21 +122,21 @@ export const NewInvoiceModal = ({ open, onClose, onSuccess }: NewInvoiceModalPro
             <Input
               value={form.service}
               onChange={(e) => setForm({ ...form, service: e.target.value })}
-              placeholder="Cardiology Consultation"
+              placeholder={t("billing.form.servicePlaceholder")}
             />
           </div>
           <div className="space-y-2">
-            <Label>{t("common.amount")} ($) *</Label>
+            <Label>{t("billing.form.amountLabel")} *</Label>
             <Input
               type="number"
               step="0.01"
               value={form.amount}
               onChange={(e) => setForm({ ...form, amount: e.target.value })}
-              placeholder="350.00"
+              placeholder={t("billing.form.amountPlaceholder")}
             />
           </div>
           <div className="space-y-2">
-            <Label>Due date</Label>
+            <Label>{t("billing.form.dueDate")}</Label>
             <Input
               type="date"
               value={form.due_date}

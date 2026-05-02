@@ -1,0 +1,20 @@
+{
+  "app": {
+    "name": "شفاء"
+  },
+  "common": {
+    "na": "—",
+    "continue": "متابعة",
+    "backToDashboard": "العودة إلى لوحة التحكم"
+  },
+  "validation": {
+    "required": "هذا الحقل مطلوب",
+    "email": "أدخل بريداً إلكترونياً صالحاً",
+    "number": "أدخل رقماً صالحاً",
+    "positiveNumber": "أدخل قيمة أكبر من صفر",
+    "minCharacters": "أدخل {count} أحرف على الأقل"
+  },
+  "pagination": {
+    "showing": "عرض {start}–{end} من {total}"
+  }
+}

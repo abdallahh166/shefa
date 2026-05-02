@@ -27,6 +27,22 @@ const fileChecks = [
     file: "src/shared/components/DataTable.tsx",
     phrases: ["Data table"],
   },
+  {
+    file: "src/features/patients/AddPatientModal.tsx",
+    phrases: ["Name required", "Patient added successfully", "Failed to add patient"],
+  },
+  {
+    file: "src/features/patients/PatientsPage.tsx",
+    phrases: ["total patients", "Patient List", "Failed to delete patients"],
+  },
+  {
+    file: "src/features/appointments/NewAppointmentModal.tsx",
+    phrases: ["Duration (min)"],
+  },
+  {
+    file: "src/features/billing/NewInvoiceModal.tsx",
+    phrases: ["Cardiology Consultation", "Due date"],
+  },
 ] as const;
 
 describe("i18n hygiene", () => {

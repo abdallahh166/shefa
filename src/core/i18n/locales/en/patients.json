@@ -1,0 +1,16 @@
+{
+  "summary": {
+    "totalPatients": "{count, plural, =0 {No patients found} one {# patient} other {# patients}}"
+  },
+  "form": {
+    "nameRequired": "Full name is required",
+    "addDescription": "Create a patient profile for this clinic.",
+    "bloodTypePlaceholder": "A+",
+    "saveSuccess": "Patient added successfully",
+    "saveFailed": "Failed to add patient",
+    "bulkDeleteSuccess": "{count, plural, one {# patient deleted} other {# patients deleted}}",
+    "bulkDeleteFailed": "Failed to delete patients",
+    "pdfTitle": "Patient List",
+    "pdfSubtitle": "Generated on {date}"
+  }
+}

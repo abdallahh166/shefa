@@ -21,7 +21,7 @@ interface NewAppointmentModalProps {
 }
 
 export const NewAppointmentModal = ({ open, onClose, onSuccess }: NewAppointmentModalProps) => {
-  const { t } = useI18n();
+  const { t } = useI18n(["appointments"]);
   const { user } = useAuth();
   const tenantId = user?.tenantId;
   const [loading, setLoading] = useState(false);
@@ -112,7 +112,7 @@ export const NewAppointmentModal = ({ open, onClose, onSuccess }: NewAppointment
         <DialogHeader>
           <DialogTitle>{t("appointments.newAppointment")}</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            {t("appointments.newAppointment")}
+            {t("appointments.form.createDescription")}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -168,7 +168,7 @@ export const NewAppointmentModal = ({ open, onClose, onSuccess }: NewAppointment
             />
           </div>
           <div className="space-y-2">
-            <Label>Duration (min) *</Label>
+            <Label>{t("appointments.form.durationMinutes")} *</Label>
             <Input
               type="number"
               min={5}

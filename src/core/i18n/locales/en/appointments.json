@@ -1,0 +1,15 @@
+{
+  "calendar": {
+    "noShow": "No-show",
+    "rangeSeparator": "–"
+  },
+  "form": {
+    "createDescription": "Schedule a new appointment.",
+    "durationMinutes": "Duration (min)",
+    "durationRequired": "Duration is required"
+  },
+  "tabs": {
+    "schedule": "Schedule",
+    "waitingRoom": "Waiting room"
+  }
+}

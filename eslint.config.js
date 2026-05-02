@@ -50,12 +50,33 @@ export default tseslint.config(
   },
   {
     files: [
+      "src/pages/LoginPage.tsx",
+      "src/shared/components/DataTable.tsx",
+      "src/features/patients/AddPatientModal.tsx",
+      "src/features/patients/PatientsPage.tsx",
+      "src/features/appointments/NewAppointmentModal.tsx",
+      "src/features/appointments/AppointmentCalendar.tsx",
+      "src/features/billing/NewInvoiceModal.tsx",
+    ],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "JSXText[value=/[A-Za-z\\u0600-\\u06FF]/]",
+          message: "Raw JSX text is restricted on migrated i18n surfaces. Use translation keys instead.",
+        },
+      ],
+    },
+  },
+  {
+    files: [
       "src/services/**/*repository.{ts,tsx}",
       "src/services/supabase/**/*.{ts,tsx}",
       "src/integrations/supabase/**/*.{ts,tsx}",
     ],
     rules: {
       "no-restricted-imports": "off",
+      "no-restricted-syntax": "off",
     },
   },
 );

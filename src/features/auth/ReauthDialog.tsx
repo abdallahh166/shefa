@@ -9,7 +9,7 @@ import { useReauthPromptStore } from "./reauthPrompt";
 import { reauthService } from "@/services/auth/reauth.service";
 
 export const ReauthDialog = () => {
-  const { t } = useI18n();
+  const { t } = useI18n(["auth"]);
   const { user } = useAuth();
   const { request, resolve, reject } = useReauthPromptStore();
   const [password, setPassword] = useState("");
@@ -20,7 +20,7 @@ export const ReauthDialog = () => {
     if (loading) return;
     setPassword("");
     setError(null);
-    reject(new Error("Re-authentication cancelled"));
+    reject(new Error(t("auth.reauth.cancelled")));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

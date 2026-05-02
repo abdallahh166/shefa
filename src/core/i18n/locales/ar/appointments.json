@@ -1,0 +1,15 @@
+{
+  "calendar": {
+    "noShow": "لم يحضر",
+    "rangeSeparator": "–"
+  },
+  "form": {
+    "createDescription": "جدولة موعد جديد.",
+    "durationMinutes": "المدة (بالدقائق)",
+    "durationRequired": "المدة مطلوبة"
+  },
+  "tabs": {
+    "schedule": "الجدول",
+    "waitingRoom": "غرفة الانتظار"
+  }
+}

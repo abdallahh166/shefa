@@ -1,0 +1,14 @@
+{
+  "form": {
+    "createDescription": "Create a new invoice for a patient.",
+    "servicePlaceholder": "Cardiology Consultation",
+    "amountLabel": "Amount",
+    "amountPlaceholder": "350.00",
+    "dueDate": "Due date"
+  },
+  "payment": {
+    "title": "Post payment",
+    "history": "Payment history",
+    "emptyHistory": "No payments recorded yet."
+  }
+}

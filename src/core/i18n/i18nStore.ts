@@ -35,7 +35,8 @@ interface I18nStoreState {
   setCalendarType: (calendarType: CalendarType) => void;
 }
 
-const STORAGE_PREFIX = "medflow:i18n";
+const LANGUAGE_STORAGE_PREFIX = "lang";
+const CALENDAR_STORAGE_PREFIX = "calendar";
 const LEGACY_STORAGE_KEY = "medflow-i18n";
 
 function getEffectiveScope() {
@@ -48,7 +49,12 @@ function getEffectiveScope() {
 
 function getScopedStorageKey() {
   const { tenantId, userId } = getEffectiveScope();
-  return `${STORAGE_PREFIX}:${tenantId}:${userId}`;
+  return `${LANGUAGE_STORAGE_PREFIX}:${tenantId}:${userId}`;
+}
+
+function getScopedCalendarStorageKey() {
+  const { tenantId, userId } = getEffectiveScope();
+  return `${CALENDAR_STORAGE_PREFIX}:${tenantId}:${userId}`;
 }
 
 function readScopedPreferences(): StoredPreferences {
@@ -57,9 +63,17 @@ function readScopedPreferences(): StoredPreferences {
   }
 
   try {
-    const scoped = window.localStorage.getItem(getScopedStorageKey());
-    if (scoped) {
-      return JSON.parse(scoped) as StoredPreferences;
+    const locale = window.localStorage.getItem(getScopedStorageKey());
+    const calendarType = window.localStorage.getItem(getScopedCalendarStorageKey());
+
+    if (locale || calendarType) {
+      return {
+        locale: normalizeLocale(locale),
+        calendarType:
+          calendarType === "gregorian" || calendarType === "hijri"
+            ? calendarType
+            : undefined,
+      };
     }
 
     const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY);
@@ -86,10 +100,16 @@ function writeScopedPreferences(preferences: StoredPreferences) {
   }
 
   try {
-    window.localStorage.setItem(
-      getScopedStorageKey(),
-      JSON.stringify(preferences),
-    );
+    if (preferences.locale) {
+      window.localStorage.setItem(getScopedStorageKey(), preferences.locale);
+    }
+
+    if (preferences.calendarType) {
+      window.localStorage.setItem(
+        getScopedCalendarStorageKey(),
+        preferences.calendarType,
+      );
+    }
   } catch {
     // Ignore local persistence failures.
   }
