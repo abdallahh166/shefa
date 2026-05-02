@@ -124,7 +124,7 @@ export const ClinicNameField = ({
       <Input
         value={clinicName}
         onChange={(e) => handleClinicNameChange(e.target.value)}
-        placeholder="My Clinic"
+        placeholder={t("auth.login.clinicNamePlaceholder")}
         className={
           slugStatus === "available"
             ? "border-green-500 focus-visible:ring-green-500/30"
@@ -154,7 +154,7 @@ export const ClinicNameField = ({
                 <div className="text-xs text-muted-foreground">
                   {t("auth.slugUrl")}{" "}
                   <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-foreground">
-                    /tenant/{slugPreview}
+                    {`/tenant/${slugPreview}`}
                   </span>
                 </div>
               )}

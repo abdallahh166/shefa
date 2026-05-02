@@ -1,4 +1,5 @@
-import { LucideIcon, TrendingUp, TrendingDown } from "lucide-react";
+import { LucideIcon, TrendingDown, TrendingUp } from "lucide-react";
+import { translatePath } from "@/core/i18n/config";
 import { cn } from "@/lib/utils";
 
 interface StatCardProps {
@@ -47,21 +48,26 @@ export const StatCard = ({
 
   return (
     <div className={cn("stat-card", className)}>
-      <div className="flex items-center justify-between mb-3">
+      <div className="mb-3 flex items-center justify-between">
         <span className="text-xs font-medium text-muted-foreground">{title}</span>
-        <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center", colors.icon)}>
+        <div
+          className={cn(
+            "flex h-8 w-8 items-center justify-center rounded-lg",
+            colors.icon,
+          )}
+        >
           <Icon className="h-4 w-4" />
         </div>
       </div>
       <div className="text-2xl font-semibold tracking-tight">{value}</div>
-      {trend && (
-        <div className="flex items-center gap-1.5 mt-2">
+      {trend ? (
+        <div className="mt-2 flex items-center gap-1.5">
           <span
             className={cn(
-              "inline-flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded",
+              "inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-medium",
               trend.positive
-                ? "text-success bg-success/10"
-                : "text-destructive bg-destructive/10"
+                ? "bg-success/10 text-success"
+                : "bg-destructive/10 text-destructive",
             )}
           >
             {trend.positive ? (
@@ -72,12 +78,14 @@ export const StatCard = ({
             {trend.positive ? "+" : ""}
             {trend.value}%
           </span>
-          <span className="text-2xs text-muted-foreground">vs last month</span>
+          <span className="text-2xs text-muted-foreground">
+            {translatePath("common.trendVsLastMonth")}
+          </span>
         </div>
-      )}
-      {subtitle && (
-        <p className="text-xs text-muted-foreground mt-1.5">{subtitle}</p>
-      )}
+      ) : null}
+      {subtitle ? (
+        <p className="mt-1.5 text-xs text-muted-foreground">{subtitle}</p>
+      ) : null}
     </div>
   );
 };

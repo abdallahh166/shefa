@@ -51,7 +51,13 @@ export default tseslint.config(
   {
     files: [
       "src/pages/LoginPage.tsx",
+      "src/pages/ForgotPasswordPage.tsx",
+      "src/pages/ResetPasswordPage.tsx",
+      "src/features/auth/ClinicNameField.tsx",
       "src/shared/components/DataTable.tsx",
+      "src/shared/components/ErrorBoundary.tsx",
+      "src/shared/components/GlobalSearch.tsx",
+      "src/shared/components/StatCard.tsx",
       "src/features/patients/AddPatientModal.tsx",
       "src/features/patients/PatientsPage.tsx",
       "src/features/appointments/NewAppointmentModal.tsx",

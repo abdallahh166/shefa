@@ -9,7 +9,7 @@ import { LanguageSwitcher } from "@/shared/components/LanguageSwitcher";
 import { authService } from "@/services/auth/auth.service";
 
 export const ResetPasswordPage = () => {
-  const { t } = useI18n();
+  const { t } = useI18n(["auth"]);
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -81,18 +81,30 @@ export const ResetPasswordPage = () => {
           <LanguageSwitcher />
         </div>
         <div className="bg-card rounded-lg border p-8">
-          <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm mb-6">M</div>
+          <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm mb-6">
+            {t("common.appName").charAt(0)}
+          </div>
           <h1 className="text-xl font-bold mb-2">{t("auth.resetPasswordTitle")}</h1>
           <p className="text-muted-foreground text-sm mb-6">{t("auth.resetPasswordDesc")}</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label>{t("settings.newPassword")}</Label>
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={t("auth.login.passwordPlaceholder")}
+              />
             </div>
             <div className="space-y-2">
               <Label>{t("settings.confirmPassword")}</Label>
-              <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" />
+              <Input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder={t("auth.login.passwordPlaceholder")}
+              />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? t("common.loading") : t("settings.updatePassword")}

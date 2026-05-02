@@ -31,7 +31,7 @@ function toQrCodeDataUrl(svgMarkup: string) {
 }
 
 export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProps) => {
-  const { t } = useI18n();
+  const { t } = useI18n(["auth"]);
   const { user, lastVerifiedAt, privilegedAuth } = useAuth();
   const privilegedSession = useMemo(
     () => buildPrivilegedSession({ user, lastVerifiedAt, privilegedAuth }),
@@ -71,9 +71,9 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
     return mode === "page" ? (
       <div className="mx-auto max-w-2xl rounded-2xl border bg-card p-8 text-center shadow-sm">
         <Shield className="mx-auto mb-4 h-10 w-10 text-muted-foreground" />
-        <h1 className="text-2xl font-semibold">No privileged security setup needed</h1>
+        <h1 className="text-2xl font-semibold">{t("auth.mfa.noSetupTitle")}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          This account does not currently hold a privileged role.
+          {t("auth.mfa.noSetupDescription")}
         </p>
       </div>
     ) : null;
@@ -135,7 +135,7 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
       });
       setEnrollment(null);
       setCode("");
-      toast({ title: "Multi-factor authentication enabled" });
+      toast({ title: t("auth.mfa.enabledToast") });
     } catch (err) {
       const message = err instanceof Error ? err.message : t("common.error");
       toast({ title: t("common.error"), description: message, variant: "destructive" });
@@ -167,7 +167,7 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
       });
       setSessionCode("");
       setSessionVerificationFactorId(null);
-      toast({ title: "Privileged session verified" });
+      toast({ title: t("auth.mfa.verifiedToast") });
     } catch (err) {
       const message = err instanceof Error ? err.message : t("common.error");
       toast({ title: t("common.error"), description: message, variant: "destructive" });
@@ -198,7 +198,7 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
         setSessionCode("");
         setSessionVerificationFactorId(null);
       }
-      toast({ title: "Multi-factor authentication factor removed" });
+      toast({ title: t("auth.mfa.removedToast") });
     } catch (err) {
       const message = err instanceof Error ? err.message : t("common.error");
       toast({ title: t("common.error"), description: message, variant: "destructive" });
@@ -214,24 +214,24 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">Privileged session security</h2>
+              <h2 className="text-lg font-semibold">{t("auth.mfa.sessionTitle")}</h2>
             </div>
             <p className="text-sm text-muted-foreground">
               {privilegedSession.roleTier === "super_admin"
-                ? "Super admins must keep TOTP MFA enrolled and use an aal2 session before they can access privileged pages."
-                : "Clinic admins must keep TOTP MFA enrolled before they can use tenant-wide security actions."}
+                ? t("auth.mfa.superAdminDescription")
+                : t("auth.mfa.clinicAdminDescription")}
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-full border bg-background px-3 py-1.5 text-sm">
             {privilegedSession.canAccessPrivilegedRoutes ? (
               <>
                 <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                <span>Privileged access ready</span>
+                <span>{t("auth.mfa.sessionReady")}</span>
               </>
             ) : (
               <>
                 <AlertTriangle className="h-4 w-4 text-amber-600" />
-                <span>Action required</span>
+                <span>{t("auth.mfa.sessionActionRequired")}</span>
               </>
             )}
           </div>
@@ -239,15 +239,15 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
 
         <div className="mt-5 grid gap-4 md:grid-cols-3">
           <div className="rounded-2xl border p-4">
-            <div className="text-sm text-muted-foreground">Role tier</div>
+            <div className="text-sm text-muted-foreground">{t("auth.mfa.roleTier")}</div>
             <div className="mt-1 font-medium capitalize">{privilegedSession.roleTier?.replace("_", " ")}</div>
           </div>
           <div className="rounded-2xl border p-4">
-            <div className="text-sm text-muted-foreground">Current assurance</div>
+            <div className="text-sm text-muted-foreground">{t("auth.mfa.currentAssurance")}</div>
             <div className="mt-1 font-medium uppercase">{privilegedSession.aal ?? "aal1"}</div>
           </div>
           <div className="rounded-2xl border p-4">
-            <div className="text-sm text-muted-foreground">Verified factors</div>
+            <div className="text-sm text-muted-foreground">{t("auth.mfa.verifiedFactors")}</div>
             <div className="mt-1 font-medium">{privilegedAuth.verifiedFactorCount}</div>
           </div>
         </div>
@@ -255,14 +255,14 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
         <div className="mt-5 rounded-2xl border p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h3 className="font-semibold">TOTP authenticator</h3>
+              <h3 className="font-semibold">{t("auth.mfa.authenticatorTitle")}</h3>
               <p className="text-sm text-muted-foreground">
-                Use an authenticator app to scan the QR code and enter the one-time code.
+                {t("auth.mfa.authenticatorDescription")}
               </p>
             </div>
             <Button type="button" variant="outline" onClick={() => void reloadState()} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-              Refresh
+              {t("auth.mfa.refresh")}
             </Button>
           </div>
 
@@ -270,7 +270,7 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
             {factors.length === 0 && !enrollment ? (
               <div className="rounded-2xl border border-dashed p-5">
                 <p className="text-sm text-muted-foreground">
-                  No MFA factor is enrolled yet. Privileged actions stay blocked until TOTP enrollment is complete.
+                  {t("auth.mfa.notEnrolled")}
                 </p>
                 <Button
                   type="button"
@@ -280,7 +280,7 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
                   data-testid="privileged-mfa-start-enrollment"
                 >
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-                  Set up TOTP MFA
+                  {t("auth.mfa.setupTotp")}
                 </Button>
               </div>
             ) : null}
@@ -289,7 +289,7 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
               <div key={factor.id} className="rounded-2xl border p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <div className="font-medium">{factor.friendly_name || "Authenticator app"}</div>
+                    <div className="font-medium">{factor.friendly_name || t("auth.mfa.factorFallbackName")}</div>
                     <div className="text-sm text-muted-foreground">
                       {factor.factor_type.toUpperCase()} - {factor.status}
                     </div>
@@ -307,7 +307,7 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
                         data-testid={`privileged-mfa-session-start-${factor.id}`}
                       >
                         <CheckCircle2 className="h-4 w-4" />
-                        Verify this session
+                        {t("auth.mfa.verifyThisSession")}
                       </Button>
                     ) : null}
                     <Button
@@ -318,19 +318,19 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
                       className="text-destructive"
                     >
                       {removingFactorId === factor.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                      Remove
+                      {t("auth.mfa.remove")}
                     </Button>
                   </div>
                 </div>
                 {sessionVerificationFactorId === factor.id ? (
                   <div className="mt-4 rounded-2xl border border-primary/20 bg-muted/30 p-4">
                     <div className="space-y-2">
-                      <Label htmlFor={`mfa-session-code-${factor.id}`}>One-time code</Label>
+                      <Label htmlFor={`mfa-session-code-${factor.id}`}>{t("auth.mfa.oneTimeCode")}</Label>
                       <Input
                         id={`mfa-session-code-${factor.id}`}
                         value={sessionCode}
                         onChange={(event) => setSessionCode(event.target.value.replace(/\s+/g, ""))}
-                        placeholder="123456"
+                        placeholder={t("auth.mfa.oneTimeCodePlaceholder")}
                         inputMode="numeric"
                         data-testid="privileged-mfa-session-code"
                       />
@@ -343,7 +343,7 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
                         data-testid="privileged-mfa-session-verify"
                       >
                         {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                        Verify session
+                        {t("auth.mfa.verifySession")}
                       </Button>
                       <Button
                         type="button"
@@ -354,7 +354,7 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
                         }}
                         disabled={verifying}
                       >
-                        Cancel
+                        {t("common.cancel")}
                       </Button>
                     </div>
                   </div>
@@ -368,14 +368,14 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
                   <div className="rounded-2xl border bg-white p-3">
                     <img
                       src={toQrCodeDataUrl(enrollment.qrCode)}
-                      alt="MFA QR code"
+                      alt={t("auth.mfa.mfaQrCodeAlt")}
                       className="mx-auto h-48 w-48"
                       data-testid="privileged-mfa-qr"
                     />
                   </div>
                   <div className="space-y-4">
                     <div>
-                      <div className="text-sm text-muted-foreground">Manual secret</div>
+                      <div className="text-sm text-muted-foreground">{t("auth.mfa.manualSecretLabel")}</div>
                       <code
                         className="mt-1 block rounded-xl bg-muted px-3 py-2 text-sm"
                         data-testid="privileged-mfa-secret"
@@ -384,12 +384,12 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
                       </code>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="mfa-code">Verification code</Label>
+                      <Label htmlFor="mfa-code">{t("auth.mfa.verificationCode")}</Label>
                       <Input
                         id="mfa-code"
                         value={code}
                         onChange={(event) => setCode(event.target.value.replace(/\s+/g, ""))}
-                        placeholder="123456"
+                        placeholder={t("auth.mfa.oneTimeCodePlaceholder")}
                         inputMode="numeric"
                         data-testid="privileged-mfa-enrollment-code"
                       />
@@ -402,10 +402,10 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
                         data-testid="privileged-mfa-enrollment-verify"
                       >
                         {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                        Verify and enable
+                        {t("auth.mfa.verifyAndEnable")}
                       </Button>
                       <Button type="button" variant="outline" onClick={() => setEnrollment(null)} disabled={verifying}>
-                        Cancel
+                        {t("common.cancel")}
                       </Button>
                     </div>
                   </div>

@@ -9,7 +9,7 @@ import { useI18n } from "@/core/i18n/i18nStore";
 import { authService } from "@/services/auth/auth.service";
 
 export const ForgotPasswordPage = () => {
-  const { t } = useI18n();
+  const { t } = useI18n(["auth"]);
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -41,7 +41,9 @@ export const ForgotPasswordPage = () => {
         </div>
 
         <div className="bg-card rounded-lg border p-8">
-          <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm mb-6">M</div>
+          <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm mb-6">
+            {t("common.appName").charAt(0)}
+          </div>
 
           {sent ? (
             <div className="space-y-4">
@@ -61,7 +63,12 @@ export const ForgotPasswordPage = () => {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Label>{t("common.email")}</Label>
-                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder={t("auth.login.emailPlaceholder")}
+                  />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? t("common.loading") : t("auth.sendResetLink")}

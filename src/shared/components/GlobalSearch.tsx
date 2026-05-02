@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useI18n } from "@/core/i18n/i18nStore";
 import { useQuery } from "@tanstack/react-query";
+import { Receipt, Search, Stethoscope, Users } from "lucide-react";
+import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
-import { searchService } from "@/services";
 import { queryKeys } from "@/services/queryKeys";
+import { searchService } from "@/services";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import {
   CommandDialog,
@@ -14,7 +15,6 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Users, Stethoscope, Receipt, Search } from "lucide-react";
 import { Button } from "@/components/primitives/Button";
 
 export const GlobalSearch = () => {
@@ -39,21 +39,23 @@ export const GlobalSearch = () => {
     [query, results],
   );
 
-  const grouped = useMemo(() => {
-    return {
-      patients: effectiveResults.filter((r) => r.entity_type === "patient"),
-      doctors: effectiveResults.filter((r) => r.entity_type === "doctor"),
-      invoices: effectiveResults.filter((r) => r.entity_type === "invoice"),
-    };
-  }, [effectiveResults]);
+  const grouped = useMemo(
+    () => ({
+      patients: effectiveResults.filter((result) => result.entity_type === "patient"),
+      doctors: effectiveResults.filter((result) => result.entity_type === "doctor"),
+      invoices: effectiveResults.filter((result) => result.entity_type === "invoice"),
+    }),
+    [effectiveResults],
+  );
 
   useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setOpen((o) => !o);
+    const down = (event: KeyboardEvent) => {
+      if (event.key === "k" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        setOpen((current) => !current);
       }
     };
+
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
   }, []);
@@ -63,7 +65,7 @@ export const GlobalSearch = () => {
       navigate(`/tenant/${clinicSlug}/${path}`);
       setOpen(false);
     },
-    [navigate, clinicSlug]
+    [navigate, clinicSlug],
   );
 
   return (
@@ -73,12 +75,14 @@ export const GlobalSearch = () => {
         variant="outline"
         size="sm"
         onClick={() => setOpen(true)}
-        className="hidden sm:flex items-center gap-2 bg-background hover:border-ring/50 transition-colors group h-8 px-3"
+        className="group hidden h-8 items-center gap-2 bg-background px-3 transition-colors hover:border-ring/50 sm:flex"
       >
         <Search className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-sm text-muted-foreground w-40 text-start">{t("common.search")}</span>
-        <kbd className="hidden lg:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-          ⌘K
+        <span className="w-40 text-start text-sm text-muted-foreground">
+          {t("common.search")}
+        </span>
+        <kbd className="hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground lg:inline-flex">
+          {t("common.keyboardShortcut")}
         </kbd>
       </Button>
 
@@ -89,43 +93,63 @@ export const GlobalSearch = () => {
           onValueChange={setQuery}
         />
         <CommandList>
-          <CommandEmpty>{query.trim().length < 2 ? t("common.search") : t("common.noData")}</CommandEmpty>
+          <CommandEmpty>
+            {query.trim().length < 2 ? t("common.searchEmpty") : t("common.noData")}
+          </CommandEmpty>
 
-          {grouped.patients.length > 0 && (
+          {grouped.patients.length > 0 ? (
             <CommandGroup heading={t("common.patients")}>
-              {grouped.patients.map((p) => (
-                <CommandItem key={p.entity_id} onSelect={() => go(`patients/${p.entity_id}`)} className="gap-2">
+              {grouped.patients.map((patient) => (
+                <CommandItem
+                  key={patient.entity_id}
+                  onSelect={() => go(`patients/${patient.entity_id}`)}
+                  className="gap-2"
+                >
                   <Users className="h-4 w-4 text-muted-foreground" />
-                  <span>{p.label}</span>
-                  <span className="text-xs text-muted-foreground ms-auto">{p.sublabel ?? ""}</span>
+                  <span>{patient.label}</span>
+                  <span className="ms-auto text-xs text-muted-foreground">
+                    {patient.sublabel ?? ""}
+                  </span>
                 </CommandItem>
               ))}
             </CommandGroup>
-          )}
+          ) : null}
 
-          {grouped.doctors.length > 0 && (
+          {grouped.doctors.length > 0 ? (
             <CommandGroup heading={t("common.doctors")}>
-              {grouped.doctors.map((d) => (
-                <CommandItem key={d.entity_id} onSelect={() => go("doctors")} className="gap-2">
+              {grouped.doctors.map((doctor) => (
+                <CommandItem
+                  key={doctor.entity_id}
+                  onSelect={() => go("doctors")}
+                  className="gap-2"
+                >
                   <Stethoscope className="h-4 w-4 text-muted-foreground" />
-                  <span>{d.label}</span>
-                  <span className="text-xs text-muted-foreground ms-auto">{d.sublabel ?? ""}</span>
+                  <span>{doctor.label}</span>
+                  <span className="ms-auto text-xs text-muted-foreground">
+                    {doctor.sublabel ?? ""}
+                  </span>
                 </CommandItem>
               ))}
             </CommandGroup>
-          )}
+          ) : null}
 
-          {grouped.invoices.length > 0 && (
+          {grouped.invoices.length > 0 ? (
             <CommandGroup heading={t("common.billing")}>
-              {grouped.invoices.map((inv) => (
-                <CommandItem key={inv.entity_id} onSelect={() => go("billing")} className="gap-2">
+              {grouped.invoices.map((invoice) => (
+                <CommandItem
+                  key={invoice.entity_id}
+                  onSelect={() => go("billing")}
+                  className="gap-2"
+                >
                   <Receipt className="h-4 w-4 text-muted-foreground" />
-                  <span>{inv.label}</span>
-                  <span className="text-xs text-muted-foreground ms-auto">{inv.sublabel ?? ""}</span>
+                  <span>{invoice.label}</span>
+                  <span className="ms-auto text-xs text-muted-foreground">
+                    {invoice.sublabel ?? ""}
+                  </span>
                 </CommandItem>
               ))}
             </CommandGroup>
-          )}
+          ) : null}
         </CommandList>
       </CommandDialog>
     </>
