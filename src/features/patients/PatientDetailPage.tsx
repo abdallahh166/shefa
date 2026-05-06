@@ -49,7 +49,14 @@ const apptStatusVariant: Record<string, "default" | "warning" | "success" | "des
 };
 
 export const PatientDetailPage = () => {
-  const { t, locale, calendarType } = useI18n();
+  const { t, locale, calendarType, dir } = useI18n([
+    "patients",
+    "appointments",
+    "billing",
+    "laboratory",
+    "pharmacy",
+    "common",
+  ]);
   const { clinicSlug, patientId } = useParams();
   const { user, hasPermission } = useAuth();
   const navigate = useNavigate();
@@ -283,9 +290,9 @@ export const PatientDetailPage = () => {
       : s === "overdue"
         ? t("billing.overdue")
         : s === "partially_paid"
-          ? "Partially paid"
+          ? t("patients.billingSection.partiallyPaid")
           : s === "void"
-            ? "Void"
+            ? t("patients.billingSection.void")
             : t("billing.pending");
 
   if (loadingPatient) {
@@ -326,7 +333,7 @@ export const PatientDetailPage = () => {
           aria-label={t("common.back")}
           title={t("common.back")}
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className={cn("h-5 w-5", dir === "rtl" && "rotate-180")} />
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
@@ -793,8 +800,16 @@ export const PatientDetailPage = () => {
           { key: "invoice_code", header: t("billing.invoiceNumber"), render: (inv) => <span className="font-medium">{inv.invoice_code}</span> },
           { key: "service", header: t("common.service"), render: (inv) => inv.service },
           { key: "amount", header: t("common.amount"), render: (inv) => <span className="font-semibold">{formatCurrency(Number(inv.amount), locale)}</span> },
-          { key: "amount_paid", header: "Paid", render: (inv) => <span className="text-success">{formatCurrency(Number(inv.amount_paid ?? 0), locale)}</span> },
-          { key: "balance_due", header: "Balance", render: (inv) => <span>{formatCurrency(Number(inv.balance_due ?? 0), locale)}</span> },
+          {
+            key: "amount_paid",
+            header: t("patients.billingSection.paidAmount"),
+            render: (inv) => <span className="text-success">{formatCurrency(Number(inv.amount_paid ?? 0), locale)}</span>,
+          },
+          {
+            key: "balance_due",
+            header: t("patients.billingSection.balanceDue"),
+            render: (inv) => <span>{formatCurrency(Number(inv.balance_due ?? 0), locale)}</span>,
+          },
           { key: "invoice_date", header: t("common.date"), render: (inv) => <span className="text-muted-foreground whitespace-nowrap">{formatDate(inv.invoice_date, locale, "date", calendarType)}</span> },
           {
             key: "status",
@@ -819,14 +834,14 @@ export const PatientDetailPage = () => {
                 <p className="text-2xl font-bold">{formatCurrency(totalBilled, locale)}</p>
                 <p className="text-xs text-muted-foreground mt-1">{t("patients.totalBilled")}</p>
               </div>
-              <div className="stat-card text-center">
-                <p className="text-2xl font-bold text-success">{formatCurrency(totalPaid, locale)}</p>
-                <p className="text-xs text-muted-foreground mt-1">Collected</p>
-              </div>
-              <div className="stat-card text-center">
-                <p className="text-2xl font-bold">{formatCurrency(totalOutstanding, locale)}</p>
-                <p className="text-xs text-muted-foreground mt-1">Outstanding</p>
-              </div>
+                <div className="stat-card text-center">
+                  <p className="text-2xl font-bold text-success">{formatCurrency(totalPaid, locale)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t("patients.billingSection.collected")}</p>
+                </div>
+                <div className="stat-card text-center">
+                  <p className="text-2xl font-bold">{formatCurrency(totalOutstanding, locale)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t("patients.billingSection.outstanding")}</p>
+                </div>
             </div>
 
             {invoices.length === 0 ? (

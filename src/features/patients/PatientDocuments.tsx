@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { useAuth } from "@/core/auth/authStore";
 import { toast } from "@/hooks/use-toast";
@@ -7,8 +7,17 @@ import { Button } from "@/components/primitives/Button";
 import { FileUpload } from "@/components/primitives/FileUpload";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { DataTable, Column } from "@/shared/components/DataTable";
-import { FileText, Upload, Trash2, Download, Loader2, File, Image, FileSpreadsheet } from "lucide-react";
-import { formatDate } from "@/shared/utils/formatDate";
+import {
+  FileText,
+  Upload,
+  Trash2,
+  Download,
+  Loader2,
+  File,
+  Image,
+  FileSpreadsheet,
+} from "lucide-react";
+import { formatDate, formatNumber } from "@/shared/utils/formatDate";
 import { patientDocumentsService } from "@/services/patients/patientDocuments.service";
 import { queryKeys } from "@/services/queryKeys";
 import type { PatientDocument } from "@/domain/patient/patient.types";
@@ -28,7 +37,7 @@ const FILE_ICONS: Record<string, typeof FileText> = {
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
 export const PatientDocuments = ({ patientId }: Props) => {
-  const { t, locale, calendarType } = useI18n();
+  const { t, locale, calendarType } = useI18n(["patients", "common"]);
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -47,7 +56,11 @@ export const PatientDocuments = ({ patientId }: Props) => {
     if (!file || !user) return;
 
     if (file.size > MAX_SIZE) {
-      toast({ title: t("common.error"), description: "File must be under 10 MB", variant: "destructive" });
+      toast({
+        title: t("common.error"),
+        description: t("patients.documentsSection.fileTooLarge"),
+        variant: "destructive",
+      });
       return;
     }
 
@@ -58,9 +71,15 @@ export const PatientDocuments = ({ patientId }: Props) => {
         file,
       });
       toast({ title: t("common.saved") });
-      queryClient.invalidateQueries({ queryKey: queryKeys.patients.documents(patientId, user?.tenantId) });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.patients.documents(patientId, user?.tenantId),
+      });
     } catch (err: any) {
-      toast({ title: t("common.error"), description: err?.message ?? "Upload failed", variant: "destructive" });
+      toast({
+        title: t("common.error"),
+        description: err?.message ?? t("patients.documentsSection.uploadFailed"),
+        variant: "destructive",
+      });
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -71,13 +90,17 @@ export const PatientDocuments = ({ patientId }: Props) => {
     try {
       const blob = await patientDocumentsService.download({ file_path: doc.file_path });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = doc.file_name;
-      a.click();
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = doc.file_name;
+      anchor.click();
       URL.revokeObjectURL(url);
     } catch (err: any) {
-      toast({ title: t("common.error"), description: err?.message ?? "Download failed", variant: "destructive" });
+      toast({
+        title: t("common.error"),
+        description: err?.message ?? t("patients.documentsSection.downloadFailed"),
+        variant: "destructive",
+      });
     }
   };
 
@@ -87,17 +110,26 @@ export const PatientDocuments = ({ patientId }: Props) => {
 
     try {
       const result = await patientDocumentsService.remove(deleteId);
-      queryClient.invalidateQueries({ queryKey: queryKeys.patients.documents(patientId, user?.tenantId) });
-      toast({ title: t("common.saved") });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.patients.documents(patientId, user?.tenantId),
+      });
+      toast({ title: t("patients.documentsSection.deleteSuccess") });
+
       if (result?.storageError) {
         toast({
           title: t("common.error"),
-          description: `Document record deleted, but file cleanup failed: ${result.storageError}`,
+          description: t("patients.documentsSection.deletePartialCleanup", {
+            error: result.storageError,
+          }),
           variant: "destructive",
         });
       }
     } catch (err: any) {
-      toast({ title: t("common.error"), description: err?.message ?? "Delete failed", variant: "destructive" });
+      toast({
+        title: t("common.error"),
+        description: err?.message ?? t("patients.documentsSection.deleteFailed"),
+        variant: "destructive",
+      });
     } finally {
       setDeleting(false);
       setDeleteId(null);
@@ -105,9 +137,11 @@ export const PatientDocuments = ({ patientId }: Props) => {
   };
 
   const formatSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    if (bytes < 1024) return `${formatNumber(bytes, locale)} B`;
+    if (bytes < 1024 * 1024) {
+      return `${formatNumber(bytes / 1024, locale, { maximumFractionDigits: 1 })} KB`;
+    }
+    return `${formatNumber(bytes / (1024 * 1024), locale, { maximumFractionDigits: 1 })} MB`;
   };
 
   const columns: Column<PatientDocument>[] = [
@@ -119,8 +153,8 @@ export const PatientDocuments = ({ patientId }: Props) => {
         const Icon = FILE_ICONS[doc.file_type] || File;
         return (
           <div className="flex items-center gap-2">
-            <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="font-medium truncate max-w-[200px]">{doc.file_name}</span>
+            <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="max-w-[200px] truncate font-medium">{doc.file_name}</span>
           </div>
         );
       },
@@ -129,22 +163,24 @@ export const PatientDocuments = ({ patientId }: Props) => {
       key: "created_at",
       header: t("common.date"),
       render: (doc) => (
-        <span className="text-muted-foreground whitespace-nowrap">
+        <span className="whitespace-nowrap text-muted-foreground">
           {formatDate(doc.created_at, locale, "datetime", calendarType)}
         </span>
       ),
     },
     {
       key: "file_size",
-      header: t("common.size") || "Size",
-      render: (doc) => <span className="text-muted-foreground">{formatSize(doc.file_size)}</span>,
+      header: t("common.size"),
+      render: (doc) => (
+        <span className="text-muted-foreground">{formatSize(doc.file_size)}</span>
+      ),
     },
     {
       key: "actions",
       header: t("common.actions"),
       searchable: false,
       render: (doc) => (
-        <div className="flex items-center gap-1 justify-end">
+        <div className="flex items-center justify-end gap-1">
           <Button
             variant="ghost"
             size="icon-sm"
@@ -173,7 +209,9 @@ export const PatientDocuments = ({ patientId }: Props) => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold">{t("patients.documents")} ({documents.length})</h3>
+        <h3 className="font-semibold">
+          {t("patients.documents")} ({documents.length})
+        </h3>
         <FileUpload
           variant="button"
           inputRef={fileRef}
@@ -188,14 +226,18 @@ export const PatientDocuments = ({ patientId }: Props) => {
       </div>
 
       {isLoading ? (
-        <div className="text-center py-8 text-muted-foreground">
-          <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+        <div className="py-8 text-center text-muted-foreground">
+          <Loader2 className="mx-auto h-6 w-6 animate-spin" />
         </div>
       ) : documents.length === 0 ? (
-        <div className="bg-card rounded-lg border p-8 text-center">
-          <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+        <div className="rounded-lg border bg-card p-8 text-center">
+          <FileText className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
           <p className="text-muted-foreground">{t("patients.noDocuments")}</p>
-          <Button variant="outline" className="mt-4" onClick={() => fileRef.current?.click()}>
+          <Button
+            variant="outline"
+            className="mt-4"
+            onClick={() => fileRef.current?.click()}
+          >
             {t("patients.uploadDocument")}
           </Button>
         </div>
@@ -206,7 +248,7 @@ export const PatientDocuments = ({ patientId }: Props) => {
           keyExtractor={(doc) => doc.id}
           searchable
           searchPlaceholder={t("common.search")}
-          exportFileName="patient-documents"
+          exportFileName={t("patients.documentsSection.exportFileName")}
           tableLabel={t("patients.documents")}
         />
       )}
@@ -214,7 +256,7 @@ export const PatientDocuments = ({ patientId }: Props) => {
       <ConfirmDialog
         open={!!deleteId}
         title={t("common.delete")}
-        message="Are you sure you want to delete this document?"
+        message={t("patients.documentsSection.deleteConfirm")}
         confirmLabel={t("common.delete")}
         variant="danger"
         loading={deleting}
@@ -224,8 +266,3 @@ export const PatientDocuments = ({ patientId }: Props) => {
     </div>
   );
 };
-
-
-
-
-

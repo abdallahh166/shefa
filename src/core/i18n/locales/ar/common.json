@@ -2,21 +2,20 @@
   "app": {
     "name": "شفاء"
   },
-  "common": {
-    "na": "—",
-    "continue": "متابعة",
-    "backToDashboard": "العودة إلى لوحة التحكم",
-    "reload": "إعادة التحميل",
-    "searchEmpty": "اكتب حرفين على الأقل للبحث",
-    "keyboardShortcut": "Ctrl K",
-    "trendVsLastMonth": "مقارنة بالشهر الماضي",
-    "errorBoundaryTitle": "حدث خطأ ما",
-    "errorBoundaryDescription": "حدث خطأ غير متوقع. يرجى إعادة تحميل الصفحة."
-  },
+  "na": "—",
+  "continue": "متابعة",
+  "backToDashboard": "العودة إلى لوحة التحكم",
+  "reload": "إعادة التحميل",
+  "searchEmpty": "اكتب حرفين على الأقل للبحث",
+  "keyboardShortcut": "Ctrl K",
+  "trendVsLastMonth": "مقارنة بالشهر الماضي",
+  "errorBoundaryTitle": "حدث خطأ ما",
+  "errorBoundaryDescription": "حدث خطأ غير متوقع. يرجى إعادة تحميل الصفحة.",
+  "size": "الحجم",
   "validation": {
     "required": "هذا الحقل مطلوب",
-    "email": "أدخل بريداً إلكترونياً صالحاً",
-    "number": "أدخل رقماً صالحاً",
+    "email": "أدخل بريدًا إلكترونيًا صالحًا",
+    "number": "أدخل رقمًا صالحًا",
     "positiveNumber": "أدخل قيمة أكبر من صفر",
     "minCharacters": "أدخل {count} أحرف على الأقل"
   },

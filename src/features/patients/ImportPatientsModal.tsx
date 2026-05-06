@@ -1,10 +1,22 @@
 import { useState } from "react";
 import { useI18n } from "@/core/i18n/i18nStore";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/primitives/Button";
 import { FileUpload } from "@/components/primitives/FileUpload";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Upload, FileText, AlertTriangle, CheckCircle2, Download } from "lucide-react";
+import {
+  Upload,
+  FileText,
+  AlertTriangle,
+  CheckCircle2,
+  Download,
+} from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { patientService } from "@/services/patients/patient.service";
 
@@ -25,31 +37,37 @@ function parseCsvLine(line: string): string[] {
   const result: string[] = [];
   let current = "";
   let inQuotes = false;
+
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
     const next = line[i + 1];
+
     if (char === '"' && next === '"') {
       current += '"';
       i++;
       continue;
     }
+
     if (char === '"') {
       inQuotes = !inQuotes;
       continue;
     }
+
     if (char === "," && !inQuotes) {
       result.push(current.trim());
       current = "";
       continue;
     }
+
     current += char;
   }
+
   result.push(current.trim());
   return result;
 }
 
 export const ImportPatientsModal = ({ open, onClose, onSuccess }: Props) => {
-  const { t } = useI18n();
+  const { t } = useI18n(["patients", "common"]);
   const [file, setFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -57,17 +75,30 @@ export const ImportPatientsModal = ({ open, onClose, onSuccess }: Props) => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (!selected) return;
+
     if (selected.size > MAX_FILE_SIZE) {
-      toast({ title: t("common.error"), description: "File must be under 2 MB", variant: "destructive" });
+      toast({
+        title: t("common.error"),
+        description: t("patients.importSection.fileTooLarge"),
+        variant: "destructive",
+      });
       return;
     }
-    const isCsv = selected.type === "text/csv" || selected.name.toLowerCase().endsWith(".csv");
-    if (isCsv) {
-      setFile(selected);
-      setResult(null);
-    } else {
-      toast({ title: t("common.error"), description: "Please select a CSV file", variant: "destructive" });
+
+    const isCsv =
+      selected.type === "text/csv" || selected.name.toLowerCase().endsWith(".csv");
+
+    if (!isCsv) {
+      toast({
+        title: t("common.error"),
+        description: t("patients.importSection.invalidFileType"),
+        variant: "destructive",
+      });
+      return;
     }
+
+    setFile(selected);
+    setResult(null);
   };
 
   const handleImport = async () => {
@@ -78,49 +109,79 @@ export const ImportPatientsModal = ({ open, onClose, onSuccess }: Props) => {
 
     try {
       const text = await file.text();
-      const lines = text.split(/\r?\n/).filter((l) => l.trim());
-      if (lines.length < 2) {
-        toast({ title: t("common.error"), description: "CSV file is empty", variant: "destructive" });
-        setImporting(false);
-        return;
-      }
-      const headers = parseCsvLine(lines[0]).map((h) => h.trim().toLowerCase());
+      const lines = text.split(/\r?\n/).filter((line) => line.trim());
 
-      // Expected headers: full_name, date_of_birth, gender, blood_type, phone, email, address, insurance_provider
-      const requiredHeaders = ["full_name"];
-      const missing = requiredHeaders.filter((h) => !headers.includes(h));
-      if (missing.length > 0) {
+      if (lines.length < 2) {
         toast({
           title: t("common.error"),
-          description: `Missing required columns: ${missing.join(", ")}`,
+          description: t("patients.importSection.emptyFile"),
           variant: "destructive",
         });
         setImporting(false);
         return;
       }
 
-      const errors: { row: number; message: string }[] = [];
+      const headers = parseCsvLine(lines[0]).map((header) =>
+        header.trim().toLowerCase(),
+      );
+      const requiredHeaders = ["full_name"];
+      const missing = requiredHeaders.filter((header) => !headers.includes(header));
+
+      if (missing.length > 0) {
+        toast({
+          title: t("common.error"),
+          description: t("patients.importSection.missingColumns", {
+            columns: missing.join(", "),
+          }),
+          variant: "destructive",
+        });
+        setImporting(false);
+        return;
+      }
+
+      const errors: Array<{ row: number; message: string }> = [];
       let success = 0;
-      const allowedBloodTypes = new Set(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]);
+      const allowedBloodTypes = new Set([
+        "A+",
+        "A-",
+        "B+",
+        "B-",
+        "AB+",
+        "AB-",
+        "O+",
+        "O-",
+      ]);
 
       const rows: Array<{ rowIndex: number; payload: any }> = [];
+
       for (let i = 1; i < lines.length; i++) {
         const values = parseCsvLine(lines[i]);
-        const row: any = {};
-        headers.forEach((h, idx) => {
-          row[h] = values[idx] || null;
+        const row: Record<string, string | null> = {};
+
+        headers.forEach((header, index) => {
+          row[header] = values[index] || null;
         });
 
         if (!row.full_name) {
-          errors.push({ row: i + 1, message: "Missing full_name" });
+          errors.push({
+            row: i + 1,
+            message: t("patients.importSection.missingFullName"),
+          });
           continue;
         }
 
-        const genderRaw = typeof row.gender === "string" ? row.gender.trim().toLowerCase() : "";
-        const gender = genderRaw === "male" || genderRaw === "female" ? genderRaw : null;
+        const genderRaw =
+          typeof row.gender === "string" ? row.gender.trim().toLowerCase() : "";
+        const gender =
+          genderRaw === "male" || genderRaw === "female" ? genderRaw : null;
 
-        const bloodTypeRaw = typeof row.blood_type === "string" ? row.blood_type.trim().toUpperCase() : "";
-        const blood_type = allowedBloodTypes.has(bloodTypeRaw) ? bloodTypeRaw : null;
+        const bloodTypeRaw =
+          typeof row.blood_type === "string"
+            ? row.blood_type.trim().toUpperCase()
+            : "";
+        const blood_type = allowedBloodTypes.has(bloodTypeRaw)
+          ? bloodTypeRaw
+          : null;
 
         rows.push({
           rowIndex: i + 1,
@@ -141,12 +202,17 @@ export const ImportPatientsModal = ({ open, onClose, onSuccess }: Props) => {
       const chunkSize = 200;
       for (let i = 0; i < rows.length; i += chunkSize) {
         const chunk = rows.slice(i, i + chunkSize);
+
         for (const item of chunk) {
           try {
             await patientService.create(item.payload);
             success++;
           } catch (rowErr: any) {
-            errors.push({ row: item.rowIndex, message: rowErr?.message ?? "Failed to import row" });
+            errors.push({
+              row: item.rowIndex,
+              message:
+                rowErr?.message ?? t("patients.importSection.rowImportFailed"),
+            });
           }
         }
       }
@@ -155,33 +221,38 @@ export const ImportPatientsModal = ({ open, onClose, onSuccess }: Props) => {
 
       if (success > 0) {
         onSuccess();
-        toast({ title: `${success} patients imported successfully` });
+        toast({ title: t("patients.importSection.success", { count: success }) });
       }
     } catch (err: any) {
-      toast({ title: t("common.error"), description: err.message, variant: "destructive" });
+      toast({
+        title: t("common.error"),
+        description: err.message,
+        variant: "destructive",
+      });
     } finally {
       setImporting(false);
     }
   };
 
   const handleDownloadTemplate = () => {
-    const csv = "full_name,date_of_birth,gender,blood_type,phone,email,address,insurance_provider\nJohn Doe,1985-03-15,male,A+,+1234567890,john@example.com,123 Main St,Insurance Co";
+    const csv =
+      "full_name,date_of_birth,gender,blood_type,phone,email,address,insurance_provider\nJohn Doe,1985-03-15,male,A+,+1234567890,john@example.com,123 Main St,Insurance Co";
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "patients-template.csv";
-    a.click();
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "patients-template.csv";
+    anchor.click();
     URL.revokeObjectURL(url);
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{t("patients.importPatients")}</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            {t("patients.importPatients")}
+            {t("patients.importSection.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -189,11 +260,15 @@ export const ImportPatientsModal = ({ open, onClose, onSuccess }: Props) => {
           <Alert>
             <FileText className="h-4 w-4" />
             <AlertDescription>
-              {t("patients.importDescription")}
+              {t("patients.importSection.description")}
             </AlertDescription>
           </Alert>
 
-          <Button variant="outline" onClick={handleDownloadTemplate} className="w-full">
+          <Button
+            variant="outline"
+            onClick={handleDownloadTemplate}
+            className="w-full"
+          >
             <Download className="h-4 w-4" /> {t("patients.downloadTemplate")}
           </Button>
 
@@ -209,30 +284,44 @@ export const ImportPatientsModal = ({ open, onClose, onSuccess }: Props) => {
             icon={<Upload className="h-10 w-10 text-muted-foreground" />}
           />
 
-          {result && (
+          {result ? (
             <Alert variant={result.errors.length > 0 ? "destructive" : "default"}>
-              {result.success > 0 && <CheckCircle2 className="h-4 w-4" />}
-              {result.errors.length > 0 && <AlertTriangle className="h-4 w-4" />}
+              {result.success > 0 ? <CheckCircle2 className="h-4 w-4" /> : null}
+              {result.errors.length > 0 ? <AlertTriangle className="h-4 w-4" /> : null}
               <AlertDescription>
-                <p className="font-medium">
-                  {result.success > 0 && `✓ ${result.success} patients imported successfully`}
-                </p>
-                {result.errors.length > 0 && (
+                {result.success > 0 ? (
+                  <p className="font-medium">
+                    {t("patients.importSection.success", {
+                      count: result.success,
+                    })}
+                  </p>
+                ) : null}
+
+                {result.errors.length > 0 ? (
                   <div className="mt-2 space-y-1 text-xs">
-                    <p className="font-medium">Errors:</p>
-                    {result.errors.slice(0, 5).map((err, i) => (
-                      <p key={i}>
-                        Row {err.row}: {err.message}
+                    <p className="font-medium">
+                      {t("patients.importSection.errorsTitle")}:
+                    </p>
+                    {result.errors.slice(0, 5).map((error, index) => (
+                      <p key={index}>
+                        {t("patients.importSection.rowLabel", {
+                          row: error.row,
+                          message: error.message,
+                        })}
                       </p>
                     ))}
-                    {result.errors.length > 5 && (
-                      <p>... and {result.errors.length - 5} more errors</p>
-                    )}
+                    {result.errors.length > 5 ? (
+                      <p>
+                        {t("patients.importSection.moreErrors", {
+                          count: result.errors.length - 5,
+                        })}
+                      </p>
+                    ) : null}
                   </div>
-                )}
+                ) : null}
               </AlertDescription>
             </Alert>
-          )}
+          ) : null}
 
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>
@@ -247,5 +336,3 @@ export const ImportPatientsModal = ({ open, onClose, onSuccess }: Props) => {
     </Dialog>
   );
 };
-
-

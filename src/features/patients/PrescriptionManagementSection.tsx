@@ -5,19 +5,40 @@ import { useAuth } from "@/core/auth/authStore";
 import { DataTable, Column } from "@/shared/components/DataTable";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { Button } from "@/components/primitives/Button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from "@/components/primitives/Inputs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Textarea,
+} from "@/components/primitives/Inputs";
 import { Label } from "@/components/ui/label";
 import { Printer, Plus } from "lucide-react";
 import { formatDate } from "@/shared/utils/formatDate";
-import { formatPrescriptionQuantity, formatPrescriptionSig } from "@/shared/utils/prescription";
+import {
+  formatPrescriptionQuantity,
+  formatPrescriptionSig,
+} from "@/shared/utils/prescription";
 import { generatePrescriptionsListPDF } from "@/shared/utils/pdfGenerator";
 import { toast } from "@/hooks/use-toast";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { doctorService } from "@/services/doctors/doctor.service";
 import { prescriptionService } from "@/services/prescriptions/prescription.service";
 import { queryKeys } from "@/services/queryKeys";
-import type { PrescriptionCreateInput, PrescriptionWithDoctor } from "@/domain/prescription/prescription.types";
+import type {
+  PrescriptionCreateInput,
+  PrescriptionWithDoctor,
+} from "@/domain/prescription/prescription.types";
 
 interface PrescriptionManagementSectionProps {
   patientId: string;
@@ -47,14 +68,20 @@ export const PrescriptionManagementSection = ({
   prescriptions,
   canManageRecords,
 }: PrescriptionManagementSectionProps) => {
-  const { t, locale, calendarType } = useI18n();
+  const { t, locale, calendarType } = useI18n([
+    "patients",
+    "appointments",
+    "pharmacy",
+    "common",
+  ]);
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [doctorSearch, setDoctorSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(defaultForm);
-  const [discontinueTarget, setDiscontinueTarget] = useState<PrescriptionWithDoctor | null>(null);
+  const [discontinueTarget, setDiscontinueTarget] =
+    useState<PrescriptionWithDoctor | null>(null);
   const [discontinueReason, setDiscontinueReason] = useState("");
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const debouncedDoctorSearch = useDebouncedValue(doctorSearch, 300);
@@ -79,6 +106,7 @@ export const PrescriptionManagementSection = ({
 
   useEffect(() => {
     if (!dialogOpen || form.doctor_id || !user?.id) return;
+
     const match = doctors.find((doctor: any) => doctor.user_id === user.id);
     if (match?.id) {
       setForm((prev) => ({ ...prev, doctor_id: match.id }));
@@ -86,11 +114,21 @@ export const PrescriptionManagementSection = ({
   }, [dialogOpen, form.doctor_id, doctors, user?.id]);
 
   const invalidatePrescriptions = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.prescriptions.root(user?.tenantId) });
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.prescriptions.root(user?.tenantId),
+    });
   };
 
   const handleCreate = async () => {
-    if (!patientId || !form.doctor_id || !form.medication || !form.dosage || !form.route || !form.frequency || !form.quantity) {
+    if (
+      !patientId ||
+      !form.doctor_id ||
+      !form.medication ||
+      !form.dosage ||
+      !form.route ||
+      !form.frequency ||
+      !form.quantity
+    ) {
       toast({
         title: t("common.missingFields"),
         description: t("common.pleaseFillAllRequiredFields"),
@@ -114,14 +152,18 @@ export const PrescriptionManagementSection = ({
         prescribed_date: form.prescribed_date,
         end_date: form.end_date || null,
       } as PrescriptionCreateInput);
-      toast({ title: "Prescription created" });
+      toast({ title: t("patients.prescriptionsSection.created") });
       setDialogOpen(false);
       setForm(defaultForm());
       setDoctorSearch("");
       invalidatePrescriptions();
     } catch (err) {
       const message = err instanceof Error ? err.message : t("common.error");
-      toast({ title: t("common.error"), description: message, variant: "destructive" });
+      toast({
+        title: t("common.error"),
+        description: message,
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }
@@ -134,11 +176,15 @@ export const PrescriptionManagementSection = ({
         status: "completed",
         end_date: todayIsoDate(),
       });
-      toast({ title: "Prescription marked completed" });
+      toast({ title: t("patients.prescriptionsSection.completed") });
       invalidatePrescriptions();
     } catch (err) {
       const message = err instanceof Error ? err.message : t("common.error");
-      toast({ title: t("common.error"), description: message, variant: "destructive" });
+      toast({
+        title: t("common.error"),
+        description: message,
+        variant: "destructive",
+      });
     } finally {
       setUpdatingStatusId(null);
     }
@@ -146,6 +192,7 @@ export const PrescriptionManagementSection = ({
 
   const handleDiscontinue = async () => {
     if (!discontinueTarget) return;
+
     setUpdatingStatusId(discontinueTarget.id);
     try {
       await prescriptionService.update(discontinueTarget.id, {
@@ -153,13 +200,17 @@ export const PrescriptionManagementSection = ({
         discontinued_reason: discontinueReason,
         end_date: todayIsoDate(),
       });
-      toast({ title: "Prescription discontinued" });
+      toast({ title: t("patients.prescriptionsSection.discontinued") });
       setDiscontinueTarget(null);
       setDiscontinueReason("");
       invalidatePrescriptions();
     } catch (err) {
       const message = err instanceof Error ? err.message : t("common.error");
-      toast({ title: t("common.error"), description: message, variant: "destructive" });
+      toast({
+        title: t("common.error"),
+        description: message,
+        variant: "destructive",
+      });
     } finally {
       setUpdatingStatusId(null);
     }
@@ -168,7 +219,9 @@ export const PrescriptionManagementSection = ({
   const getStatusLabel = (status: string) => {
     if (status === "active") return t("patients.active");
     if (status === "completed") return t("appointments.completed");
-    if (status === "discontinued") return "Discontinued";
+    if (status === "discontinued") {
+      return t("patients.prescriptionsSection.statusDiscontinued");
+    }
     return status;
   };
 
@@ -190,14 +243,16 @@ export const PrescriptionManagementSection = ({
             {formatPrescriptionSig(prescription) || prescription.dosage}
           </div>
           {prescription.instructions ? (
-            <div className="text-xs text-muted-foreground">{prescription.instructions}</div>
+            <div className="text-xs text-muted-foreground">
+              {prescription.instructions}
+            </div>
           ) : null}
         </div>
       ),
     },
     {
       key: "quantity",
-      header: "Supply",
+      header: t("patients.prescriptionsSection.supply"),
       render: (prescription) => formatPrescriptionQuantity(prescription) || "-",
     },
     {
@@ -215,7 +270,14 @@ export const PrescriptionManagementSection = ({
           </div>
           {prescription.end_date ? (
             <div className="text-xs text-muted-foreground">
-              Ends {formatDate(prescription.end_date, locale, "date", calendarType)}
+              {t("patients.prescriptionsSection.endsOn", {
+                date: formatDate(
+                  prescription.end_date,
+                  locale,
+                  "date",
+                  calendarType,
+                ),
+              })}
             </div>
           ) : null}
         </div>
@@ -243,7 +305,7 @@ export const PrescriptionManagementSection = ({
     prescriptionColumns.push({
       key: "actions",
       header: t("common.actions"),
-      render: (prescription) => (
+      render: (prescription) =>
         prescription.status === "active" ? (
           <div className="flex flex-wrap justify-end gap-2">
             <Button
@@ -253,7 +315,7 @@ export const PrescriptionManagementSection = ({
               onClick={() => void handleComplete(prescription.id)}
               disabled={updatingStatusId === prescription.id}
             >
-              Complete
+              {t("patients.prescriptionsSection.completeAction")}
             </Button>
             <Button
               type="button"
@@ -265,24 +327,25 @@ export const PrescriptionManagementSection = ({
               }}
               disabled={updatingStatusId === prescription.id}
             >
-              Discontinue
+              {t("patients.prescriptionsSection.discontinueAction")}
             </Button>
           </div>
-        ) : null
-      ),
+        ) : null,
     });
   }
 
   return (
     <div className="space-y-4">
-      {prescriptions.length > 0 && (
+      {prescriptions.length > 0 ? (
         <div className="flex justify-between gap-2">
           {canManageRecords ? (
             <Button size="sm" onClick={() => setDialogOpen(true)} className="gap-2">
               <Plus className="h-4 w-4" />
-              Add prescription
+              {t("patients.prescriptionsSection.addAction")}
             </Button>
-          ) : <div />}
+          ) : (
+            <div />
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -298,17 +361,22 @@ export const PrescriptionManagementSection = ({
             {t("common.print")}
           </Button>
         </div>
-      )}
+      ) : null}
 
       {prescriptions.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground space-y-3">
+        <div className="space-y-3 py-12 text-center text-muted-foreground">
           <p>{t("patients.noPrescriptionsFound")}</p>
-          {canManageRecords && (
-            <Button variant="outline" size="sm" onClick={() => setDialogOpen(true)} className="gap-2">
+          {canManageRecords ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDialogOpen(true)}
+              className="gap-2"
+            >
               <Plus className="h-4 w-4" />
-              Add prescription
+              {t("patients.prescriptionsSection.addAction")}
             </Button>
-          )}
+          ) : null}
         </div>
       ) : (
         <DataTable
@@ -322,9 +390,9 @@ export const PrescriptionManagementSection = ({
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && setDialogOpen(false)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>New prescription</DialogTitle>
+            <DialogTitle>{t("patients.prescriptionsSection.dialogTitle")}</DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
-              Capture the medication, sig, quantity, and refill details for this patient.
+              {t("patients.prescriptionsSection.dialogDescription")}
             </DialogDescription>
           </DialogHeader>
 
@@ -354,7 +422,7 @@ export const PrescriptionManagementSection = ({
             </div>
 
             <div className="space-y-2">
-              <Label>Medication *</Label>
+              <Label>{t("patients.prescriptionsSection.medicationLabel")}</Label>
               <Input
                 value={form.medication}
                 onChange={(e) => setForm((prev) => ({ ...prev, medication: e.target.value }))}
@@ -362,49 +430,59 @@ export const PrescriptionManagementSection = ({
             </div>
 
             <div className="space-y-2">
-              <Label>Strength / dose *</Label>
+              <Label>{t("patients.prescriptionsSection.dosageLabel")}</Label>
               <Input
                 value={form.dosage}
                 onChange={(e) => setForm((prev) => ({ ...prev, dosage: e.target.value }))}
-                placeholder="e.g. 500 mg"
+                placeholder={t("patients.prescriptionsSection.dosagePlaceholder")}
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Route *</Label>
+              <Label>{t("patients.prescriptionsSection.routeLabel")}</Label>
               <Input
                 value={form.route}
                 onChange={(e) => setForm((prev) => ({ ...prev, route: e.target.value }))}
-                placeholder="e.g. Oral"
+                placeholder={t("patients.prescriptionsSection.routePlaceholder")}
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Frequency *</Label>
+              <Label>{t("patients.prescriptionsSection.frequencyLabel")}</Label>
               <Input
                 value={form.frequency}
                 onChange={(e) => setForm((prev) => ({ ...prev, frequency: e.target.value }))}
-                placeholder="e.g. Twice daily"
+                placeholder={t("patients.prescriptionsSection.frequencyPlaceholder")}
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Quantity *</Label>
+              <Label>{t("patients.prescriptionsSection.quantityLabel")}</Label>
               <Input
                 type="number"
                 min={1}
                 value={form.quantity}
-                onChange={(e) => setForm((prev) => ({ ...prev, quantity: Number.parseInt(e.target.value, 10) || 0 }))}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    quantity: Number.parseInt(e.target.value, 10) || 0,
+                  }))
+                }
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Refills</Label>
+              <Label>{t("patients.prescriptionsSection.refillsLabel")}</Label>
               <Input
                 type="number"
                 min={0}
                 value={form.refills}
-                onChange={(e) => setForm((prev) => ({ ...prev, refills: Number.parseInt(e.target.value, 10) || 0 }))}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    refills: Number.parseInt(e.target.value, 10) || 0,
+                  }))
+                }
               />
             </div>
 
@@ -413,12 +491,14 @@ export const PrescriptionManagementSection = ({
               <Input
                 type="date"
                 value={form.prescribed_date}
-                onChange={(e) => setForm((prev) => ({ ...prev, prescribed_date: e.target.value }))}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, prescribed_date: e.target.value }))
+                }
               />
             </div>
 
             <div className="space-y-2">
-              <Label>End date</Label>
+              <Label>{t("patients.prescriptionsSection.endDateLabel")}</Label>
               <Input
                 type="date"
                 value={form.end_date}
@@ -427,12 +507,14 @@ export const PrescriptionManagementSection = ({
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <Label>Instructions</Label>
+              <Label>{t("patients.prescriptionsSection.instructionsLabel")}</Label>
               <Textarea
                 rows={4}
                 value={form.instructions}
-                onChange={(e) => setForm((prev) => ({ ...prev, instructions: e.target.value }))}
-                placeholder="Take with food. Stop and call clinic if rash develops."
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, instructions: e.target.value }))
+                }
+                placeholder={t("patients.prescriptionsSection.instructionsPlaceholder")}
               />
             </div>
           </div>
@@ -442,27 +524,38 @@ export const PrescriptionManagementSection = ({
               {t("common.cancel")}
             </Button>
             <Button onClick={() => void handleCreate()} disabled={saving}>
-              {saving ? t("common.loading") : "Save prescription"}
+              {saving
+                ? t("common.loading")
+                : t("patients.prescriptionsSection.saveAction")}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!discontinueTarget} onOpenChange={(open) => !open && setDiscontinueTarget(null)}>
+      <Dialog
+        open={!!discontinueTarget}
+        onOpenChange={(open) => !open && setDiscontinueTarget(null)}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Discontinue prescription</DialogTitle>
+            <DialogTitle>
+              {t("patients.prescriptionsSection.discontinueDialogTitle")}
+            </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
-              Document why {discontinueTarget?.medication ?? "this medication"} is being stopped.
+              {t("patients.prescriptionsSection.discontinueDialogDescription", {
+                medication:
+                  discontinueTarget?.medication ??
+                  t("patients.prescriptionsSection.thisMedication"),
+              })}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label>Reason *</Label>
+            <Label>{t("patients.prescriptionsSection.reasonLabel")}</Label>
             <Textarea
               rows={4}
               value={discontinueReason}
               onChange={(e) => setDiscontinueReason(e.target.value)}
-              placeholder="Therapy completed early, adverse effect, duplicate order, etc."
+              placeholder={t("patients.prescriptionsSection.reasonPlaceholder")}
             />
           </div>
           <DialogFooter>
@@ -472,9 +565,12 @@ export const PrescriptionManagementSection = ({
             <Button
               variant="danger"
               onClick={() => void handleDiscontinue()}
-              disabled={!discontinueReason.trim() || updatingStatusId === discontinueTarget?.id}
+              disabled={
+                !discontinueReason.trim() ||
+                updatingStatusId === discontinueTarget?.id
+              }
             >
-              Discontinue
+              {t("patients.prescriptionsSection.discontinueAction")}
             </Button>
           </DialogFooter>
         </DialogContent>

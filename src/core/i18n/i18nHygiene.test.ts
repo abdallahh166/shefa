@@ -36,6 +36,36 @@ const fileChecks = [
     phrases: ["total patients", "Patient List", "Failed to delete patients"],
   },
   {
+    file: "src/features/patients/PatientDocuments.tsx",
+    phrases: [
+      "File must be under 10 MB",
+      "Upload failed",
+      "Download failed",
+      "Delete failed",
+      "Are you sure you want to delete this document?",
+    ],
+  },
+  {
+    file: "src/features/patients/ImportPatientsModal.tsx",
+    phrases: [
+      "Please select a CSV file",
+      "CSV file is empty",
+      "Missing required columns",
+      "patients imported successfully",
+      "Errors:",
+    ],
+  },
+  {
+    file: "src/features/patients/PrescriptionManagementSection.tsx",
+    phrases: [
+      "Prescription created",
+      "Prescription marked completed",
+      "Prescription discontinued",
+      "Save prescription",
+      "Discontinue prescription",
+    ],
+  },
+  {
     file: "src/features/appointments/NewAppointmentModal.tsx",
     phrases: ["Duration (min)"],
   },

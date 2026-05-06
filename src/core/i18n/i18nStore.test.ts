@@ -38,12 +38,13 @@ describe("i18n store", () => {
 
   it("updates document language metadata for RTL locales", async () => {
     await initializeI18n("ar");
-    await ensureNamespaces(["portal"]);
+    await ensureNamespaces(["portal", "common"]);
 
     expect(document.documentElement.lang).toBe("ar-EG");
     expect(document.documentElement.dir).toBe("rtl");
     expect(document.documentElement.dataset.font).toBe("arabic");
     expect(translatePath("portal.layout.title")).toBe("بوابة المرضى");
+    expect(translatePath("common.reload")).toBe("إعادة التحميل");
   });
 
   it("loads feature namespaces lazily", async () => {
@@ -55,10 +56,16 @@ describe("i18n store", () => {
   it("supports ICU pluralization and interpolation in feature namespaces", async () => {
     await ensureNamespaces(["admin"]);
 
-    expect(translatePath("admin.common.activeAlerts", { count: 1 })).toBe("1 active alert");
-    expect(translatePath("admin.common.activeAlerts", { count: 3 })).toBe("3 active alerts");
+    expect(translatePath("admin.common.activeAlerts", { count: 1 })).toBe(
+      "1 active alert",
+    );
+    expect(translatePath("admin.common.activeAlerts", { count: 3 })).toBe(
+      "3 active alerts",
+    );
     expect(
-      translatePath("admin.tenantForm.editTitle", { name: "Cairo Heart Clinic" }),
+      translatePath("admin.tenantForm.editTitle", {
+        name: "Cairo Heart Clinic",
+      }),
     ).toBe("Edit Cairo Heart Clinic");
   });
 
@@ -80,6 +87,8 @@ describe("i18n store", () => {
     });
 
     expect(window.localStorage.getItem("lang:tenant-1:user-1")).toBe("ar");
-    expect(window.localStorage.getItem("calendar:tenant-1:user-1")).toBe("hijri");
+    expect(window.localStorage.getItem("calendar:tenant-1:user-1")).toBe(
+      "hijri",
+    );
   });
 });

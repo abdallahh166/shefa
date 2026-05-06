@@ -2,17 +2,16 @@
   "app": {
     "name": "Shefaa"
   },
-  "common": {
-    "na": "—",
-    "continue": "Continue",
-    "backToDashboard": "Back to dashboard",
-    "reload": "Reload",
-    "searchEmpty": "Type at least 2 characters to search",
-    "keyboardShortcut": "Ctrl K",
-    "trendVsLastMonth": "vs last month",
-    "errorBoundaryTitle": "Something went wrong",
-    "errorBoundaryDescription": "An unexpected error occurred. Please reload the page."
-  },
+  "na": "—",
+  "continue": "Continue",
+  "backToDashboard": "Back to dashboard",
+  "reload": "Reload",
+  "searchEmpty": "Type at least 2 characters to search",
+  "keyboardShortcut": "Ctrl K",
+  "trendVsLastMonth": "vs last month",
+  "errorBoundaryTitle": "Something went wrong",
+  "errorBoundaryDescription": "An unexpected error occurred. Please reload the page.",
+  "size": "Size",
   "validation": {
     "required": "This field is required",
     "email": "Enter a valid email address",
