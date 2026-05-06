@@ -91,4 +91,22 @@ describe("i18n store", () => {
       "hijri",
     );
   });
+
+  it("hydrates tenant override language from the override tenant scope", async () => {
+    window.localStorage.setItem("lang:tenant-2:user-1", "ar");
+
+    useAuth.setState({
+      tenantOverride: {
+        id: "tenant-2",
+        slug: "tenant-2",
+        name: "Tenant 2",
+      },
+    });
+
+    await useI18nStore.getState().hydrate();
+
+    expect(useI18nStore.getState().locale).toBe("ar");
+    expect(window.localStorage.getItem("lang:tenant-2:user-1")).toBe("ar");
+    expect(window.localStorage.getItem("lang:tenant-1:user-1")).toBeNull();
+  });
 });

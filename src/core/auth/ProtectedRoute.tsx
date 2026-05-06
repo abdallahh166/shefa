@@ -4,6 +4,7 @@ import { buildPrivilegedSession, isSuperAdmin, useAuth, type Permission, type Pr
 import { useFeatureAccess, type Feature } from "@/core/subscription/useFeatureAccess";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/primitives/Button";
+import { useI18n } from "@/core/i18n/i18nStore";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -47,6 +48,7 @@ export const ProtectedRoute = ({
   requiredFeature,
   requiredPrivilegedRole,
 }: ProtectedRouteProps) => {
+  const { t } = useI18n(["auth", "common"]);
   const { isAuthenticated, isLoading, hasPermission, user, lastVerifiedAt, privilegedAuth } = useAuth();
   const { hasFeature, requiredPlan, isLoading: featureLoading } = useFeatureAccess();
   const privilegedSession = buildPrivilegedSession({ user, lastVerifiedAt, privilegedAuth });
@@ -60,13 +62,13 @@ export const ProtectedRoute = ({
     return (
       <div className="flex min-h-screen items-center justify-center px-6">
         <div className="max-w-md rounded-2xl border bg-card p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-semibold mb-2">Clinic Access Blocked</h1>
+          <h1 className="text-2xl font-semibold mb-2">{t("auth.access.clinicBlockedTitle")}</h1>
           <p className="text-muted-foreground mb-3">
-            This clinic is currently {user?.tenantStatus}. Staff access has been restricted by the platform administrator.
+            {t("auth.access.clinicBlockedDescription", { status: user?.tenantStatus })}
           </p>
           {user?.tenantStatusReason ? (
             <p className="text-sm text-muted-foreground">
-              Reason: <span className="text-foreground">{user.tenantStatusReason}</span>
+              {t("auth.access.reason")}: <span className="text-foreground">{user.tenantStatusReason}</span>
             </p>
           ) : null}
         </div>
@@ -77,8 +79,8 @@ export const ProtectedRoute = ({
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <h1 className="text-2xl font-semibold mb-2">Access Denied</h1>
-          <p className="text-muted-foreground">You don't have permission to view this page.</p>
+          <h1 className="text-2xl font-semibold mb-2">{t("auth.access.deniedTitle")}</h1>
+          <p className="text-muted-foreground">{t("auth.access.deniedDescription")}</p>
         </div>
       </div>
     );
@@ -89,8 +91,8 @@ export const ProtectedRoute = ({
       return (
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <h1 className="text-2xl font-semibold mb-2">Privileged Access Required</h1>
-            <p className="text-muted-foreground">This page is reserved for elevated platform administrators.</p>
+            <h1 className="text-2xl font-semibold mb-2">{t("auth.access.privilegedRequiredTitle")}</h1>
+            <p className="text-muted-foreground">{t("auth.access.privilegedRequiredDescription")}</p>
           </div>
         </div>
       );
@@ -106,17 +108,17 @@ export const ProtectedRoute = ({
     return (
       <div className="flex min-h-screen items-center justify-center px-6">
         <div className="max-w-md rounded-2xl border bg-card p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-semibold mb-2">Feature Unavailable</h1>
+          <h1 className="text-2xl font-semibold mb-2">{t("auth.access.featureUnavailableTitle")}</h1>
           <p className="text-muted-foreground mb-5">
-            This module is not enabled for the current clinic subscription.
+            {t("auth.access.featureUnavailableDescription")}
           </p>
           {planRequired ? (
             <p className="text-sm text-muted-foreground mb-5">
-              Required plan: <span className="font-medium capitalize text-foreground">{planRequired}</span>
+              {t("auth.access.requiredPlan")}: <span className="font-medium capitalize text-foreground">{planRequired}</span>
             </p>
           ) : null}
           <Button type="button" onClick={() => window.location.assign("/pricing")}>
-            View Plans
+            {t("common.viewAllPlans")}
           </Button>
         </div>
       </div>

@@ -48,6 +48,7 @@ export interface AppUser {
 
 export interface AppLayoutLabels {
   brandName: string;
+  mainNavigation: string;
   logOut: string;
   collapseSidebar: string;
   expandSidebar: string;
@@ -219,7 +220,7 @@ function AppSidebar({
         sidebarWidth,
         className,
       )}
-      aria-label="Main navigation"
+      aria-label={labels.mainNavigation}
     >
       {/* ── Logo ── */}
       <div className={cn(

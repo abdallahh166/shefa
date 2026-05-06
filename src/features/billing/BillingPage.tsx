@@ -33,12 +33,12 @@ const statusVariant = {
 const toDateKey = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-const getStatusLabel = (status: string) => {
-  if (status === "paid") return "Paid";
-  if (status === "pending") return "Pending";
-  if (status === "overdue") return "Overdue";
-  if (status === "partially_paid") return "Partially paid";
-  if (status === "void") return "Void";
+const getStatusLabel = (status: string, t: (path: string, options?: Record<string, unknown>) => string) => {
+  if (status === "paid") return t("billing.paid");
+  if (status === "pending") return t("billing.pending");
+  if (status === "overdue") return t("billing.overdue");
+  if (status === "partially_paid") return t("billing.status.partiallyPaid");
+  if (status === "void") return t("billing.status.void");
   return status;
 };
 
@@ -126,7 +126,7 @@ export const BillingPage = () => {
     if (!voidReason.trim()) {
       toast({
         title: t("common.missingFields"),
-        description: "Please enter a reason before voiding the invoice.",
+        description: t("billing.void.reasonRequired"),
         variant: "destructive",
       });
       return;
@@ -135,7 +135,7 @@ export const BillingPage = () => {
     setVoiding(true);
     try {
       await billingService.voidInvoice(voidInvoice.id, voidReason.trim());
-      toast({ title: "Invoice voided" });
+      toast({ title: t("billing.void.success") });
       setVoidInvoice(null);
       setVoidReason("");
       invalidateInvoices();
@@ -173,12 +173,12 @@ export const BillingPage = () => {
     },
     {
       key: "amount_paid",
-      header: "Paid",
+      header: t("billing.paid"),
       render: (invoice) => <span className="text-success">{formatCurrency(Number(invoice.amount_paid), locale)}</span>,
     },
     {
       key: "balance_due",
-      header: "Balance",
+      header: t("billing.balance"),
       render: (invoice) => <span>{formatCurrency(Number(invoice.balance_due), locale)}</span>,
     },
     {
@@ -189,7 +189,7 @@ export const BillingPage = () => {
     },
     {
       key: "due_date",
-      header: "Due",
+      header: t("billing.due"),
       render: (invoice) => (
         invoice.due_date ? formatDate(invoice.due_date, locale) : <span className="text-muted-foreground">-</span>
       ),
@@ -200,7 +200,7 @@ export const BillingPage = () => {
       sortable: true,
       render: (invoice) => (
         <StatusBadge variant={statusVariant[invoice.status] ?? "default"}>
-          {getStatusLabel(invoice.status)}
+          {getStatusLabel(invoice.status, t)}
         </StatusBadge>
       ),
     },
@@ -217,7 +217,7 @@ export const BillingPage = () => {
               className="gap-1"
             >
               <Wallet className="h-4 w-4" />
-              Post payment
+              {t("billing.payment.action")}
             </Button>
           ) : null}
           {invoice.status !== "void" && Number(invoice.amount_paid) === 0 ? (
@@ -231,7 +231,7 @@ export const BillingPage = () => {
               className="gap-1 text-destructive hover:bg-destructive/10"
             >
               <Ban className="h-4 w-4" />
-              Void
+              {t("billing.status.void")}
             </Button>
           ) : null}
         </div>
@@ -284,11 +284,11 @@ export const BillingPage = () => {
         filterSlot={(
           <StatusFilter
             options={[
-              { value: "paid", label: "Paid" },
-              { value: "pending", label: "Pending" },
-              { value: "overdue", label: "Overdue" },
-              { value: "partially_paid", label: "Partially paid" },
-              { value: "void", label: "Void" },
+              { value: "paid", label: getStatusLabel("paid", t) },
+              { value: "pending", label: getStatusLabel("pending", t) },
+              { value: "overdue", label: getStatusLabel("overdue", t) },
+              { value: "partially_paid", label: getStatusLabel("partially_paid", t) },
+              { value: "void", label: getStatusLabel("void", t) },
             ]}
             selected={statusFilter}
             onChange={setStatusFilter}
@@ -314,9 +314,9 @@ export const BillingPage = () => {
       <Dialog open={!!voidInvoice} onOpenChange={(next) => !next && setVoidInvoice(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Void invoice</DialogTitle>
+            <DialogTitle>{t("billing.void.title")}</DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
-              Voiding removes this invoice from active collections. Use it only for genuine front-desk or billing corrections.
+              {t("billing.void.description")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -325,12 +325,12 @@ export const BillingPage = () => {
               <div className="text-muted-foreground">{voidInvoice?.patients?.full_name ?? "-"}</div>
             </div>
             <div className="space-y-2">
-              <Label>Reason *</Label>
+              <Label>{t("billing.void.reasonRequiredLabel")}</Label>
               <Textarea
                 rows={4}
                 value={voidReason}
                 onChange={(event) => setVoidReason(event.target.value)}
-                placeholder="Entered under the wrong patient, duplicate invoice, billing correction, etc."
+                placeholder={t("billing.void.reasonPlaceholder")}
               />
             </div>
           </div>
@@ -349,7 +349,7 @@ export const BillingPage = () => {
               onClick={() => void handleVoidInvoice()}
               disabled={voiding}
             >
-              {voiding ? t("common.loading") : "Void invoice"}
+              {voiding ? t("common.loading") : t("billing.void.action")}
             </Button>
           </DialogFooter>
         </DialogContent>

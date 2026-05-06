@@ -6,9 +6,57 @@
     "amountPlaceholder": "350.00",
     "dueDate": "تاريخ الاستحقاق"
   },
+  "invoice": "الفاتورة",
+  "paid": "مدفوع",
+  "pending": "معلق",
+  "overdue": "متأخر",
+  "balance": "الرصيد",
+  "due": "الاستحقاق",
+  "outstanding": "المتبقي",
+  "status": {
+    "partiallyPaid": "مدفوعة جزئيًا",
+    "void": "ملغاة"
+  },
+  "void": {
+    "title": "إلغاء الفاتورة",
+    "description": "إلغاء الفاتورة يزيلها من التحصيلات النشطة. استخدمه فقط لتصحيحات الاستقبال أو الفوترة الفعلية.",
+    "reasonRequired": "يرجى إدخال سبب قبل إلغاء الفاتورة.",
+    "reasonRequiredLabel": "السبب *",
+    "reasonPlaceholder": "أُدخلت على مريض خطأ، فاتورة مكررة، تصحيح فوترة، وغيرها.",
+    "action": "إلغاء الفاتورة",
+    "success": "تم إلغاء الفاتورة"
+  },
   "payment": {
     "title": "تسجيل دفعة",
+    "description": "سجّل دفعة محصلة على هذه الفاتورة مع الحفاظ على دقة الرصيد المتبقي.",
+    "action": "تسجيل دفعة",
+    "posted": "تم تسجيل الدفعة",
+    "amountRequired": "المبلغ *",
+    "methodRequired": "الطريقة *",
+    "selectMethod": "اختر طريقة الدفع",
+    "collectedAt": "وقت التحصيل",
+    "reference": "المرجع",
+    "referenceShort": "مرجع",
+    "referencePlaceholder": "إيصال جهاز الدفع، مرجع التحويل، وغيرها.",
+    "notes": "ملاحظات",
+    "notesPlaceholder": "دفعة زيارة مباشرة، دفعة تأمين مجمعة، ملاحظات تسوية مجزأة، وغيرها.",
     "history": "سجل الدفعات",
-    "emptyHistory": "لا توجد دفعات مسجلة بعد."
+    "emptyHistory": "لا توجد دفعات مسجلة بعد.",
+    "postedCount": "{count, plural, =0 {لا توجد دفعات مسجلة} one {دفعة واحدة مسجلة} two {دفعتان مسجلتان} few {# دفعات مسجلة} many {# دفعة مسجلة} other {# دفعة مسجلة}}",
+    "methodOnDate": "{method} في {date}",
+    "methods": {
+      "cash": "نقدًا",
+      "card": "بطاقة",
+      "bankTransfer": "تحويل بنكي",
+      "mobileWallet": "محفظة إلكترونية",
+      "insurance": "تحويل تأمين",
+      "other": "أخرى"
+    }
+  },
+  "paywall": {
+    "title": "تم إيقاف الوصول للاشتراك",
+    "currentPlan": "الخطة الحالية",
+    "accessEndsOn": "ينتهي الوصول في: {date}",
+    "description": "جدّد أو رقّ اشتراك العيادة للاستمرار في استخدام الوحدات المقيدة."
   }
 }

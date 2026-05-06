@@ -1084,7 +1084,9 @@ export const AdminDashboardPage = () => {
         <div className="space-y-1">
           <p>{formatDate(job.updated_at, locale, "datetime")}</p>
           <p className="text-xs text-muted-foreground">
-            {job.last_attempt_at ? `Last attempt ${formatDate(job.last_attempt_at, locale, "datetime")}` : "No attempt timestamp"}
+            {job.last_attempt_at
+              ? t("admin.operations.lastAttempt", { date: formatDate(job.last_attempt_at, locale, "datetime") })
+              : t("admin.operations.noAttemptTimestamp")}
           </p>
         </div>
       ),
@@ -1425,18 +1427,18 @@ export const AdminDashboardPage = () => {
           <div className="space-y-6 animate-fade-in">
             <div className="flex flex-col gap-3 rounded-2xl border bg-card p-5 md:flex-row md:items-center md:justify-between">
               <div className="space-y-1">
-                <h3 className="font-semibold">Operations drill-down</h3>
+                <h3 className="font-semibold">{t("admin.operations.drillDownTitle")}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Filter the platform signals by tenant before retrying background work.
+                  {t("admin.operations.drillDownDescription")}
                 </p>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Select value={operationsTenantFilter} onValueChange={setOperationsTenantFilter}>
                   <SelectTrigger className="w-[220px]">
-                    <SelectValue placeholder="All tenants" />
+                    <SelectValue placeholder={t("admin.operations.allTenants")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All tenants</SelectItem>
+                    <SelectItem value="all">{t("admin.operations.allTenants")}</SelectItem>
                     {recentTenants.map((tenant) => (
                       <SelectItem key={tenant.id} value={tenant.id}>
                         {tenant.name}
@@ -1585,9 +1587,9 @@ export const AdminDashboardPage = () => {
             <div className="rounded-2xl border bg-card p-5 space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="font-semibold">Admin activity stream</h3>
+                  <h3 className="font-semibold">{t("admin.operations.activityStreamTitle")}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Recent super-admin actions with request IDs for incident correlation.
+                    {t("admin.operations.activityStreamDescription")}
                   </p>
                 </div>
                 {operationsTenantId ? (

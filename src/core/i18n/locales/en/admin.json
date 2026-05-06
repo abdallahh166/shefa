@@ -122,7 +122,14 @@
     "serviceColumn": "Service",
     "levelColumn": "Level",
     "messageColumn": "Message",
-    "noErrorMessage": "No error message"
+    "noErrorMessage": "No error message",
+    "lastAttempt": "Last attempt {date}",
+    "noAttemptTimestamp": "No attempt timestamp",
+    "drillDownTitle": "Operations drill-down",
+    "drillDownDescription": "Filter the platform signals by tenant before retrying background work.",
+    "allTenants": "All tenants",
+    "activityStreamTitle": "Admin activity stream",
+    "activityStreamDescription": "Recent super-admin actions with request IDs for incident correlation."
   },
   "clinics": {
     "title": "Tenant Lifecycle",
@@ -259,6 +266,32 @@
         "description": "Controls claims, follow-up queues, and insurance operations."
       }
     }
+  },
+  "tenantUsage": {
+    "title": "Tenant usage",
+    "description": "Review storage, activity, and workload before making platform-level changes for {tenantName}.",
+    "fallbackTenant": "this tenant",
+    "loading": "Loading tenant usage...",
+    "patients": "Patients",
+    "staffUsers": "Staff users",
+    "storedFiles": "Stored files",
+    "apiRequests30d": "API requests, 30 days",
+    "pendingJobs": "Pending jobs",
+    "failedJobs": "Failed jobs",
+    "empty": "No usage data is available for this tenant yet."
+  },
+  "jobRetry": {
+    "titleOne": "Retry failed job",
+    "titleMany": "Retry failed jobs",
+    "forTenant": " for {tenantName}",
+    "descriptionOne": "This will requeue the selected failed job{tenantName}.",
+    "descriptionMany": "This will requeue {count, plural, one {# failed job} other {# failed jobs}}{tenantName}. Only retry idempotent jobs that are safe to run again.",
+    "reason": "Reason",
+    "reasonPlaceholder": "Explain why this retry is safe and necessary.",
+    "confirmationLabel": "Type RETRY to confirm",
+    "retrying": "Retrying...",
+    "actionOne": "Retry job",
+    "actionMany": "Retry jobs"
   },
   "tenantStatusDialog": {
     "reason": "Reason",

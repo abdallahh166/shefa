@@ -3,6 +3,7 @@ import { Button } from "@/components/primitives/Button";
 import { Input, Textarea } from "@/components/primitives/Inputs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { useI18n } from "@/core/i18n/i18nStore";
 
 interface JobRetryDialogProps {
   open: boolean;
@@ -21,6 +22,7 @@ export const JobRetryDialog = ({
   onClose,
   onSubmit,
 }: JobRetryDialogProps) => {
+  const { t } = useI18n(["admin"]);
   const [reason, setReason] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const requiresTypedConfirmation = jobCount > 1;
@@ -35,28 +37,33 @@ export const JobRetryDialog = ({
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>{jobCount > 1 ? "Retry failed jobs" : "Retry failed job"}</DialogTitle>
+          <DialogTitle>{jobCount > 1 ? t("admin.jobRetry.titleMany") : t("admin.jobRetry.titleOne")}</DialogTitle>
           <DialogDescription>
             {jobCount > 1
-              ? `This will requeue ${jobCount} failed jobs${tenantName ? ` for ${tenantName}` : ""}. Only retry idempotent jobs that are safe to run again.`
-              : `This will requeue the selected failed job${tenantName ? ` for ${tenantName}` : ""}.`}
+              ? t("admin.jobRetry.descriptionMany", {
+                count: jobCount,
+                tenantName: tenantName ? t("admin.jobRetry.forTenant", { tenantName }) : "",
+              })
+              : t("admin.jobRetry.descriptionOne", {
+                tenantName: tenantName ? t("admin.jobRetry.forTenant", { tenantName }) : "",
+              })}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2">
-          <Label htmlFor="job-retry-reason">Reason</Label>
+          <Label htmlFor="job-retry-reason">{t("admin.jobRetry.reason")}</Label>
           <Textarea
             id="job-retry-reason"
             rows={4}
             value={reason}
             onChange={(event) => setReason(event.target.value)}
-            placeholder="Explain why this retry is safe and necessary."
+            placeholder={t("admin.jobRetry.reasonPlaceholder")}
           />
         </div>
 
         {requiresTypedConfirmation ? (
           <div className="space-y-2">
-            <Label htmlFor="job-retry-confirmation">Type RETRY to confirm</Label>
+            <Label htmlFor="job-retry-confirmation">{t("admin.jobRetry.confirmationLabel")}</Label>
             <Input
               id="job-retry-confirmation"
               value={confirmation}
@@ -68,14 +75,14 @@ export const JobRetryDialog = ({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={loading}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             variant="danger"
             onClick={() => void onSubmit(reason.trim())}
             disabled={loading || reason.trim().length < 3 || (requiresTypedConfirmation && confirmation.trim() !== "RETRY")}
           >
-            {loading ? "Retrying..." : jobCount > 1 ? "Retry jobs" : "Retry job"}
+            {loading ? t("admin.jobRetry.retrying") : jobCount > 1 ? t("admin.jobRetry.actionMany") : t("admin.jobRetry.actionOne")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -122,7 +122,14 @@
     "serviceColumn": "الخدمة",
     "levelColumn": "المستوى",
     "messageColumn": "الرسالة",
-    "noErrorMessage": "لا توجد رسالة خطأ"
+    "noErrorMessage": "لا توجد رسالة خطأ",
+    "lastAttempt": "آخر محاولة {date}",
+    "noAttemptTimestamp": "لا يوجد وقت محاولة",
+    "drillDownTitle": "تفاصيل العمليات",
+    "drillDownDescription": "صفِ إشارات المنصة حسب العيادة قبل إعادة محاولة الأعمال الخلفية.",
+    "allTenants": "كل العيادات",
+    "activityStreamTitle": "سجل نشاط الإدارة",
+    "activityStreamDescription": "آخر إجراءات مديري المنصة مع معرفات الطلبات لتتبع الحوادث."
   },
   "clinics": {
     "title": "دورة حياة العيادة",
@@ -259,6 +266,32 @@
         "description": "تتحكم في المطالبات وطوابير المتابعة وعمليات التأمين."
       }
     }
+  },
+  "tenantUsage": {
+    "title": "استخدام العيادة",
+    "description": "راجع التخزين والنشاط وحجم العمل قبل إجراء تغييرات على مستوى المنصة لـ {tenantName}.",
+    "fallbackTenant": "هذه العيادة",
+    "loading": "جاري تحميل استخدام العيادة...",
+    "patients": "المرضى",
+    "staffUsers": "الموظفون",
+    "storedFiles": "الملفات المخزنة",
+    "apiRequests30d": "طلبات API خلال 30 يومًا",
+    "pendingJobs": "المهام المعلقة",
+    "failedJobs": "المهام الفاشلة",
+    "empty": "لا توجد بيانات استخدام متاحة لهذه العيادة بعد."
+  },
+  "jobRetry": {
+    "titleOne": "إعادة محاولة مهمة فاشلة",
+    "titleMany": "إعادة محاولة المهام الفاشلة",
+    "forTenant": " لـ {tenantName}",
+    "descriptionOne": "سيتم إرجاع المهمة الفاشلة المحددة إلى قائمة الانتظار{tenantName}.",
+    "descriptionMany": "سيتم إرجاع {count, plural, one {مهمة فاشلة واحدة} two {مهمتين فاشلتين} few {# مهام فاشلة} many {# مهمة فاشلة} other {# مهمة فاشلة}} إلى قائمة الانتظار{tenantName}. أعد محاولة المهام الآمنة للتشغيل مرة أخرى فقط.",
+    "reason": "السبب",
+    "reasonPlaceholder": "اشرح لماذا إعادة المحاولة آمنة وضرورية.",
+    "confirmationLabel": "اكتب RETRY للتأكيد",
+    "retrying": "جاري إعادة المحاولة...",
+    "actionOne": "إعادة محاولة المهمة",
+    "actionMany": "إعادة محاولة المهام"
   },
   "tenantStatusDialog": {
     "reason": "السبب",

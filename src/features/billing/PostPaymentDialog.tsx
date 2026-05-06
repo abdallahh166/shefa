@@ -33,13 +33,32 @@ const toDateTimeLocalValue = (value?: string | null) => {
   return local.toISOString().slice(0, 16);
 };
 
-const getInvoiceStatusLabel = (status?: string) => {
-  if (status === "paid") return "Paid";
-  if (status === "pending") return "Pending";
-  if (status === "overdue") return "Overdue";
-  if (status === "partially_paid") return "Partially paid";
-  if (status === "void") return "Void";
+const getInvoiceStatusLabel = (status: string | undefined, t: (path: string, options?: Record<string, unknown>) => string) => {
+  if (status === "paid") return t("billing.paid");
+  if (status === "pending") return t("billing.pending");
+  if (status === "overdue") return t("billing.overdue");
+  if (status === "partially_paid") return t("billing.status.partiallyPaid");
+  if (status === "void") return t("billing.status.void");
   return status ?? "-";
+};
+
+const getPaymentMethodLabel = (method: string, t: (path: string, options?: Record<string, unknown>) => string) => {
+  switch (method) {
+    case "cash":
+      return t("billing.payment.methods.cash");
+    case "card":
+      return t("billing.payment.methods.card");
+    case "bank_transfer":
+      return t("billing.payment.methods.bankTransfer");
+    case "mobile_wallet":
+      return t("billing.payment.methods.mobileWallet");
+    case "insurance":
+      return t("billing.payment.methods.insurance");
+    case "other":
+      return t("billing.payment.methods.other");
+    default:
+      return method.replace("_", " ");
+  }
 };
 
 export const PostPaymentDialog = ({ invoice, open, onClose, onSuccess }: PostPaymentDialogProps) => {
@@ -117,7 +136,7 @@ export const PostPaymentDialog = ({ invoice, open, onClose, onSuccess }: PostPay
         notes: form.notes || null,
       };
       await billingService.postPayment(invoice.id, input);
-      toast({ title: "Payment posted" });
+      toast({ title: t("billing.payment.posted") });
       resetForm();
       onSuccess();
       onClose();
@@ -133,9 +152,9 @@ export const PostPaymentDialog = ({ invoice, open, onClose, onSuccess }: PostPay
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Post payment</DialogTitle>
+          <DialogTitle>{t("billing.payment.title")}</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            Record a collected payment against this invoice and keep the remaining balance accurate.
+            {t("billing.payment.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -143,26 +162,26 @@ export const PostPaymentDialog = ({ invoice, open, onClose, onSuccess }: PostPay
           <div className="space-y-5">
             <div className="grid grid-cols-1 gap-3 rounded-lg border bg-muted/30 p-4 md:grid-cols-4">
               <div>
-                <div className="text-xs text-muted-foreground">Invoice</div>
+                <div className="text-xs text-muted-foreground">{t("billing.invoice")}</div>
                 <div className="font-medium">{invoice.invoice_code}</div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">Patient</div>
+                <div className="text-xs text-muted-foreground">{t("appointments.patient")}</div>
                 <div className="font-medium">{invoice.patients?.full_name ?? "-"}</div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">Outstanding</div>
+                <div className="text-xs text-muted-foreground">{t("billing.outstanding")}</div>
                 <div className="font-medium">{formatCurrency(outstandingBalance, locale)}</div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">Status</div>
-                <StatusBadge variant={statusVariant}>{getInvoiceStatusLabel(invoice.status)}</StatusBadge>
+                <div className="text-xs text-muted-foreground">{t("common.status")}</div>
+                <StatusBadge variant={statusVariant}>{getInvoiceStatusLabel(invoice.status, t)}</StatusBadge>
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>Amount *</Label>
+                <Label>{t("billing.payment.amountRequired")}</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -173,26 +192,26 @@ export const PostPaymentDialog = ({ invoice, open, onClose, onSuccess }: PostPay
                 />
               </div>
               <div className="space-y-2">
-                <Label>Method *</Label>
+                <Label>{t("billing.payment.methodRequired")}</Label>
                 <Select
                   value={form.payment_method}
                   onValueChange={(value) => setForm((prev) => ({ ...prev, payment_method: value }))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select payment method" />
+                    <SelectValue placeholder={t("billing.payment.selectMethod")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="card">Card</SelectItem>
-                    <SelectItem value="bank_transfer">Bank transfer</SelectItem>
-                    <SelectItem value="mobile_wallet">Mobile wallet</SelectItem>
-                    <SelectItem value="insurance">Insurance remittance</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    <SelectItem value="cash">{t("billing.payment.methods.cash")}</SelectItem>
+                    <SelectItem value="card">{t("billing.payment.methods.card")}</SelectItem>
+                    <SelectItem value="bank_transfer">{t("billing.payment.methods.bankTransfer")}</SelectItem>
+                    <SelectItem value="mobile_wallet">{t("billing.payment.methods.mobileWallet")}</SelectItem>
+                    <SelectItem value="insurance">{t("billing.payment.methods.insurance")}</SelectItem>
+                    <SelectItem value="other">{t("billing.payment.methods.other")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Collected at</Label>
+                <Label>{t("billing.payment.collectedAt")}</Label>
                 <Input
                   type="datetime-local"
                   value={form.paid_at}
@@ -200,36 +219,36 @@ export const PostPaymentDialog = ({ invoice, open, onClose, onSuccess }: PostPay
                 />
               </div>
               <div className="space-y-2">
-                <Label>Reference</Label>
+                <Label>{t("billing.payment.reference")}</Label>
                 <Input
                   value={form.reference}
                   onChange={(e) => setForm((prev) => ({ ...prev, reference: e.target.value }))}
-                  placeholder="Terminal receipt, transfer ref, etc."
+                  placeholder={t("billing.payment.referencePlaceholder")}
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label>Notes</Label>
+                <Label>{t("billing.payment.notes")}</Label>
                 <Textarea
                   rows={3}
                   value={form.notes}
                   onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
-                  placeholder="Walk-in payment, insurer batch, split settlement notes, etc."
+                  placeholder={t("billing.payment.notesPlaceholder")}
                 />
               </div>
             </div>
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="font-medium">Payment history</h3>
+                <h3 className="font-medium">{t("billing.payment.history")}</h3>
                 <span className="text-xs text-muted-foreground">
-                  {paymentHistoryQuery.data?.length ?? 0} posted payment{(paymentHistoryQuery.data?.length ?? 0) === 1 ? "" : "s"}
+                  {t("billing.payment.postedCount", { count: paymentHistoryQuery.data?.length ?? 0 })}
                 </span>
               </div>
               <div className="rounded-lg border">
                 {paymentHistoryQuery.isLoading ? (
                   <div className="p-4 text-sm text-muted-foreground">{t("common.loading")}</div>
                 ) : (paymentHistoryQuery.data?.length ?? 0) === 0 ? (
-                  <div className="p-4 text-sm text-muted-foreground">No payments recorded yet.</div>
+                  <div className="p-4 text-sm text-muted-foreground">{t("billing.payment.emptyHistory")}</div>
                 ) : (
                   <div className="divide-y">
                     {paymentHistoryQuery.data?.map((payment) => (
@@ -237,10 +256,13 @@ export const PostPaymentDialog = ({ invoice, open, onClose, onSuccess }: PostPay
                         <div>
                           <div className="font-medium">{formatCurrency(Number(payment.amount), locale)}</div>
                           <div className="text-xs text-muted-foreground">
-                            {payment.payment_method.replace("_", " ")} on {formatDate(payment.paid_at, locale, "datetime", calendarType)}
+                            {t("billing.payment.methodOnDate", {
+                              method: getPaymentMethodLabel(payment.payment_method, t),
+                              date: formatDate(payment.paid_at, locale, "datetime", calendarType),
+                            })}
                           </div>
                           {payment.reference ? (
-                            <div className="text-xs text-muted-foreground">Ref: {payment.reference}</div>
+                            <div className="text-xs text-muted-foreground">{t("billing.payment.referenceShort")}: {payment.reference}</div>
                           ) : null}
                         </div>
                         {payment.notes ? (
@@ -260,7 +282,7 @@ export const PostPaymentDialog = ({ invoice, open, onClose, onSuccess }: PostPay
             {t("common.cancel")}
           </Button>
           <Button onClick={() => void handleSubmit()} disabled={saving || !invoice}>
-            {saving ? t("common.loading") : "Post payment"}
+            {saving ? t("common.loading") : t("billing.payment.action")}
           </Button>
         </DialogFooter>
       </DialogContent>

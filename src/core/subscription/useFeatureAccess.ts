@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSubscription, PlanType } from "./SubscriptionContext";
 import { useAuth } from "@/core/auth/authStore";
@@ -18,7 +18,7 @@ export function useFeatureAccess() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const hasFeature = (feature: Feature): boolean => {
+  const hasFeature = useCallback((feature: Feature): boolean => {
     return hasFeatureAccess({
       feature,
       plan,
@@ -26,7 +26,7 @@ export function useFeatureAccess() {
       isExpired,
       flags: flags ?? [],
     });
-  };
+  }, [flags, isExpired, plan, status]);
 
   const requiredPlan = (feature: Feature): PlanType | null => requiredPlanForFeature(feature);
 
@@ -35,5 +35,5 @@ export function useFeatureAccess() {
     requiredPlan,
     currentPlan: plan,
     isLoading: subscriptionLoading || flagsLoading,
-  }), [plan, subscriptionLoading, flagsLoading, flags, status, isExpired]);
+  }), [hasFeature, plan, subscriptionLoading, flagsLoading]);
 }

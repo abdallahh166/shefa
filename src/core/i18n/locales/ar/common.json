@@ -6,6 +6,23 @@
   "continue": "متابعة",
   "backToDashboard": "العودة إلى لوحة التحكم",
   "reload": "إعادة التحميل",
+  "appName": "شفاء",
+  "mainNavigation": "التنقل الرئيسي",
+  "cancel": "إلغاء",
+  "close": "إغلاق",
+  "loading": "جاري التحميل...",
+  "all": "الكل",
+  "status": "الحالة",
+  "actions": "الإجراءات",
+  "service": "الخدمة",
+  "amount": "المبلغ",
+  "date": "التاريخ",
+  "viewAllPlans": "عرض جميع الخطط",
+  "previous": "السابق",
+  "next": "التالي",
+  "previousPage": "الانتقال إلى الصفحة السابقة",
+  "nextPage": "الانتقال إلى الصفحة التالية",
+  "morePages": "صفحات إضافية",
   "searchEmpty": "اكتب حرفين على الأقل للبحث",
   "keyboardShortcut": "Ctrl K",
   "trendVsLastMonth": "مقارنة بالشهر الماضي",
@@ -20,6 +37,7 @@
     "minCharacters": "أدخل {count} أحرف على الأقل"
   },
   "pagination": {
+    "label": "ترقيم الصفحات",
     "showing": "عرض {start}–{end} من {total}"
   }
 }

@@ -73,6 +73,18 @@ const fileChecks = [
     file: "src/features/billing/NewInvoiceModal.tsx",
     phrases: ["Cardiology Consultation", "Due date"],
   },
+  {
+    file: "src/features/billing/PostPaymentDialog.tsx",
+    phrases: ["Post payment", "Payment history", "No payments recorded yet."],
+  },
+  {
+    file: "src/features/appointments/WaitingRoomPanel.tsx",
+    phrases: ["Waiting room", "Call patient", "Not yet"],
+  },
+  {
+    file: "src/core/auth/ProtectedRoute.tsx",
+    phrases: ["Access Denied", "Feature Unavailable", "Required plan"],
+  },
 ] as const;
 
 describe("i18n hygiene", () => {
@@ -83,5 +95,10 @@ describe("i18n hygiene", () => {
         expect(content).not.toContain(phrase);
       }
     }
+  });
+
+  it("keeps language out of React Query key factories", () => {
+    const content = readFileSync(resolve("src/services/queryKeys.ts"), "utf8");
+    expect(content).not.toMatch(/\b(locale|lang|language)\b/i);
   });
 });

@@ -20,18 +20,18 @@ const STATUS_ORDER: Record<AppointmentQueueStatus, number> = {
   no_show: 4,
 };
 
-function queueStatusLabel(status: AppointmentQueueStatus) {
+function queueStatusLabel(status: AppointmentQueueStatus, t: (path: string, options?: Record<string, unknown>) => string) {
   switch (status) {
     case "waiting":
-      return "Waiting";
+      return t("appointments.queue.status.waiting");
     case "called":
-      return "Called";
+      return t("appointments.queue.status.called");
     case "in_service":
-      return "In service";
+      return t("appointments.queue.status.inService");
     case "done":
-      return "Done";
+      return t("appointments.queue.status.done");
     case "no_show":
-      return "No-show";
+      return t("appointments.queue.status.noShow");
     default:
       return status;
   }
@@ -52,7 +52,7 @@ function queueStatusVariant(status: AppointmentQueueStatus) {
 }
 
 export const WaitingRoomPanel = ({ entries, isLoading, onUpdateStatus }: WaitingRoomPanelProps) => {
-  const { locale, calendarType } = useI18n();
+  const { locale, calendarType, t } = useI18n(["appointments"]);
   const [statusFilter, setStatusFilter] = useState<AppointmentQueueStatus | "all">("all");
 
   const counts = useMemo(() => (
@@ -81,12 +81,12 @@ export const WaitingRoomPanel = ({ entries, isLoading, onUpdateStatus }: Waiting
   }, [entries, statusFilter]);
 
   const filters: Array<{ value: AppointmentQueueStatus | "all"; label: string; count: number }> = [
-    { value: "all", label: "All", count: entries.length },
-    { value: "waiting", label: "Waiting", count: counts.waiting },
-    { value: "called", label: "Called", count: counts.called },
-    { value: "in_service", label: "In service", count: counts.in_service },
-    { value: "done", label: "Done", count: counts.done },
-    { value: "no_show", label: "No-show", count: counts.no_show },
+    { value: "all", label: t("common.all"), count: entries.length },
+    { value: "waiting", label: queueStatusLabel("waiting", t), count: counts.waiting },
+    { value: "called", label: queueStatusLabel("called", t), count: counts.called },
+    { value: "in_service", label: queueStatusLabel("in_service", t), count: counts.in_service },
+    { value: "done", label: queueStatusLabel("done", t), count: counts.done },
+    { value: "no_show", label: queueStatusLabel("no_show", t), count: counts.no_show },
   ];
 
   return (
@@ -108,15 +108,15 @@ export const WaitingRoomPanel = ({ entries, isLoading, onUpdateStatus }: Waiting
       {isLoading ? (
         <Card>
           <CardHeader>
-            <CardTitle>Waiting room</CardTitle>
-            <CardDescription>Loading today&apos;s arrivals.</CardDescription>
+            <CardTitle>{t("appointments.queue.title")}</CardTitle>
+            <CardDescription>{t("appointments.queue.loading")}</CardDescription>
           </CardHeader>
         </Card>
       ) : visibleEntries.length === 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>Waiting room</CardTitle>
-            <CardDescription>No checked-in patients for the selected filter.</CardDescription>
+            <CardTitle>{t("appointments.queue.title")}</CardTitle>
+            <CardDescription>{t("appointments.queue.empty")}</CardDescription>
           </CardHeader>
         </Card>
       ) : (
@@ -127,28 +127,30 @@ export const WaitingRoomPanel = ({ entries, isLoading, onUpdateStatus }: Waiting
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <CardTitle className="text-lg">
-                      {entry.appointments?.patients?.full_name ?? "Unknown patient"}
+                      {entry.appointments?.patients?.full_name ?? t("appointments.queue.unknownPatient")}
                     </CardTitle>
                     <CardDescription>
-                      {entry.appointments?.doctors?.full_name ?? "Unassigned doctor"} · Appointment{" "}
-                      {entry.appointments ? formatDate(entry.appointments.appointment_date, locale, "datetime", calendarType) : "time unavailable"}
+                      {t("appointments.queue.appointmentSummary", {
+                        doctorName: entry.appointments?.doctors?.full_name ?? t("appointments.queue.unassignedDoctor"),
+                        date: entry.appointments ? formatDate(entry.appointments.appointment_date, locale, "datetime", calendarType) : t("appointments.queue.timeUnavailable"),
+                      })}
                     </CardDescription>
                   </div>
                   <StatusBadge variant={queueStatusVariant(entry.status)} dot>
-                    {queueStatusLabel(entry.status)}
+                    {queueStatusLabel(entry.status, t)}
                   </StatusBadge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
                   <div>
-                    Checked in: {formatDate(entry.check_in_at, locale, "time", calendarType)}
+                    {t("appointments.queue.checkedInAt", { time: formatDate(entry.check_in_at, locale, "time", calendarType) })}
                   </div>
                   <div>
-                    Called: {entry.called_at ? formatDate(entry.called_at, locale, "time", calendarType) : "Not yet"}
+                    {t("appointments.queue.calledAt", { time: entry.called_at ? formatDate(entry.called_at, locale, "time", calendarType) : t("appointments.queue.notYet") })}
                   </div>
                   <div>
-                    Completed: {entry.completed_at ? formatDate(entry.completed_at, locale, "time", calendarType) : "Not yet"}
+                    {t("appointments.queue.completedAt", { time: entry.completed_at ? formatDate(entry.completed_at, locale, "time", calendarType) : t("appointments.queue.notYet") })}
                   </div>
                 </div>
 
@@ -156,10 +158,10 @@ export const WaitingRoomPanel = ({ entries, isLoading, onUpdateStatus }: Waiting
                   {entry.status === "waiting" && (
                     <>
                       <Button size="sm" onClick={() => void onUpdateStatus(entry.id, "called")}>
-                        Call patient
+                        {t("appointments.queue.actions.callPatient")}
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => void onUpdateStatus(entry.id, "no_show")}>
-                        Mark no-show
+                        {t("appointments.queue.actions.markNoShow")}
                       </Button>
                     </>
                   )}
@@ -167,20 +169,20 @@ export const WaitingRoomPanel = ({ entries, isLoading, onUpdateStatus }: Waiting
                   {entry.status === "called" && (
                     <>
                       <Button size="sm" onClick={() => void onUpdateStatus(entry.id, "in_service")}>
-                        Start visit
+                        {t("appointments.queue.actions.startVisit")}
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => void onUpdateStatus(entry.id, "waiting")}>
-                        Back to waiting
+                        {t("appointments.queue.actions.backToWaiting")}
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => void onUpdateStatus(entry.id, "no_show")}>
-                        Mark no-show
+                        {t("appointments.queue.actions.markNoShow")}
                       </Button>
                     </>
                   )}
 
                   {entry.status === "in_service" && (
                     <Button size="sm" variant="success" onClick={() => void onUpdateStatus(entry.id, "done")}>
-                      Complete visit
+                      {t("appointments.queue.actions.completeVisit")}
                     </Button>
                   )}
                 </div>

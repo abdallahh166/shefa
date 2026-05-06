@@ -35,18 +35,18 @@ const statusVariant = {
   no_show: "warning",
 } as const;
 
-function queueStatusLabel(status: AppointmentQueueStatus) {
+function queueStatusLabel(status: AppointmentQueueStatus, t: (path: string, options?: Record<string, unknown>) => string) {
   switch (status) {
     case "waiting":
-      return "Waiting";
+      return t("appointments.queue.status.waiting");
     case "called":
-      return "Called";
+      return t("appointments.queue.status.called");
     case "in_service":
-      return "In service";
+      return t("appointments.queue.status.inService");
     case "done":
-      return "Done";
+      return t("appointments.queue.status.done");
     case "no_show":
-      return "No-show";
+      return t("appointments.queue.status.noShow");
     default:
       return status;
   }
@@ -161,7 +161,7 @@ export const AppointmentsPage = () => {
       case "in_progress": return t("appointments.inProgress");
       case "completed": return t("appointments.completed");
       case "cancelled": return t("appointments.cancelled");
-      case "no_show": return "No-show";
+      case "no_show": return t("appointments.queue.status.noShow");
       default: return s;
     }
   };
@@ -236,7 +236,7 @@ export const AppointmentsPage = () => {
   const handleCheckIn = async (appointmentId: string) => {
     try {
       await appointmentQueueService.checkIn(appointmentId);
-      toast({ title: "Patient checked in", description: "Added to the waiting room queue." });
+      toast({ title: t("appointments.queue.toasts.checkedIn"), description: t("appointments.queue.toasts.addedToQueue") });
       setWorkflowTab("waitingRoom");
       invalidateAppointments();
     } catch (err) {
@@ -248,7 +248,7 @@ export const AppointmentsPage = () => {
   const handleQueueStatusUpdate = async (queueId: string, nextStatus: AppointmentQueueStatus) => {
     try {
       await appointmentQueueService.updateStatus(queueId, nextStatus);
-      toast({ title: "Waiting room updated", description: queueStatusLabel(nextStatus) });
+      toast({ title: t("appointments.queue.toasts.updated"), description: queueStatusLabel(nextStatus, t) });
       invalidateAppointments();
     } catch (err) {
       const message = err instanceof Error ? err.message : t("common.error");
@@ -311,14 +311,14 @@ export const AppointmentsPage = () => {
             <div className="flex flex-wrap justify-end gap-1">
               {queueEntry ? (
                 <>
-                  <StatusBadge variant="info">{queueStatusLabel(queueEntry.status)}</StatusBadge>
+                  <StatusBadge variant="info">{queueStatusLabel(queueEntry.status, t)}</StatusBadge>
                   <Button
                     onClick={() => setWorkflowTab("waitingRoom")}
                     variant="ghost"
                     size="sm"
                     data-testid={`appointment-action-open-queue-${a.id}`}
                   >
-                    Waiting room
+                    {t("appointments.queue.title")}
                   </Button>
                 </>
               ) : (
@@ -329,7 +329,7 @@ export const AppointmentsPage = () => {
                     size="sm"
                     data-testid={`appointment-action-check-in-${a.id}`}
                   >
-                    Check in
+                    {t("appointments.queue.actions.checkIn")}
                   </Button>
                   <Button
                     onClick={() => void handleUpdateStatus(a.id, "no_show")}
@@ -337,7 +337,7 @@ export const AppointmentsPage = () => {
                     size="sm"
                     data-testid={`appointment-action-no-show-${a.id}`}
                   >
-                    No-show
+                    {t("appointments.queue.status.noShow")}
                   </Button>
                   <Button
                     onClick={() => void handleUpdateStatus(a.id, "cancelled")}
@@ -399,12 +399,12 @@ export const AppointmentsPage = () => {
     <PageContainer className="space-y-5">
       <SectionHeader
         title={t("appointments.title")}
-        subtitle={`${totalAppointments} appointments`}
+        subtitle={t("appointments.summary.total", { count: totalAppointments })}
         actions={(
           <div className="flex items-center gap-2">
             <PermissionGuard permission="manage_appointments">
               <Button size="sm" onClick={() => setShowModal(true)} data-testid="appointments-add-button">
-                <CalendarPlus className="h-3.5 w-3.5 mr-1" />
+                <CalendarPlus className="h-3.5 w-3.5 me-1" />
                 {t("appointments.newAppointment")}
               </Button>
             </PermissionGuard>
@@ -414,8 +414,8 @@ export const AppointmentsPage = () => {
 
       <Tabs value={workflowTab} onValueChange={(value) => setWorkflowTab(value as WorkflowTab)} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="schedule">Schedule</TabsTrigger>
-          <TabsTrigger value="waitingRoom">Waiting room</TabsTrigger>
+          <TabsTrigger value="schedule">{t("appointments.tabs.schedule")}</TabsTrigger>
+          <TabsTrigger value="waitingRoom">{t("appointments.tabs.waitingRoom")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="schedule" className="space-y-5">

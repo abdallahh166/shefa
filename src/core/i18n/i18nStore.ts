@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { create } from "zustand";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/core/auth/authStore";
@@ -44,6 +44,7 @@ function getEffectiveScope() {
   return {
     tenantId: tenantOverride?.id ?? user?.tenantId ?? "public",
     userId: user?.id ?? "anon",
+    isTenantOverride: !!tenantOverride,
   };
 }
 
@@ -127,17 +128,22 @@ function normalizeCalendarType(
 }
 
 async function readRemoteLocale() {
-  const userId = useAuth.getState().user?.id;
-  if (!userId) {
+  const { user, tenantOverride } = useAuth.getState();
+  if (!user?.id || tenantOverride) {
     return undefined;
   }
 
   try {
-    const preferences = await userPreferencesService.getByUserId(userId);
+    const preferences = await userPreferencesService.getByUserId(user.id);
     return preferences?.locale ?? undefined;
   } catch {
     return undefined;
   }
+}
+
+function canPersistRemoteLocale() {
+  const { user, tenantOverride } = useAuth.getState();
+  return !!user?.id && !tenantOverride;
 }
 
 function persistCurrentState(locale: Locale, calendarType: CalendarType) {
@@ -151,7 +157,7 @@ export const useI18nStore = create<I18nStoreState>((set, get) => ({
   isHydrated: false,
   hydrate: async () => {
     const localPreferences = readScopedPreferences();
-    const remoteLocale = await readRemoteLocale();
+    const remoteLocale = localPreferences.locale ? undefined : await readRemoteLocale();
     const locale = normalizeLocale(
       remoteLocale ?? localPreferences.locale ?? i18n.resolvedLanguage,
     );
@@ -186,7 +192,7 @@ export const useI18nStore = create<I18nStoreState>((set, get) => ({
     })();
 
     const userId = useAuth.getState().user?.id;
-    if (userId) {
+    if (userId && canPersistRemoteLocale()) {
       void userPreferencesService.setLocale(userId, locale).catch(() => undefined);
     }
   },
@@ -231,13 +237,6 @@ export function useI18n(
     void ensureNamespaces(namespaces);
   }, [namespaceKey, namespaces]);
 
-  const t = useMemo(
-    () =>
-      (path: string, options?: Record<string, unknown>) =>
-        translatePath(path, options),
-    [boundI18n.language, locale],
-  );
-
   return {
     i18n: boundI18n,
     locale,
@@ -246,7 +245,8 @@ export function useI18n(
     isHydrated,
     setLocale,
     setCalendarType,
-    t,
+    t: (path: string, options?: Record<string, unknown>) =>
+      translatePath(path, options),
   };
 }
 

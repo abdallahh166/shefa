@@ -6,9 +6,57 @@
     "amountPlaceholder": "350.00",
     "dueDate": "Due date"
   },
+  "invoice": "Invoice",
+  "paid": "Paid",
+  "pending": "Pending",
+  "overdue": "Overdue",
+  "balance": "Balance",
+  "due": "Due",
+  "outstanding": "Outstanding",
+  "status": {
+    "partiallyPaid": "Partially paid",
+    "void": "Void"
+  },
+  "void": {
+    "title": "Void invoice",
+    "description": "Voiding removes this invoice from active collections. Use it only for genuine front-desk or billing corrections.",
+    "reasonRequired": "Please enter a reason before voiding the invoice.",
+    "reasonRequiredLabel": "Reason *",
+    "reasonPlaceholder": "Entered under the wrong patient, duplicate invoice, billing correction, etc.",
+    "action": "Void invoice",
+    "success": "Invoice voided"
+  },
   "payment": {
     "title": "Post payment",
+    "description": "Record a collected payment against this invoice and keep the remaining balance accurate.",
+    "action": "Post payment",
+    "posted": "Payment posted",
+    "amountRequired": "Amount *",
+    "methodRequired": "Method *",
+    "selectMethod": "Select payment method",
+    "collectedAt": "Collected at",
+    "reference": "Reference",
+    "referenceShort": "Ref",
+    "referencePlaceholder": "Terminal receipt, transfer ref, etc.",
+    "notes": "Notes",
+    "notesPlaceholder": "Walk-in payment, insurer batch, split settlement notes, etc.",
     "history": "Payment history",
-    "emptyHistory": "No payments recorded yet."
+    "emptyHistory": "No payments recorded yet.",
+    "postedCount": "{count, plural, =0 {No posted payments} one {# posted payment} other {# posted payments}}",
+    "methodOnDate": "{method} on {date}",
+    "methods": {
+      "cash": "Cash",
+      "card": "Card",
+      "bankTransfer": "Bank transfer",
+      "mobileWallet": "Mobile wallet",
+      "insurance": "Insurance remittance",
+      "other": "Other"
+    }
+  },
+  "paywall": {
+    "title": "Subscription Access Paused",
+    "currentPlan": "Current plan",
+    "accessEndsOn": "Access ends on: {date}",
+    "description": "Renew or upgrade the clinic subscription to continue using restricted modules."
   }
 }

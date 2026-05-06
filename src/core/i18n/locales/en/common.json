@@ -6,6 +6,23 @@
   "continue": "Continue",
   "backToDashboard": "Back to dashboard",
   "reload": "Reload",
+  "appName": "Shefaa",
+  "mainNavigation": "Main navigation",
+  "cancel": "Cancel",
+  "close": "Close",
+  "loading": "Loading...",
+  "all": "All",
+  "status": "Status",
+  "actions": "Actions",
+  "service": "Service",
+  "amount": "Amount",
+  "date": "Date",
+  "viewAllPlans": "View all plans",
+  "previous": "Previous",
+  "next": "Next",
+  "previousPage": "Go to previous page",
+  "nextPage": "Go to next page",
+  "morePages": "More pages",
   "searchEmpty": "Type at least 2 characters to search",
   "keyboardShortcut": "Ctrl K",
   "trendVsLastMonth": "vs last month",
@@ -20,6 +37,7 @@
     "minCharacters": "Enter at least {count} characters"
   },
   "pagination": {
+    "label": "Pagination",
     "showing": "Showing {start}–{end} of {total}"
   }
 }

@@ -130,7 +130,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       controller.abort();
     };
-  }, [isAuthenticated, user?.tenantId, user?.globalRoles, tenantOverrideId, hasTenantOverride, authLoading]);
+  }, [isAuthenticated, user, tenantOverrideId, hasTenantOverride, authLoading]);
 
   return (
     <SubscriptionContext.Provider value={state}>

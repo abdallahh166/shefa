@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Factor } from "@supabase/supabase-js";
 import { Shield, KeyRound, Loader2, AlertTriangle, CheckCircle2, RefreshCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Inputs";
@@ -16,6 +15,13 @@ type EnrollmentState = {
   qrCode: string;
   secret: string;
   uri: string;
+};
+
+type MfaFactor = {
+  id: string;
+  friendly_name?: string | null;
+  factor_type: string;
+  status: string;
 };
 
 interface PrivilegedMfaPanelProps {
@@ -37,7 +43,7 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
     () => buildPrivilegedSession({ user, lastVerifiedAt, privilegedAuth }),
     [lastVerifiedAt, privilegedAuth, user],
   );
-  const [factors, setFactors] = useState<Factor[]>([]);
+  const [factors, setFactors] = useState<MfaFactor[]>([]);
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [code, setCode] = useState("");

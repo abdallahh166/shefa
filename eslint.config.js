@@ -80,6 +80,7 @@ export default tseslint.config(
   },
   {
     files: [
+      "src/services/**/*.{ts,tsx}",
       "src/services/**/*repository.{ts,tsx}",
       "src/services/supabase/**/*.{ts,tsx}",
       "src/integrations/supabase/**/*.{ts,tsx}",

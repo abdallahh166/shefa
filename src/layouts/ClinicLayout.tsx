@@ -108,6 +108,7 @@ export const ClinicLayout = () => {
 
   const labels: AppLayoutLabels = {
     brandName: t("common.appName"),
+    mainNavigation: t("common.mainNavigation"),
     logOut: t("common.logout"),
     collapseSidebar: t("common.collapseSidebar"),
     expandSidebar: t("common.expandSidebar"),
