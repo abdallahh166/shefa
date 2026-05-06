@@ -94,7 +94,7 @@ export const ResetPasswordPage = () => {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={t("auth.login.passwordPlaceholder")}
+                placeholder={t("auth.loginFields.passwordPlaceholder")}
               />
             </div>
             <div className="space-y-2">
@@ -103,7 +103,7 @@ export const ResetPasswordPage = () => {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder={t("auth.login.passwordPlaceholder")}
+                placeholder={t("auth.loginFields.passwordPlaceholder")}
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>

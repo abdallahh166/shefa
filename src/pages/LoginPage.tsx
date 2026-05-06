@@ -166,7 +166,7 @@ export const LoginPage = () => {
                   <Input
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder={t("auth.login.fullNamePlaceholder")}
+                    placeholder={t("auth.loginFields.fullNamePlaceholder")}
                   />
                 </div>
                 <ClinicNameField
@@ -185,7 +185,7 @@ export const LoginPage = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={t("auth.login.emailPlaceholder")}
+                placeholder={t("auth.loginFields.emailPlaceholder")}
                 data-testid="login-email"
               />
             </div>
@@ -195,7 +195,7 @@ export const LoginPage = () => {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={t("auth.login.passwordPlaceholder")}
+                placeholder={t("auth.loginFields.passwordPlaceholder")}
                 data-testid="login-password"
               />
               {mode === "signup" && <PasswordStrength password={password} t={t} />}

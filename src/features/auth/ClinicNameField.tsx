@@ -124,7 +124,7 @@ export const ClinicNameField = ({
       <Input
         value={clinicName}
         onChange={(e) => handleClinicNameChange(e.target.value)}
-        placeholder={t("auth.login.clinicNamePlaceholder")}
+        placeholder={t("auth.loginFields.clinicNamePlaceholder")}
         className={
           slugStatus === "available"
             ? "border-green-500 focus-visible:ring-green-500/30"

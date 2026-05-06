@@ -9,6 +9,14 @@ import { ServiceError } from "@/services/supabase/errors";
 
 const PROFILE_COLUMNS = "id, user_id, tenant_id, full_name, avatar_url, tenants:tenant_id(name, slug, status, status_reason)";
 
+function isInvalidRefreshTokenError(error: { message?: string | null }) {
+  const message = error.message?.toLowerCase() ?? "";
+  return (
+    message.includes("invalid refresh token") ||
+    message.includes("refresh token not found")
+  );
+}
+
 export interface AuthRepository {
   signInWithPassword(email: string, password: string): Promise<SupabaseUser | null>;
   signOut(): Promise<void>;
@@ -46,6 +54,10 @@ export const authRepository: AuthRepository = {
   async getSession() {
     const { data, error } = await supabase.auth.getSession();
     if (error) {
+      if (isInvalidRefreshTokenError(error)) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+        return { user: null };
+      }
       throw new ServiceError(error.message ?? "Failed to load session", { code: error.code, details: error });
     }
     return { user: data.session?.user ?? null };

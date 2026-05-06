@@ -67,7 +67,7 @@ export const ForgotPasswordPage = () => {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder={t("auth.login.emailPlaceholder")}
+                    placeholder={t("auth.loginFields.emailPlaceholder")}
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>

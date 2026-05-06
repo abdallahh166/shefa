@@ -53,6 +53,15 @@ describe("i18n store", () => {
     expect(translatePath("portal.layout.signOut")).toBe("Sign out");
   });
 
+  it("keeps auth action labels separate from field placeholders", async () => {
+    await ensureNamespaces(["auth"]);
+
+    expect(translatePath("auth.login")).toBe("Sign In");
+    expect(translatePath("auth.loginFields.emailPlaceholder")).toBe(
+      "you@example.com",
+    );
+  });
+
   it("supports ICU pluralization and interpolation in feature namespaces", async () => {
     await ensureNamespaces(["admin"]);
 
