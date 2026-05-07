@@ -1,509 +1,449 @@
-# Clinic Management System (Multi-tenant SaaS)
+# Shefaa Clinic Platform
 
-Production-grade clinic management system built with React, Vite, Supabase (Auth, Postgres, Storage), React Query, and Zustand. The codebase is organized into domain, services, repositories, and feature modules with tenant isolation enforced at the database and service layers.
+Shefaa is a production-oriented, multi-tenant clinic SaaS for running outpatient clinic operations across Arabic and English workspaces. It combines a React/Vite frontend, Supabase Auth/Postgres/Storage/Edge Functions, strict tenant isolation, role-based access, patient-facing portal flows, billing operations, telemedicine foundations, and audit-ready service boundaries.
 
-## TL;DR
+The system is built as a real healthcare operations app, not a demo shell: direct database access is kept behind repositories, business workflows run through services and domain schemas, sensitive flows are protected by RLS/RBAC/MFA-style controls, and operational jobs are handled through Supabase Edge Functions.
 
-- Multi-tenant healthcare SaaS with strict tenant isolation at RLS + repository layers.
-- Domain models validated via Zod; services enforce business rules and return standardized errors.
-- Supabase RPCs handle sensitive or aggregate operations; edge functions cover public onboarding.
-- Materialized views power reports; refresh is scheduled via pg_cron.
-- Storage is tenant-scoped with private buckets and signed URL access.
-- Rate limiting is enforced for auth and upload workflows.
-- Production deployment targets Cloudflare Pages via GitHub Actions (build output: `dist`).
+## System Snapshot
 
-## Overview
+- Multi-tenant clinic workspace with tenant-scoped data, RLS policies, service-layer checks, and tenant-aware React Query keys.
+- Core clinic operations: dashboard, patients, doctors, appointments, prescriptions, laboratory, pharmacy inventory, insurance, billing, reports, notifications, settings, and audit logs.
+- Patient portal under `/portal/:clinicSlug` with invite-aware magic-link login and patient-scoped views for appointments, prescriptions, lab results, documents, and invoices.
+- Admin console under `/admin` for platform administration, tenant lifecycle, pricing, subscriptions, feature/module gating, jobs, and impersonation controls.
+- Privileged access hardening for elevated users, including TOTP/session verification surfaces and scoped step-up grants for sensitive actions.
+- Bilingual Arabic/English frontend using i18next, ICU formatting, lazy namespaces, tenant/user-scoped language persistence, and RTL document metadata.
+- Supabase Edge Functions for onboarding, staff invites, reminders, invoice emails, jobs, Agora token issuance, lab webhooks, and integration API entry points.
+- Deployment target: Cloudflare Pages for the frontend, Supabase for database, auth, storage, functions, and scheduled/backend work.
 
-Core capabilities:
-- Multi-tenant clinics
-- Patients, doctors, appointments, prescriptions, labs, billing, insurance
-- Reporting with SQL-side aggregation
-- Audit logging for critical actions
-- Supabase RPCs for sensitive operations
+## Product Areas
 
-## Feature Modules
+### Clinic Workspace
 
-### 1. Authentication & Security
-Features:
-- User authentication (login/logout/session handling)
-- Password reset / account recovery
-- Role-based access control (RBAC)
-- Multi-tenant workspace isolation
-- Audit logging for critical actions
-Security controls:
-- Tenant isolation
-- Permission-based UI access
-- Activity tracking via audit logs
+Clinic users work inside `/tenant/:clinicSlug` after authentication. Route access is permission-gated and, where applicable, subscription/module-gated.
 
-### 2. Dashboard & System Overview
-Features:
-- Key performance indicators (KPIs)
-- Recent activity feed
-- Daily appointment overview
-- Billing summary
-- Lab and prescription alerts
-Typical metrics:
-- Today's appointments
-- Active patients
-- Pending lab results
-- Outstanding invoices
+- Dashboard KPIs and activity overview.
+- Patient records, medical history, document upload/list/delete, imports, archive/restore, and duplicate checks.
+- Doctor profiles and weekly schedule management.
+- Appointment list/calendar workflows with conflict detection and telemedicine entry points.
+- Prescriptions, lab orders/results, pharmacy inventory, insurance claims, billing/invoices/payments, reports, search, notifications, and clinic settings.
 
-### 3. Patient Management
-Features:
-- Patient profiles
-- Medical history
-- Status tracking
-- Search and filtering
-- Patient document management
-Patient documents:
-- Upload documents
-- List stored files
-- Delete documents
-- Secure storage access
+### Patient Portal
 
-### 4. Doctor Management
-Features:
-- Doctor profiles
-- Doctor status (active/inactive)
-- Specialty tracking
-- Doctor availability schedules
-Scheduling:
-- Weekly schedules
-- Time slot management
-- Schedule validation rules
+Patients enter through `/portal/:clinicSlug/login` and access only their own scoped account data after portal authentication.
 
-### 5. Appointment Management
-Features:
-- List view
-- Calendar view
-- Create appointment
-- Reschedule appointments
-- Cancel appointments
-- Status tracking
-Workflow states:
-- Scheduled
-- Confirmed
-- Completed
-- Cancelled
-- No-show
+- Portal dashboard.
+- Appointments.
+- Prescriptions.
+- Lab results.
+- Documents.
+- Invoices.
 
-### 6. Prescription Management
-Features:
-- Create prescriptions
-- View patient prescriptions
-- Medication details
-- Prescription history
+Portal auth and scope tests live in `tests/e2e/portal-auth.spec.ts`.
 
-### 7. Billing & Invoicing
-Features:
-- Invoice creation
-- Billing summaries
-- Payment tracking
-- Invoice status management
-Invoice states:
-- Draft
-- Pending
-- Paid
-- Cancelled
+### Platform Admin
 
-### 8. Pharmacy Inventory
-Features:
-- Medication catalog
-- Stock tracking
-- Inventory updates
-- Pharmacy summary reports
+Super-admin functionality lives under `/admin` and uses privileged route protection.
 
-### 9. Laboratory Management
-Features:
-- Create lab orders
-- Track lab status
-- Upload or record lab results
-- Patient lab history
-Lab states:
-- Ordered
-- In progress
-- Completed
-- Reviewed
+- Tenant and module administration.
+- Pricing/subscription management.
+- Job visibility and retries.
+- Admin impersonation workflows.
+- Privileged security setup under `/security/privileged`.
 
-### 10. Insurance Management
-Features:
-- Insurance claim records
-- Claim status tracking
-- Patient insurance linking
-- Claim summary reports
+### Communications and Jobs
 
-### 11. Reports & Analytics
-Features:
-- Appointment analytics
-- Revenue reports
-- Patient growth metrics
-- Status breakdowns
-- Monthly and daily summaries
-Exports:
-- CSV export
-- PDF reports where available
+The backend includes job and notification infrastructure rather than relying only on frontend side effects.
 
-### 12. Notifications
-Features:
-- System notifications
-- Status updates
-- Important reminders
-Examples:
-- Appointment changes
-- Lab result availability
-- Invoice status updates
-
-### 13. Settings & Administration
-Features:
-- Clinic profile settings
-- User management
-- Role and permission management
-- Notification preferences
-- Audit log viewer
-- Tenant configuration
+- Appointment reminders via `appointment-reminders`.
+- Invoice email execution via `send-invoice-emails` and durable `invoice_email_delivery_log` records.
+- Admin-triggered jobs for appointment notifications, insurance processing, monthly reports, and materialized-view refresh.
+- Integration entry points for lab webhooks and partner API workflows.
 
 ## Architecture
 
-### Layering
-- `domain`: Zod schemas + types. Pure validation and invariants.
-- `services`: Business logic, validation, tenant resolution, error handling.
-- `repositories`: All direct Supabase access (no Supabase in UI).
-- `features`: UI modules + hooks.
-- `core`: Auth, env validation, shared app infrastructure.
+### Frontend Stack
 
-### Dependency Flow
-```
+- React 18 + Vite.
+- TypeScript.
+- React Router.
+- TanStack Query.
+- Zustand.
+- Tailwind CSS + shadcn/Radix primitives.
+- i18next + react-i18next + ICU.
+- Recharts, jsPDF, Playwright, Vitest, ESLint.
+
+### Backend Stack
+
+- Supabase Auth.
+- Supabase Postgres with RLS, RPCs, triggers, indexes, constraints, and materialized views.
+- Supabase Storage with private buckets and signed URL access.
+- Supabase Edge Functions for server-side workflows.
+- pgTAP database tests under `supabase/tests`.
+
+### Code Boundaries
+
+The main dependency flow is:
+
+```text
 features -> services -> repositories -> Supabase
-features -> domain (types/schemas)
-services -> domain (validation)
-repositories -> Supabase client
+features -> domain
+services -> domain
 ```
 
-### Tenant Context
-- Tenant is derived from authenticated user context in services (`getTenantContext`).
-- Repositories enforce tenant scoping in queries.
-- RLS policies enforce tenant isolation in the database.
+Key directories:
 
-### Data Access Rules
-- Supabase client is used only inside repositories.
-- Services validate inputs and outputs with Zod.
-- React Query keys are tenant-scoped via `src/services/queryKeys.ts`.
+```text
+src/
+  app/              app wiring
+  core/             auth, env, i18n, jobs, subscription, shared infrastructure
+  domain/           Zod schemas and domain types
+  features/         route-level feature modules and UI workflows
+  services/         business services, repositories, query keys, realtime, jobs
+  shared/           shared UI, utilities, cross-feature components
+  components/       design-system and shadcn-style primitives
 
-### Event System
-- Lightweight domain event bus in `src/core/events`.
-- Events emit from services and trigger handlers for audit logging, notifications, and analytics refresh.
+supabase/
+  migrations/       schema, RLS, RPC, trigger, index, and hardening migrations
+  functions/        Supabase Edge Functions
+  tests/            pgTAP database tests
 
-### Background Jobs
-- Job runner in `src/core/jobs` with retry and logging.
-- Jobs execute via Supabase Edge Functions (admin-only).
+tests/
+  e2e/              Playwright coverage and helpers
+```
 
-### Feature Flags
-- `feature_flags` table with tenant-scoped flags.
-- `useFeatureAccess` combines plan entitlements + flags to control module visibility.
+### Service Boundary Rules
 
-## Data Flow (High Level)
+- UI code calls services and hooks, not Supabase tables directly.
+- Repositories own direct Supabase access.
+- Services resolve tenant/user context, apply business rules, and map errors.
+- Domain schemas validate inputs and outputs.
+- Query keys are centralized in `src/services/queryKeys.ts` and must remain tenant-safe.
 
-1. UI triggers service calls.
-2. Services validate input with Zod, resolve tenant/user context.
-3. Repositories execute tenant-scoped queries or RPCs.
-4. Output is validated against domain schemas.
-5. React Query caches data with tenant-scoped keys.
+## Internationalization
 
-## Database & Schema Highlights
+Shefaa has an enterprise-grade bilingual frontend foundation:
 
-- Tenant isolation via `tenant_id` on all data tables.
-- Exclusion constraints for preventing overlapping appointments and doctor schedules.
-- Trigram indexes for fast ILIKE search.
-- Report materialized views for aggregate KPIs.
-- Audit logs for critical domain changes.
+- English and Arabic resources.
+- RTL support via `document.documentElement.dir` and `lang` synchronization.
+- Lazy namespace loading per route.
+- ICU plural/date/number formatting.
+- Tenant/user-scoped language persistence using keys such as `lang:${tenantId}:${userId}`.
+- Shared `useI18n`, `translatePath`, and formatting utilities under `src/core/i18n`.
 
-## Supabase Backend Surface
-
-### Core Tables (High Level)
-- `tenants`, `profiles`, `user_roles`, `subscriptions`
-- `patients`, `patient_documents`, `medical_records`
-- `doctors`, `doctor_schedules`
-- `appointments`, `appointment_reminder_log`
-- `prescriptions`, `medications`
-- `lab_orders`
-- `invoices`, `invoice_items`
-- `insurance_claims`
-- `notifications`, `notification_preferences`
-- `audit_logs`, `client_error_logs`
-- `feature_flags`
-- `rate_limits`
-
-### RPC Functions (Selected)
-- `check_rate_limit`
-- `log_audit_event`
-- `get_report_overview`, `get_report_revenue_by_month`, `get_report_patient_growth`
-- `get_report_appointment_types`, `get_report_appointment_statuses`
-- `get_report_revenue_by_service`, `get_report_doctor_performance`
-- `get_invoice_summary`, `get_medication_summary`, `get_insurance_summary`
-- `generate_patient_code`
-- `search_global`
-
-### Edge Functions
-- `register-clinic` (public onboarding with CAPTCHA + rate limiting)
-- `check-slug` (public slug availability with CAPTCHA + rate limiting)
-- `invite-staff` (authenticated, admin-only)
-- `appointment-reminders` (cron-invoked, emails + in-app notifications)
-- `send-appointment-notifications` (admin-only job trigger)
-- `generate-monthly-reports` (admin-only job trigger)
-- `refresh-materialized-views` (admin-only job trigger)
-- `process-insurance-claims` (admin-only job trigger)
-- `send-invoice-emails` (admin-only job trigger)
-
-### Storage Buckets
-- `avatars` (private, image-only)
-- `patient-documents` (private, tenant-scoped)
+The current rollout is intentionally incremental by module so localization remains UI-only and does not leak into service or database boundaries.
 
 ## Security Model
 
-- RLS enabled across all multi-tenant tables.
-- RBAC enforced at RLS + service layer.
-- Storage buckets private; access via signed URLs.
-- Edge functions hardened with CAPTCHA, rate limiting, and email verification.
-- Service role keys used only in server-side functions.
-- Rate limiting enforced via `check_rate_limit` for login, password reset, and upload flows.
-- Soft deletes enforced by repository filters and restrictive RLS policies.
+Security is enforced across the frontend, service layer, database, and functions:
 
-## Performance & Scalability
+- Supabase Auth for sessions and identity.
+- Role and permission checks in protected routes and services.
+- RLS enabled on multi-tenant tables.
+- Tenant-scoped repository queries and RPC calls.
+- Private storage buckets for patient documents and avatars.
+- Signed URL access for sensitive files.
+- CAPTCHA and rate limiting on public onboarding paths.
+- Service role usage limited to server-side Edge Functions and scripts.
+- Audit logging for sensitive domain actions.
+- Privileged admin flows protected by MFA/session verification and server-issued step-up grants.
 
-- Server-side pagination for large lists.
-- Typeahead search with limits and server-side filtering.
-- Materialized views for reports (scheduled refresh).
-- Tenant-scoped React Query keys to avoid cache bleeding.
-- Realtime invalidation targets specific query keys.
+Important security-oriented tests include:
 
-## Observability
+- `supabase/tests/admin_super_admin_hardening.sql`
+- `tests/e2e/privileged-security.spec.ts`
+- portal scope checks in `tests/e2e/portal-auth.spec.ts`
 
-- Client error logs stored in `client_error_logs` (tenant-scoped).
-- Audit logs for critical actions (patients, appointments, invoices, documents, lab orders, prescriptions, insurance).
-- Audit and error logs include `request_id`, `action_type`, and `resource_type` for tracing.
+## Supabase Surface
 
-## Error Handling
+### Selected Tables
 
-- Services throw standardized errors (`ServiceError`, `ValidationError`, `AuthorizationError`, `NotFoundError`, `ConflictError`, `BusinessRuleError`).
-- Repositories map Supabase errors to service errors consistently.
+- Platform and access: `tenants`, `profiles`, `user_roles`, `user_global_roles`, `subscriptions`, `feature_flags`
+- Clinic operations: `patients`, `medical_records`, `patient_documents`, `doctors`, `doctor_schedules`, `appointments`
+- Clinical and finance: `prescriptions`, `medications`, `lab_orders`, `invoices`, `invoice_items`, `invoice_payments`, `insurance_claims`
+- Portal and communication: `patient_accounts`, `notifications`, `notification_preferences`, `appointment_reminder_log`, `invoice_email_delivery_log`
+- Operations and audit: `audit_logs`, `client_error_logs`, `rate_limits`, `jobs`, `command_idempotency`, `privileged_step_up_grants`
 
-## Environment & Configuration
+### Selected RPCs
 
-Environment validation is enforced at startup in `src/core/env/env.ts`.
+- `check_rate_limit`
+- `log_audit_event`
+- `search_global`
+- `generate_patient_code`
+- `get_portal_login_metadata`
+- `get_report_overview`
+- `get_report_revenue_by_month`
+- `get_report_patient_growth`
+- `get_invoice_summary`
+- `post_invoice_payment`
+- `issue_privileged_step_up_grant`
+- `consume_privileged_step_up_grant_for_actor`
 
-Required variables:
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_PUBLISHABLE_KEY`
+### Edge Functions
 
-Optional variables:
-- `VITE_SUPABASE_PROJECT_ID`
-- `VITE_CAPTCHA_SITE_KEY`
-- `VITE_SENTRY_DSN`
+- `register-clinic` - public clinic onboarding with CAPTCHA/rate limiting.
+- `check-slug` - public clinic slug availability with CAPTCHA/rate limiting.
+- `invite-staff` - protected staff invitation flow.
+- `appointment-reminders` - scheduled reminders and notification delivery.
+- `send-appointment-notifications` - admin/job-triggered appointment notifications.
+- `send-invoice-emails` - invoice email delivery with durable delivery logs.
+- `generate-monthly-reports` - report generation job.
+- `refresh-materialized-views` - report aggregate refresh job.
+- `process-insurance-claims` - insurance workflow job.
+- `job-worker` - background job execution.
+- `agora-token` - telemedicine token issuance.
+- `lab-webhook-inbound` - inbound lab integration endpoint.
+- `integration-api` - partner/integration API surface.
 
-Templates:
-- `.env.example` (remote)
-- `.env.local.example` (local)
+### Storage Buckets
 
-## Local Development Quick Start
+- `avatars` - private user/clinic images.
+- `patient-documents` - private tenant-scoped patient files.
 
-1. Install dependencies:
-```
+## Local Setup
+
+### Prerequisites
+
+- Node.js compatible with the lockfile.
+- npm 10.x.
+- Supabase CLI.
+- Docker Desktop if running local Supabase.
+
+### Install
+
+```bash
 npm install
 ```
 
-2. Start Supabase locally:
-```
-supabase start
+### Environment
+
+Frontend startup validates required Vite variables in `src/core/env/env.ts`.
+
+Required:
+
+```text
+VITE_SUPABASE_URL=
+VITE_SUPABASE_PUBLISHABLE_KEY=
 ```
 
-3. Use local environment:
-```
-npm run env:local
+Common optional values:
+
+```text
+VITE_SUPABASE_PROJECT_ID=
+VITE_CAPTCHA_SITE_KEY=
+VITE_SENTRY_DSN=
+VITE_APP_VERSION=
+APP_ORIGINS=
+REMINDER_CRON_SECRET=
+SENTRY_DSN=
 ```
 
-4. Start the app:
-```
+Templates:
+
+- `.env.example` for remote/default configuration.
+- `.env.local.example` for local Supabase values.
+- `.env.e2e.local` is generated by the E2E bootstrap when possible.
+
+This checkout currently defaults to remote env behavior. `npm run env:remote` disables `.env.local` if it exists, and `npm run env:status` reports which env file mode is active. Local Supabase can still be used manually by creating `.env.local` from `.env.local.example` and matching the values from `supabase status`.
+
+### Run the App
+
+```bash
 npm run dev
 ```
 
-## Remote Development
+Build and preview:
 
-1. Ensure `.env` points to the remote project.
-2. Use remote environment:
-```
-npm run env:remote
-```
-
-## Environment Switching
-
-We use `.env` for remote and `.env.local` for local.
-
-Commands:
-```
-npm run env:local
-npm run env:remote
-npm run env:status
+```bash
+npm run build
+npm run preview
 ```
 
 ## Supabase Workflows
 
-Apply migrations locally:
+Start local Supabase:
+
+```bash
+supabase start
 ```
+
+Apply local migrations:
+
+```bash
 supabase migration up
 ```
 
-Reset local DB:
-```
+Reset local database:
+
+```bash
 supabase db reset
 ```
 
-Push migrations to remote:
+Create a schema diff:
+
+```bash
+supabase db diff
 ```
+
+Push migrations to a linked remote project:
+
+```bash
 supabase db push
 ```
 
-Run DB tests (pgTAP):
-```
+Run database tests:
+
+```bash
 supabase test db
 ```
 
-## Testing
-
-- Unit tests: `npm run test`
-- End-to-end tests: `npm run test:e2e`
-- Database policy + RPC tests: `supabase test db`
-- Build validation: `npm run build`
-
-### E2E Environment
-
-The Playwright suite will auto-start a local Vite server on `http://127.0.0.1:4173` unless `E2E_BASE_URL` is provided.
-
-Required environment variables for the super-admin coverage:
-- `E2E_SUPER_ADMIN_EMAIL`
-- `E2E_SUPER_ADMIN_PASSWORD`
-- `E2E_ADMIN_EMAIL`
-- `E2E_ADMIN_PASSWORD`
-- `E2E_CLINIC_SLUG`
-
-Optional helpers:
-- `E2E_DOCTOR_NAME`
-- `E2E_PORTAL_EMAIL`
-- `E2E_PORTAL_PASSWORD`
-
-Run only the super-admin SaaS coverage:
-```
-npx playwright test tests/e2e/super-admin-pricing.spec.ts tests/e2e/super-admin-tenant-lifecycle.spec.ts tests/e2e/super-admin-module-gating.spec.ts
-```
-
-## CI/CD
-
-GitHub Actions workflows:
-- `ci.yml`: lint, unit tests, coverage gate.
-- `migrations.yml`: apply migrations to remote with approval.
-- `backup-verify.yml`: backup verification checks.
-- `cloudflare-deploy.yml`: deploy to Cloudflare Pages on `main`.
-
 ## Scripts
 
-- `npm run dev` - start Vite
-- `npm run build` - build for production
-- `npm run lint` - lint
-- `npm run test` - unit tests
-- `npm run test:db` - Supabase db tests
-- `npm run env:local` - switch to local env
-- `npm run env:remote` - switch to remote env
-- `npm run env:status` - check which env is active
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the Vite dev server. |
+| `npm run build` | Production build to `dist`. |
+| `npm run build:dev` | Development-mode Vite build. |
+| `npm run preview` | Preview the built app locally. |
+| `npm run lint` | Run ESLint. |
+| `npm run test` | Run Vitest unit/integration tests. |
+| `npm run test:watch` | Run Vitest in watch mode. |
+| `npm run test:coverage` | Run Vitest with coverage. |
+| `npm run test:db` | Run Supabase pgTAP database tests. |
+| `npm run test:db:remote` | Run the remote DB test helper. |
+| `npm run e2e:bootstrap` | Seed/bootstrap deterministic E2E users and env. |
+| `npm run test:e2e` | Run Playwright E2E tests. |
+| `npm run test:load` | Run the load-test helper. |
+| `npm run env:remote` | Disable `.env.local` and use remote/default env. |
+| `npm run env:status` | Report active env mode. |
+| `npm run health:outbound` | Check outbound/provider health. |
 
-## Project Structure
+## Testing
 
+Recommended validation before opening a PR:
+
+```bash
+npm run lint
+npm run test
+npm run build
 ```
-src/
-  app/         App wiring and routes
-  core/        Cross-cutting concerns (auth, env, config)
-  domain/      Zod schemas + types
-  services/    Service layer + repositories
-  features/    Feature modules (UI + hooks)
-  shared/      Shared UI + utilities
+
+Database/security validation:
+
+```bash
+supabase test db
 ```
 
-## Security Notes
+End-to-end validation:
 
-- Client uses publishable key only.
-- Service role key must never be used on the frontend.
-- RLS is enabled across all multi-tenant tables.
-- Storage buckets are private; sensitive assets use signed URLs.
+```bash
+npm run test:e2e
+```
 
-## Documentation
+The Playwright config starts a preview server on `http://127.0.0.1:4173` unless `E2E_BASE_URL` is supplied. The bootstrap script can create deterministic admin, super-admin, doctor, and portal fixtures and writes `.env.e2e.local` for the test run.
 
-- Local vs remote usage: `docs/local-and-remote-supabase.md`
-- RLS review: `docs/rls-policy-review-2026-03-11.md`
-- Production hardening: `docs/production-hardening.md`
+Common E2E variables:
+
+```text
+E2E_SUPER_ADMIN_EMAIL=
+E2E_SUPER_ADMIN_PASSWORD=
+E2E_ADMIN_EMAIL=
+E2E_ADMIN_PASSWORD=
+E2E_CLINIC_SLUG=
+E2E_DOCTOR_NAME=
+E2E_PORTAL_EMAIL=
+E2E_PORTAL_PASSWORD=
+```
+
+Targeted examples:
+
+```bash
+npx playwright test tests/e2e/privileged-security.spec.ts
+npx playwright test tests/e2e/portal-auth.spec.ts
+```
 
 ## Deployment
 
-This repo deploys to Cloudflare Pages.
+The frontend deploys to Cloudflare Pages with build output in `dist`.
 
-Requirements:
-- Cloudflare Pages project created for the repo.
-- GitHub Actions secrets:
-  - `CLOUDFLARE_API_TOKEN`
-  - `CLOUDFLARE_ACCOUNT_ID`
-  - `CLOUDFLARE_PAGES_PROJECT_NAME`
+Required Cloudflare/GitHub secrets:
 
-Cloudflare Pages environment variables (set in the dashboard for Production and Preview):
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_PUBLISHABLE_KEY`
-- `VITE_SUPABASE_PROJECT_ID` (optional)
-- `VITE_CAPTCHA_SITE_KEY` (optional)
-- `VITE_SENTRY_DSN` (optional)
+```text
+CLOUDFLARE_API_TOKEN
+CLOUDFLARE_ACCOUNT_ID
+CLOUDFLARE_PAGES_PROJECT_NAME
+```
 
-Before production:
-- `npm run build`
-- `supabase db diff` against production
-- `supabase db push` to production
-- Run smoke tests
+Cloudflare Pages environment variables:
 
-## Architecture and Risk Analysis
+```text
+VITE_SUPABASE_URL
+VITE_SUPABASE_PUBLISHABLE_KEY
+VITE_SUPABASE_PROJECT_ID
+VITE_CAPTCHA_SITE_KEY
+VITE_SENTRY_DSN
+VITE_APP_VERSION
+```
 
-### Strengths
-- Clear domain/service/repository separation.
-- Tenant isolation enforced at multiple layers.
-- Zod validation at service boundaries.
-- RLS + audit logging for critical data.
-- Report aggregates via materialized views.
+Supabase Edge Function secrets vary by function. Common production values include:
 
-### Remaining Considerations
-- Materialized view refresh schedule should match business requirements for reporting freshness.
-- Realtime invalidation is optimized but still domain-level; record-level invalidation could further reduce refetch.
-- Large patient histories are now paginated; UI should expose pagination controls where needed.
-- Soft delete columns are referenced in services; ensure migrations exist in every environment.
-- If additional public endpoints are added, they must include CAPTCHA and rate limiting.
+```text
+APP_ORIGINS
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+SUPABASE_PUBLISHABLE_KEY
+REMINDER_CRON_SECRET
+RESEND_API_KEY
+INVOICE_EMAIL_FROM
+AGORA_APP_ID
+AGORA_APP_CERTIFICATE
+HCAPTCHA_SECRET
+SENTRY_DSN
+```
 
-### Security Posture Summary
-- RLS coverage expanded and tested.
-- Storage policies enforce tenant isolation.
-- Edge functions hardened with CAPTCHA, rate limits, and email verification.
+Pre-deploy checklist:
 
-## Roadmap (Planned Enhancements)
+```bash
+npm run lint
+npm run test
+npm run build
+supabase db diff
+supabase test db
+```
 
-- Advanced job orchestration (queue-based execution) as load grows.
-- Automated incident alerts and SLO dashboards.
+Then apply migrations through the approved Supabase deployment workflow and verify Cloudflare Pages preview/production environment variables.
 
-## Contributing
+## CI/CD
 
-1. Create a branch
-2. Add migrations for schema changes (never edit applied migrations)
-3. Run `supabase test db`
-4. Open a PR
+GitHub Actions workflows are kept under `.github/workflows`.
 
----
+- CI: lint, tests, and build/coverage checks.
+- Migration workflows: controlled Supabase migration application.
+- Backup verification: operational backup smoke checks.
+- Cloudflare Pages deployment: frontend deployment from `main`.
 
-## Data Model Diagram (High-Level)
+## Documentation
+
+Useful project docs:
+
+- `docs/clinic-workflow.md` - current clinic workflow and business rules.
+- `docs/feature-production-readiness-report.md` - feature maturity and risk overview.
+- `docs/production-readiness-roadmap.md` - hardening roadmap.
+- `docs/production-hardening.md` - production security notes.
+- `docs/local-and-remote-supabase.md` - local/remote Supabase workflows.
+- `docs/rls-policy-review-2026-03-11.md` - RLS review.
+- `docs/ops/backup-and-restore.md` - backup/restore runbook.
+- `docs/ops/incident-response-and-access-review.md` - incident and access review runbook.
+- `docs/ops/phi-retention-and-deletion.md` - PHI lifecycle policy notes.
+- `docs/ops/vendor-compliance-inventory.md` - vendor/compliance inventory.
+
+## Data Model Overview
 
 ```mermaid
 flowchart LR
   tenants["tenants"] --> profiles["profiles"]
   tenants --> user_roles["user_roles"]
+  tenants --> subscriptions["subscriptions"]
+  tenants --> feature_flags["feature_flags"]
   tenants --> patients["patients"]
   tenants --> doctors["doctors"]
   tenants --> appointments["appointments"]
@@ -514,146 +454,30 @@ flowchart LR
   tenants --> notifications["notifications"]
   tenants --> audit_logs["audit_logs"]
 
+  patients --> patient_accounts["patient_accounts"]
   patients --> patient_documents["patient_documents"]
+  patients --> medical_records["medical_records"]
   patients --> appointments
   patients --> prescriptions
   patients --> lab_orders
   patients --> invoices
   patients --> insurance_claims
 
-  doctors --> appointments
   doctors --> doctor_schedules["doctor_schedules"]
+  doctors --> appointments
 
   invoices --> invoice_items["invoice_items"]
+  invoices --> invoice_payments["invoice_payments"]
+  invoices --> invoice_email_delivery_log["invoice_email_delivery_log"]
 ```
 
-Notes:
-- All core entities are tenant-scoped by `tenant_id`.
-- Soft delete columns are used in core entities (`deleted_at`, `deleted_by`).
-- Audit logs capture critical domain actions.
+All core clinic records are tenant-scoped. Sensitive operations are designed to be validated in services and enforced again by RLS, RPCs, constraints, or Edge Function authorization.
 
----
+## Contributing
 
-## API Examples
-
-### Services (Frontend)
-
-```ts
-import { patientService } from "@/services";
-
-// Create a patient
-const created = await patientService.create({
-  full_name: "Maya Hassan",
-  date_of_birth: "1991-04-12",
-  gender: "female",
-  phone: "+20 100 555 1122",
-});
-
-// List patients with pagination
-const page = await patientService.list({ search: "maya", limit: 20, offset: 0 });
-```
-
-```ts
-import { appointmentService } from "@/services";
-
-// Create appointment with conflict protection
-await appointmentService.create({
-  patient_id: "uuid",
-  doctor_id: "uuid",
-  appointment_date: "2026-03-13T10:00:00.000Z",
-  duration_minutes: 30,
-  type: "consultation",
-});
-```
-
-```ts
-import { reportService } from "@/services";
-
-// Aggregated dashboards (RPC-backed)
-const overview = await reportService.getOverview();
-const revenueByMonth = await reportService.getRevenueByMonth(6);
-```
-
-### RPC (Database)
-
-```sql
--- Get reporting overview
-select * from public.get_report_overview();
-
--- Apply tenant-safe global search (limit results)
-select * from public.search_global('maya', 8);
-```
-
-### Edge Functions
-
-```bash
-# Check slug availability (public, CAPTCHA required)
-curl -X POST "$SUPABASE_URL/functions/v1/check-slug" \
-  -H "Content-Type: application/json" \
-  -d '{"clinicName":"Bright Clinic","captchaToken":"..."}'
-
-# Register clinic (public, CAPTCHA + rate limiting)
-curl -X POST "$SUPABASE_URL/functions/v1/register-clinic" \
-  -H "Content-Type: application/json" \
-  -d '{"clinicName":"Bright Clinic","fullName":"Maya Hassan","email":"maya@example.com","password":"strong-pass","captchaToken":"..."}'
-```
-
----
-
-## Ops Runbooks
-
-### Local Development
-
-1. Start Supabase locally:
-```
-supabase start
-```
-2. Apply migrations:
-```
-supabase migration up
-```
-3. Run DB tests:
-```
-supabase test db
-```
-
-### Remote Deploy (Supabase)
-
-1. Ensure `.env` points to remote project:
-```
-npm run env:remote
-```
-2. Apply migrations to remote:
-```
-supabase db push
-```
-3. Validate policies and RPCs:
-```
-supabase test db
-```
-
-### Cloudflare Pages Deploy
-
-1. Push to `main` to trigger `.github/workflows/cloudflare-deploy.yml`.
-2. Confirm build output `dist` is deployed.
-3. For preview builds, ensure the same env vars exist under Preview environment.
-
-### Backup & Restore
-
-- Backup: use Supabase dashboard backups or `pg_dump` from a managed replica.
-- Restore: create a new project, restore snapshot, re-apply secrets, then repoint `.env`.
-
-### Incident Response (Data Leakage or Policy Regression)
-
-1. Freeze writes by revoking write policies or setting tenant feature flags to disable modules.
-2. Rotate keys:
-   - Rotate JWT secrets and service role keys.
-   - Regenerate signed URL policies if used.
-3. Run audit log review by tenant and time window.
-4. Patch and re-run `supabase test db`.
-
-### Edge Functions Operations
-
-- Deploy: `supabase functions deploy <name>`
-- Secrets: `supabase secrets set KEY=VALUE`
-- Verify JWT: set `verify_jwt = true` in `supabase/config.toml` for protected functions.
+1. Create a branch.
+2. Keep changes inside the existing domain/service/repository boundaries.
+3. Add migrations for schema changes; do not edit applied migrations.
+4. Add focused tests for changed behavior.
+5. Run lint, tests, build, and relevant Supabase tests.
+6. Open a PR with verification notes and any remaining operational risk.
