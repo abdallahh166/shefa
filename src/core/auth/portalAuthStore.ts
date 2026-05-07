@@ -1,6 +1,7 @@
-﻿import { create } from "zustand";
+import { create } from "zustand";
 import { authRepository } from "@/services/auth/auth.repository";
 import { portalService } from "@/services/portal/portal.service";
+import { authService } from "@/services/auth/auth.service";
 
 export type PortalUser = {
   id: string;
@@ -37,8 +38,9 @@ export const usePortalAuth = create<PortalAuthState>((set) => ({
       isLoading: false,
     }),
   logout: async () => {
-    await authRepository.signOut();
-    set({ user: null, supabaseUser: null, isAuthenticated: false });
+    const u = usePortalAuth.getState().user;
+    const principalKey = u ? `${u.id}:${u.tenantId}` : undefined;
+    await authService.logout(crypto.randomUUID(), principalKey);
   },
   initialize: async () => {
     set({ isLoading: true });

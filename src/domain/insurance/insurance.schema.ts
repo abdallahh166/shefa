@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 import { dateStringSchema, dateTimeStringSchema } from "../shared/date.schema";
 import { listParamsSchema } from "../shared/pagination.schema";
 import { uuidSchema } from "../shared/identifiers.schema";
@@ -72,7 +72,9 @@ export const insuranceClaimCreateSchema = insuranceClaimSchema
     claim_date: dateStringSchema.optional(),
   });
 
-export const insuranceClaimUpdateSchema = insuranceClaimCreateSchema.partial();
+export const insuranceClaimUpdateSchema = insuranceClaimCreateSchema.partial().extend({
+  expected_updated_at: dateTimeStringSchema.optional(),
+});
 
 export const insuranceClaimListParamsSchema = listParamsSchema;
 

@@ -94,7 +94,7 @@ export const notificationRepository: NotificationRepository = {
       .subscribe();
     return {
       unsubscribe: () => {
-        supabase.removeChannel(channel);
+        void supabase.removeChannel(channel).catch(() => undefined);
       },
     };
   },

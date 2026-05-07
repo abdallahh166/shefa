@@ -18,6 +18,12 @@ vi.mock("@/core/auth/authStore", () => ({
   },
 }));
 
+vi.mock("@/services/subscription/featureAccess.service", () => ({
+  featureAccessService: {
+    assertFeatureAccess: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 vi.mock("@/services/pharmacy/pharmacy.repository", () => ({
   pharmacyRepository: {
     getSummary: vi.fn(),

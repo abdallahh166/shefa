@@ -43,7 +43,7 @@ export interface AppointmentRepository {
   getById(id: string, tenantId: string): Promise<Appointment>;
   hasConflict(doctorId: string, appointmentDate: string, tenantId: string, excludeId?: string): Promise<boolean>;
   create(input: AppointmentCreateInput, tenantId: string): Promise<Appointment>;
-  update(id: string, input: AppointmentUpdateInput, tenantId: string): Promise<Appointment>;
+  update(id: string, input: AppointmentUpdateInput, tenantId: string, expectedUpdatedAt?: string): Promise<Appointment | null>;
   archive(id: string, tenantId: string, userId: string): Promise<Appointment>;
   restore(id: string, tenantId: string): Promise<Appointment>;
 }
@@ -283,7 +283,7 @@ export const appointmentRepository: AppointmentRepository = {
 
     return assertOk(result) as Appointment;
   },
-  async update(id, input, tenantId) {
+  async update(id, input, tenantId, expectedUpdatedAt) {
     const payload: Record<string, unknown> = {};
 
     if (input.patient_id !== undefined) payload.patient_id = input.patient_id;
@@ -304,15 +304,22 @@ export const appointmentRepository: AppointmentRepository = {
       return assertOk(result) as Appointment;
     }
 
-    const result = await supabase
+    let query = supabase
       .from("appointments")
       .update(payload)
       .eq("id", id)
-      .eq("tenant_id", tenantId)
-      .select(APPOINTMENT_COLUMNS)
-      .single();
-
-    return assertOk(result) as Appointment;
+      .eq("tenant_id", tenantId);
+    if (expectedUpdatedAt) {
+      query = query.eq("updated_at", expectedUpdatedAt);
+    }
+    const { data, error } = await query.select(APPOINTMENT_COLUMNS).maybeSingle();
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to update appointment", {
+        code: error.code,
+        details: error,
+      });
+    }
+    return (data ?? null) as Appointment | null;
   },
   async archive(id, tenantId, userId) {
     const result = await supabase

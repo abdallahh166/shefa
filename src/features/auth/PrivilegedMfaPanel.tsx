@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Shield, KeyRound, Loader2, AlertTriangle, CheckCircle2, RefreshCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Inputs";
@@ -52,24 +52,29 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
   const [sessionVerificationFactorId, setSessionVerificationFactorId] = useState<string | null>(null);
   const [removingFactorId, setRemovingFactorId] = useState<string | null>(null);
 
-  const reloadState = async () => {
-    const [factorState] = await Promise.all([
-      authService.listMfaFactors(),
-      privilegedSessionService.refresh(),
-    ]);
-    setFactors(factorState.all);
-  };
+  const reloadState = useCallback(async () => {
+    const state = await privilegedSessionService.refresh();
+    setFactors(state.factors.all);
+  }, []);
 
   useEffect(() => {
     if (!user || !privilegedSession.isPrivileged) return;
+    let cancelled = false;
     setLoading(true);
     void reloadState()
       .catch((err) => {
+        if (cancelled) return;
         const message = err instanceof Error ? err.message : t("common.error");
         toast({ title: t("common.error"), description: message, variant: "destructive" });
       })
-      .finally(() => setLoading(false));
-  }, [privilegedSession.isPrivileged, t, user]);
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [privilegedSession.isPrivileged, reloadState, t, user]);
 
   if (!user) return null;
 
@@ -124,7 +129,6 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
     setVerifying(true);
     try {
       await authService.verifyTotpFactor({ factorId: enrollment.factorId, code });
-      await privilegedSessionService.refresh();
       await reloadState();
       await auditLogService.logEvent({
         tenant_id: toAuditTenantId(user),
@@ -155,7 +159,6 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
     setVerifying(true);
     try {
       await authService.verifyTotpFactor({ factorId: sessionVerificationFactorId, code: sessionCode });
-      await privilegedSessionService.refresh();
       await reloadState();
       await auditLogService.logEvent({
         tenant_id: toAuditTenantId(user),
@@ -186,7 +189,6 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
     setRemovingFactorId(factorId);
     try {
       await authService.removeMfaFactor(factorId);
-      await privilegedSessionService.refresh();
       await reloadState();
       await auditLogService.logEvent({
         tenant_id: toAuditTenantId(user),

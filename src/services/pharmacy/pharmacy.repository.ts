@@ -18,7 +18,7 @@ export interface PharmacyRepository {
   listPaged(params: MedicationListParams, tenantId: string): Promise<PagedResult<Medication>>;
   getSummary(tenantId: string): Promise<MedicationSummary>;
   create(input: MedicationCreateInput, tenantId: string): Promise<Medication>;
-  update(id: string, input: MedicationUpdateInput, tenantId: string): Promise<Medication>;
+  update(id: string, input: MedicationUpdateInput, tenantId: string, expectedUpdatedAt?: string): Promise<Medication | null>;
   remove(id: string, tenantId: string): Promise<void>;
 }
 
@@ -99,7 +99,7 @@ export const pharmacyRepository: PharmacyRepository = {
 
     return assertOk(result) as Medication;
   },
-  async update(id, input, tenantId) {
+  async update(id, input, tenantId, expectedUpdatedAt) {
     const payload: Record<string, unknown> = {};
 
     if (input.name !== undefined) payload.name = input.name;
@@ -119,15 +119,22 @@ export const pharmacyRepository: PharmacyRepository = {
       return assertOk(result) as Medication;
     }
 
-    const result = await supabase
+    let query = supabase
       .from("medications")
       .update(payload)
       .eq("id", id)
-      .eq("tenant_id", tenantId)
-      .select(MEDICATION_COLUMNS)
-      .single();
-
-    return assertOk(result) as Medication;
+      .eq("tenant_id", tenantId);
+    if (expectedUpdatedAt) {
+      query = query.eq("updated_at", expectedUpdatedAt);
+    }
+    const { data, error } = await query.select(MEDICATION_COLUMNS).maybeSingle();
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to update medication", {
+        code: error.code,
+        details: error,
+      });
+    }
+    return (data ?? null) as Medication | null;
   },
   async remove(id, tenantId) {
     const { error } = await supabase

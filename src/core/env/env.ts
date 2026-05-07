@@ -7,6 +7,7 @@ const envSchema = z.object({
   VITE_CAPTCHA_SITE_KEY: z.string().min(1).optional().or(z.literal("")),
   VITE_SENTRY_DSN: z.string().url().optional().or(z.literal("")),
   VITE_APP_VERSION: z.string().min(1).optional().or(z.literal("")),
+  VITE_AUTH_KILL_SWITCH: z.string().optional().or(z.literal("")),
 });
 
 const isTest =
@@ -26,6 +27,7 @@ let parsed = envSchema.safeParse({
   VITE_CAPTCHA_SITE_KEY: getEnv("VITE_CAPTCHA_SITE_KEY"),
   VITE_SENTRY_DSN: getEnv("VITE_SENTRY_DSN"),
   VITE_APP_VERSION: getEnv("VITE_APP_VERSION"),
+  VITE_AUTH_KILL_SWITCH: getEnv("VITE_AUTH_KILL_SWITCH"),
 });
 
 if (!parsed.success && isTest) {
@@ -36,6 +38,7 @@ if (!parsed.success && isTest) {
     VITE_CAPTCHA_SITE_KEY: "",
     VITE_SENTRY_DSN: "",
     VITE_APP_VERSION: "",
+    VITE_AUTH_KILL_SWITCH: "",
   });
 }
 
@@ -56,4 +59,6 @@ export const env = {
     parsed.data.VITE_SENTRY_DSN || undefined,
   VITE_APP_VERSION:
     parsed.data.VITE_APP_VERSION || undefined,
+  VITE_AUTH_KILL_SWITCH:
+    parsed.data.VITE_AUTH_KILL_SWITCH || undefined,
 };

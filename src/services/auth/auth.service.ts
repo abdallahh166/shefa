@@ -1,9 +1,71 @@
 import { z } from "zod";
-import { AuthorizationError, toServiceError } from "@/services/supabase/errors";
+import { AuthorizationError, ServiceError, toServiceError } from "@/services/supabase/errors";
 import { uuidSchema } from "@/domain/shared/identifiers.schema";
-import { authRepository } from "./auth.repository";
+import { authRepository, isTransientAuthNetworkError } from "./auth.repository";
 import { env } from "@/core/env/env";
 import { rateLimitService } from "@/services/security/rateLimit.service";
+import { emitAuthMetric } from "./authMetrics";
+import { isAuthKillSwitchActive } from "./authKillSwitch";
+import {
+  broadcastAuthEvent,
+  runAuthCleanupEvent,
+  type AuthTransitionEventV1,
+} from "./authSessionOrchestrator";
+import { awaitRecoveryWithBackpressure, isAuthRecoveryInProgress, runAuthRecovery } from "./authRecovery";
+import { getPreemptiveRefreshThresholdSec } from "@/services/supabase/supabaseAuthFetch";
+import { useAuth } from "@/core/auth/authStore";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** When true, `onAuthStateChange(SIGNED_OUT)` cleanup is handled by `logout()` finally (avoids double boundary reset). */
+export const authListenerGuards = { suppressSignedOutCleanup: false };
+
+let unauthorizedWindowStart = Date.now();
+let unauthorizedCount = 0;
+
+function noteUnauthorizedTriggerInternal() {
+  const now = Date.now();
+  if (now - unauthorizedWindowStart > 60_000) {
+    unauthorizedWindowStart = now;
+    unauthorizedCount = 0;
+  }
+  unauthorizedCount++;
+  if (unauthorizedCount > 10) {
+    emitAuthMetric("unexpected_logout", { reason: "unauthorized_storm" });
+    throw new ServiceError("Too many unauthorized recovery attempts", { code: "RATE_LIMITED" });
+  }
+}
+
+function isInvalidRefreshTokenMessage(message: string) {
+  const m = message.toLowerCase();
+  return m.includes("invalid refresh token") || m.includes("refresh token not found");
+}
+
+async function runRefreshWithRetriesInternal(authTraceId: string) {
+  if (isAuthKillSwitchActive()) {
+    emitAuthMetric("auth_kill_switch_activated", { authTraceId });
+    throw new ServiceError("Authentication unavailable", { code: "AUTH_KILL_SWITCH" });
+  }
+  const delays = [500, 1000, 2000];
+  for (let attempt = 0; attempt < 3; attempt++) {
+    emitAuthMetric("refresh_attempt", { attempt, authTraceId });
+    const { error } = await authRepository.refreshSessionSingleFlight();
+    if (!error) return;
+    const msg = error.message ?? "";
+    if (isInvalidRefreshTokenMessage(msg)) {
+      emitAuthMetric("refresh_failed", { terminal: true, authTraceId });
+      throw new ServiceError("Refresh failed", { code: "REFRESH_FAILED" });
+    }
+    if (!isTransientAuthNetworkError(error)) {
+      emitAuthMetric("refresh_failed", { terminal: true, authTraceId });
+      throw new ServiceError("Refresh failed", { code: "REFRESH_FAILED" });
+    }
+    await sleep(delays[attempt] ?? 2000);
+  }
+  emitAuthMetric("refresh_failed", { terminal: true, authTraceId });
+  throw new ServiceError("Refresh failed", { code: "REFRESH_FAILED" });
+}
 
 const emailSchema = z.string().trim().email();
 const passwordSchema = z.string().min(8).max(128);
@@ -11,8 +73,44 @@ const nonEmptySchema = z.string().trim().min(2).max(120);
 const slugSchema = z.string().trim().min(2).max(60);
 
 export const authService = {
+  noteUnauthorizedTrigger: noteUnauthorizedTriggerInternal,
+
+  async getActiveSession() {
+    try {
+      const s = await authRepository.getSession();
+      return {
+        user: s.user ?? null,
+        expiresAt: s.expiresAt,
+        createdAt: s.createdAt ?? null,
+      };
+    } catch (err) {
+      throw toServiceError(err, "Failed to load session");
+    }
+  },
+
+  async ensureFreshSessionIfNeeded(thresholdSec?: number) {
+    if (isAuthKillSwitchActive()) {
+      emitAuthMetric("auth_kill_switch_activated", {});
+      return;
+    }
+    const threshold = thresholdSec ?? getPreemptiveRefreshThresholdSec();
+    const { expiresAt } = await authRepository.getSession();
+    if (!expiresAt) return;
+    const now = Date.now() / 1000;
+    if (expiresAt - now > threshold) return;
+    emitAuthMetric("refresh_attempt", { phase: "preemptive" });
+    const { error } = await authRepository.refreshSessionSingleFlight();
+    if (error) {
+      emitAuthMetric("refresh_failed", { phase: "preemptive" });
+    }
+  },
+
   async login(email: string, password: string) {
     try {
+      if (isAuthKillSwitchActive()) {
+        emitAuthMetric("auth_kill_switch_activated", {});
+        throw new AuthorizationError("Authentication is temporarily unavailable.");
+      }
       const parsedEmail = emailSchema.parse(email);
       const parsedPassword = z.string().min(1).parse(password);
       await rateLimitService.assertAllowed("login", [parsedEmail]);
@@ -35,15 +133,103 @@ export const authService = {
       throw toServiceError(err, "Login failed");
     }
   },
-  async logout() {
+  async handleUnauthorized(params: { source: string; endpoint: string; authTraceId: string }) {
+    noteUnauthorizedTriggerInternal();
+    if (isAuthKillSwitchActive()) {
+      emitAuthMetric("auth_kill_switch_activated", { authTraceId: params.authTraceId });
+      try {
+        useAuth.getState().setAuthMachineState("reauth_required");
+      } catch {
+        /* ignore */
+      }
+      throw new ServiceError("Authentication unavailable", { code: "AUTH_KILL_SWITCH" });
+    }
+
+    if (isAuthRecoveryInProgress()) {
+      await awaitRecoveryWithBackpressure();
+      return;
+    }
+
     try {
-      await authRepository.signOut();
-    } catch (err) {
-      throw toServiceError(err, "Failed to sign out");
+      await runAuthRecovery(async () => {
+        await runRefreshWithRetriesInternal(params.authTraceId);
+      });
+    } catch (e) {
+      if (e instanceof ServiceError && (e.code === "RATE_LIMITED" || e.code === "AUTH_KILL_SWITCH")) throw e;
+      try {
+        useAuth.getState().setAuthMachineState("reauth_required");
+      } catch {
+        /* ignore */
+      }
     }
   },
+
+  async logout(authTraceId?: string, principalKey?: string) {
+    authListenerGuards.suppressSignedOutCleanup = true;
+    const trace = authTraceId ?? crypto.randomUUID();
+    const tabId = (() => {
+      if (typeof sessionStorage === "undefined") return "ssr";
+      try {
+        let id = sessionStorage.getItem("shefaa_tab_id");
+        if (!id) {
+          id = crypto.randomUUID();
+          sessionStorage.setItem("shefaa_tab_id", id);
+        }
+        return id;
+      } catch {
+        return "tab";
+      }
+    })();
+    const session = await authRepository.getSession().catch(() => ({ user: null as SupabaseUser | null }));
+    const u = session.user;
+    const principalKeyResolved = principalKey ?? (u?.id ? `${u.id}:none` : "anon:none");
+    const event: AuthTransitionEventV1 = {
+      v: 1,
+      eventId: crypto.randomUUID(),
+      originTabId: tabId,
+      principalKey: principalKeyResolved,
+      type: "LOGOUT",
+      occurredAt: Date.now(),
+      authTraceId: trace,
+    };
+    try {
+      try {
+        await authRepository.signOut({ scope: "global" });
+      } catch {
+        await authRepository.signOut({ scope: "local" }).catch(() => undefined);
+      }
+    } finally {
+      await runAuthCleanupEvent(event);
+      broadcastAuthEvent(event);
+      authListenerGuards.suppressSignedOutCleanup = false;
+    }
+  },
+
+  async refreshSessionWithRetryPolicy(authTraceId: string) {
+    if (isAuthKillSwitchActive()) {
+      emitAuthMetric("auth_kill_switch_activated", { authTraceId });
+      return { ok: false as const, code: "AUTH_KILL_SWITCH" as const };
+    }
+    try {
+      await runAuthRecovery(async () => {
+        await runRefreshWithRetriesInternal(authTraceId);
+      });
+      return { ok: true as const };
+    } catch (e) {
+      if (e instanceof Error && e.message === "RECOVERY_TIMEOUT") {
+        emitAuthMetric("auth_recovery_failed", { reason: "timeout", authTraceId });
+        return { ok: false as const, code: "RECOVERY_TIMEOUT" as const };
+      }
+      return { ok: false as const, code: "REFRESH_FAILED" as const };
+    }
+  },
+
   async getSessionUser() {
     try {
+      if (isAuthKillSwitchActive()) {
+        emitAuthMetric("auth_kill_switch_activated", {});
+        return null;
+      }
       const result = await authRepository.getSession();
       return result.user ?? null;
     } catch (err) {

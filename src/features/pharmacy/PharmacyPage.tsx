@@ -112,9 +112,8 @@ export const PharmacyPage = () => {
   };
 
   const handleUpdateStock = async (id: string, newStock: number) => {
-    const status = newStock === 0 ? "out_of_stock" : newStock < 50 ? "low_stock" : "in_stock";
     try {
-      await pharmacyService.update(id, { stock: newStock, status });
+      await pharmacyService.update(id, { stock: newStock });
       invalidateMedications();
     } catch (err) {
       const message = err instanceof Error ? err.message : t("common.error");

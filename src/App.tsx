@@ -2,7 +2,8 @@ import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/services/query/queryClient.instance";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SessionTimeout } from "./features/auth/SessionTimeout";
 import { ReauthDialog } from "./features/auth/ReauthDialog";
@@ -54,8 +55,6 @@ const ReportsPage = lazyPage(() => import("./features/reports/ReportsPage"), (m)
 const SettingsPage = lazyPage(() => import("./features/settings/SettingsPage"), (m) => m.SettingsPage, ["common", "settings", "auth"]);
 const TelemedicineCallPage = lazyPage(() => import("./features/telemedicine/TelemedicineCallPage"), (m) => m.TelemedicineCallPage, ["common", "appointments"]);
 const NotFound = lazy(() => import("./pages/NotFound"));
-
-const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

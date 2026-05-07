@@ -3,6 +3,7 @@ import {
   invoiceCreateSchema,
   invoiceListParamsSchema,
   invoicePaymentCreateSchema,
+  invoicePaymentCommandResultSchema,
   invoicePaymentSchema,
   invoiceSchema,
   invoiceSummarySchema,
@@ -11,6 +12,7 @@ import {
 } from "@/domain/billing/billing.schema";
 import { dateStringSchema } from "@/domain/shared/date.schema";
 import { uuidSchema } from "@/domain/shared/identifiers.schema";
+import { statePolicies } from "@/domain/workflows/statePolicies";
 import type {
   Invoice,
   InvoiceCreateInput,
@@ -23,22 +25,12 @@ import { limitOffsetSchema } from "@/domain/shared/pagination.schema";
 import { emitDomainEvent } from "@/core/events";
 import { assertAnyPermission } from "@/services/supabase/permissions";
 import { featureAccessService } from "@/services/subscription/featureAccess.service";
-import { BusinessRuleError, toServiceError } from "@/services/supabase/errors";
+import { BusinessRuleError, ConflictError, NotFoundError, toServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
+import { withAuthStaleGuard } from "@/services/auth/authContextSnapshot";
 import { auditLogService } from "@/services/settings/audit.service";
 import { rateLimitService } from "@/services/security/rateLimit.service";
 import { billingRepository } from "./billing.repository";
-
-const INVOICE_STATUS_TRANSITIONS: Record<
-  Invoice["status"],
-  Array<Invoice["status"]>
-> = {
-  pending: ["overdue", "void"],
-  overdue: ["pending", "void"],
-  partially_paid: ["overdue", "void"],
-  paid: [],
-  void: [],
-};
 
 const todayDateKey = () => new Date().toISOString().slice(0, 10);
 
@@ -68,7 +60,7 @@ function normalizeInvoiceAmounts(totalAmount: number, amountPaid: number) {
 function assertInvoiceStatusTransition(current: Invoice["status"], next: Invoice["status"], existing: Invoice, input: InvoiceUpdateInput) {
   if (current === next) return;
 
-  if (!INVOICE_STATUS_TRANSITIONS[current].includes(next)) {
+  if (!statePolicies.billing.canTransition(current, next)) {
     throw new BusinessRuleError(`Cannot move invoice from ${current} to ${next}`, {
       code: "INVOICE_STATUS_TRANSITION_INVALID",
       details: { currentStatus: current, nextStatus: next },
@@ -243,14 +235,15 @@ export const billingService = {
       const parsedId = uuidSchema.parse(id);
       const parsed = invoiceUpdateSchema.parse(input);
       const { tenantId, userId } = getTenantContext();
+      const { expected_updated_at, ...parsedUpdate } = parsed;
       const existing = invoiceSchema.parse(await billingRepository.getById(parsedId, tenantId));
 
-      if (parsed.status !== undefined) {
-        assertInvoiceStatusTransition(existing.status, parsed.status, existing, parsed);
+      if (parsedUpdate.status !== undefined) {
+        assertInvoiceStatusTransition(existing.status, parsedUpdate.status, existing, parsedUpdate);
       }
 
-      const totalAmount = parsed.amount !== undefined ? toMoney(Number(parsed.amount)) : Number(existing.amount);
-      const amountPaid = parsed.amount_paid !== undefined ? toMoney(Number(parsed.amount_paid)) : Number(existing.amount_paid);
+      const totalAmount = parsedUpdate.amount !== undefined ? toMoney(Number(parsedUpdate.amount)) : Number(existing.amount);
+      const amountPaid = parsedUpdate.amount_paid !== undefined ? toMoney(Number(parsedUpdate.amount_paid)) : Number(existing.amount_paid);
       if (amountPaid > totalAmount) {
         throw new BusinessRuleError("Amount paid cannot exceed the invoice total", {
           code: "INVOICE_AMOUNT_PAID_EXCEEDS_TOTAL",
@@ -258,29 +251,37 @@ export const billingService = {
       }
 
       const { balanceDue } = normalizeInvoiceAmounts(totalAmount, amountPaid);
-      const voidedAt = parsed.status === "void"
-        ? (parsed.voided_at ?? existing.voided_at ?? new Date().toISOString())
-        : parsed.voided_at ?? existing.voided_at ?? null;
+      const voidedAt = parsedUpdate.status === "void"
+        ? (parsedUpdate.voided_at ?? existing.voided_at ?? new Date().toISOString())
+        : parsedUpdate.voided_at ?? existing.voided_at ?? null;
 
-      const normalizedStatus = parsed.status === "void"
+      const normalizedStatus = parsedUpdate.status === "void"
         ? "void"
-        : deriveInvoiceStatus(totalAmount, amountPaid, parsed.due_date ?? existing.due_date ?? null, null);
+        : deriveInvoiceStatus(totalAmount, amountPaid, parsedUpdate.due_date ?? existing.due_date ?? null, null);
 
       const normalizedUpdate: InvoiceUpdateInput = {
-        ...parsed,
+        ...parsedUpdate,
         amount: totalAmount,
         amount_paid: amountPaid,
         balance_due: normalizedStatus === "void" ? 0 : balanceDue,
         status: normalizedStatus,
         paid_at: normalizedStatus === "paid"
-          ? parsed.paid_at ?? existing.paid_at ?? new Date().toISOString()
+          ? parsedUpdate.paid_at ?? existing.paid_at ?? new Date().toISOString()
           : normalizedStatus === "void"
             ? null
-            : parsed.paid_at ?? existing.paid_at ?? null,
+            : parsedUpdate.paid_at ?? existing.paid_at ?? null,
         voided_at: normalizedStatus === "void" ? voidedAt : null,
       };
 
-      const result = await billingRepository.update(parsedId, normalizedUpdate, tenantId);
+      const result = await billingRepository.update(parsedId, normalizedUpdate, tenantId, expected_updated_at);
+      if (!result) {
+        if (expected_updated_at) {
+          throw new ConflictError("Invoice was modified by another user", {
+            code: "CONCURRENT_UPDATE",
+          });
+        }
+        throw new NotFoundError("Invoice not found");
+      }
       const invoice = invoiceSchema.parse(result);
 
       await auditLogService.logEvent({
@@ -316,6 +317,7 @@ export const billingService = {
       await featureAccessService.assertFeatureAccess("billing");
       const parsedId = uuidSchema.parse(invoiceId);
       const parsed = invoicePaymentCreateSchema.parse(input);
+      return await withAuthStaleGuard(async () => {
       const { tenantId, userId } = getTenantContext();
       const existing = invoiceSchema.parse(await billingRepository.getById(parsedId, tenantId));
 
@@ -339,56 +341,69 @@ export const billingService = {
 
       await rateLimitService.assertAllowed("invoice_payment_post", [tenantId, userId]);
 
-      const payment = invoicePaymentSchema.parse(
-        await billingRepository.createPayment(parsedId, existing.patient_id, {
+      const command = invoicePaymentCommandResultSchema.parse(
+        await billingRepository.postPaymentAtomic(parsedId, {
           ...parsed,
           amount: paymentAmount,
           paid_at: parsed.paid_at ?? new Date().toISOString(),
+          idempotency_key: parsed.idempotency_key ?? crypto.randomUUID(),
         }, tenantId, userId),
       );
 
-      const amountPaid = toMoney(Number(existing.amount_paid) + paymentAmount);
-      const { balanceDue } = normalizeInvoiceAmounts(Number(existing.amount), amountPaid);
-      const nextStatus = deriveInvoiceStatus(Number(existing.amount), amountPaid, existing.due_date ?? null, null);
+      if (command.result_code === "IDEMPOTENCY_MISMATCH") {
+        throw new BusinessRuleError(command.message ?? "Idempotency key mismatch", {
+          code: "INVOICE_PAYMENT_IDEMPOTENCY_MISMATCH",
+        });
+      }
+      if (!command.invoice || !command.payment) {
+        throw new ConflictError(command.message ?? "Payment command could not be completed", {
+          code: "INVOICE_PAYMENT_COMMAND_INCOMPLETE",
+          details: { retryable: command.retryable, resultCode: command.result_code },
+        });
+      }
 
-      const invoice = invoiceSchema.parse(
-        await billingRepository.update(parsedId, {
-          amount_paid: amountPaid,
-          balance_due: balanceDue,
-          status: nextStatus,
-          paid_at: nextStatus === "paid" ? payment.paid_at : existing.paid_at ?? null,
-        }, tenantId),
-      );
+      const invoice = invoiceSchema.parse(command.invoice);
+      const payment = invoicePaymentSchema.parse(command.payment);
 
-      await auditLogService.logEvent({
-        tenant_id: tenantId,
-        user_id: userId,
-        action: "invoice_payment_posted",
-        action_type: "invoice_payment_create",
-        entity_type: "invoice_payment",
-        entity_id: payment.id,
-        details: {
-          invoice_id: invoice.id,
-          amount: payment.amount,
-          payment_method: payment.payment_method,
-          balance_due: invoice.balance_due,
-          status: invoice.status,
-        },
-      });
+      try {
+        await auditLogService.logEvent({
+          tenant_id: tenantId,
+          user_id: userId,
+          action: "invoice_payment_posted",
+          action_type: "invoice_payment_create",
+          entity_type: "invoice_payment",
+          entity_id: payment.id,
+          details: {
+            invoice_id: invoice.id,
+            amount: payment.amount,
+            payment_method: payment.payment_method,
+            balance_due: invoice.balance_due,
+            status: invoice.status,
+            idempotency_replay: command.idempotency_replay,
+          },
+        });
+      } catch (auditError) {
+        console.error("Failed to persist billing audit event", auditError);
+      }
 
       if (existing.status !== "paid" && invoice.status === "paid") {
-        await emitDomainEvent(
-          "InvoicePaid",
-          {
-            invoiceId: invoice.id,
-            patientId: invoice.patient_id,
-            amount: Number(payment.amount),
-          },
-          { tenantId, userId },
-        );
+        try {
+          await emitDomainEvent(
+            "InvoicePaid",
+            {
+              invoiceId: invoice.id,
+              patientId: invoice.patient_id,
+              amount: Number(payment.amount),
+            },
+            { tenantId, userId },
+          );
+        } catch (eventError) {
+          console.error("Failed to emit InvoicePaid event", eventError);
+        }
       }
 
       return { invoice, payment };
+      });
     } catch (err) {
       throw toServiceError(err, "Failed to post invoice payment");
     }

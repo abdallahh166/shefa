@@ -14,10 +14,10 @@ export const subscriptionRepository: SubscriptionRepository = {
       .from("subscriptions")
       .select(SUBSCRIPTION_COLUMNS)
       .eq("tenant_id", tenantId)
-      .single();
+      .range(0, 0);
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load subscription", { code: error.code, details: error });
     }
-    return (data ?? null) as SubscriptionSummary | null;
+    return ((data ?? [])[0] ?? null) as SubscriptionSummary | null;
   },
 };

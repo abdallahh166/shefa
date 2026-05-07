@@ -8,11 +8,18 @@ import { initEventHandlers } from "./core/events";
 import { initSentry } from "./core/observability/sentry";
 import { initializeI18nStore } from "./core/i18n/i18nStore";
 import { initializePrivilegedSessionLifecycle } from "./services/auth/privilegedSession.lifecycle";
+import { initAuthMultiTabSync, startAuthDriftWatcher } from "./services/auth/authSessionOrchestrator";
+import { authRepository } from "./services/auth/auth.repository";
 
 // Apply theme class before anything renders (prevents flash)
 initTheme();
 void initializeI18nStore();
 
+initAuthMultiTabSync();
+startAuthDriftWatcher({
+  getSession: () => authRepository.getSession(),
+  refreshSessionSingleFlight: () => authRepository.refreshSessionSingleFlight(),
+});
 // Initialize auth state on app load
 useAuth.getState().initialize();
 initializePrivilegedSessionLifecycle();

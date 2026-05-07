@@ -43,8 +43,8 @@ export const reportRepository: ReportRepository = {
     }
     return ((data as any)?.[0] ?? null) as ReportRefreshStatus | null;
   },
-  async getOverview(_tenantId) {
-    const { data, error } = await supabase.rpc("get_report_overview");
+  async getOverview(tenantId) {
+    const { data, error } = await supabase.rpc("get_report_overview", { _tenant_id: tenantId });
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load report overview", {
         code: error.code,
@@ -53,8 +53,11 @@ export const reportRepository: ReportRepository = {
     }
     return ((data as any)?.[0] ?? { total_revenue: 0, total_patients: 0, total_appointments: 0, avg_doctor_rating: 0 }) as ReportOverview;
   },
-  async getRevenueByMonth(_tenantId, months = 6) {
-    const { data, error } = await supabase.rpc("get_report_revenue_by_month", { _months: months });
+  async getRevenueByMonth(tenantId, months = 6) {
+    const { data, error } = await supabase.rpc("get_report_revenue_by_month", {
+      _months: months,
+      _tenant_id: tenantId,
+    } as any);
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load revenue report", {
         code: error.code,
@@ -63,44 +66,18 @@ export const reportRepository: ReportRepository = {
     }
     return (data ?? []) as RevenueByMonthRow[];
   },
-  async getPatientGrowth(_tenantId, months = 6) {
-    const primary = await supabase.rpc("get_report_patient_growth", { _months: months });
-    if (!primary.error) {
-      return (primary.data ?? []) as PatientGrowthRow[];
-    }
-
-    const primaryError = primary.error;
-    const message = `${primaryError.message ?? ""} ${primaryError.details ?? ""} ${primaryError.hint ?? ""}`;
-    const isForbidden = primaryError.code === "42501" || /forbidden/i.test(message);
-    const status = (primaryError as { status?: number; statusCode?: number }).status
-      ?? (primaryError as { status?: number; statusCode?: number }).statusCode;
-    const shouldRetry =
-      !isForbidden &&
-      (/_months|months|signature|function|get_report_patient_growth|parameters?/i.test(message) ||
-        ["PGRST202", "PGRST203", "PGRST116", "PGRST301", "PGRST204", "42883"].includes(primaryError.code ?? "") ||
-        status === 400);
-
-    if (shouldRetry) {
-      const alt = await supabase.rpc("get_report_patient_growth", { months });
-      if (!alt.error) {
-        return (alt.data ?? []) as PatientGrowthRow[];
-      }
-
-      const fallback = await supabase.rpc("get_report_patient_growth");
-      if (!fallback.error) {
-        return (fallback.data ?? []) as PatientGrowthRow[];
-      }
-
-      throw new ServiceError(primaryError.message ?? "Failed to load patient growth report", {
-        code: primaryError.code,
-        details: { primary: primaryError, alt: alt.error, fallback: fallback.error },
+  async getPatientGrowth(tenantId, months = 6) {
+    const { data, error } = await supabase.rpc("get_report_patient_growth", {
+      _months: months,
+      _tenant_id: tenantId,
+    } as any);
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to load patient growth report", {
+        code: error.code,
+        details: error,
       });
     }
-
-    throw new ServiceError(primaryError.message ?? "Failed to load patient growth report", {
-      code: primaryError.code,
-      details: primaryError,
-    });
+    return (data ?? []) as PatientGrowthRow[];
   },
   async getAppointmentTypes(_tenantId) {
     const { data, error } = await supabase.rpc("get_report_appointment_types");

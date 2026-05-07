@@ -17,10 +17,23 @@ function isInvalidRefreshTokenError(error: { message?: string | null }) {
   );
 }
 
+export function isTransientAuthNetworkError(error: { message?: string | null; name?: string }) {
+  const message = error.message?.toLowerCase() ?? "";
+  return (
+    message.includes("network")
+    || message.includes("fetch")
+    || message.includes("failed to fetch")
+    || error.name === "AuthRetryableFetchError"
+  );
+}
+
+let refreshSessionFlight: Promise<{ error: { message?: string | null; name?: string } | null }> | null = null;
+
 export interface AuthRepository {
   signInWithPassword(email: string, password: string): Promise<SupabaseUser | null>;
-  signOut(): Promise<void>;
-  getSession(): Promise<{ user?: SupabaseUser | null }>;
+  signOut(options?: { scope?: "global" | "local" }): Promise<void>;
+  getSession(): Promise<{ user?: SupabaseUser | null; expiresAt?: number; createdAt?: string | null }>;
+  refreshSessionSingleFlight(): Promise<{ error: { message?: string | null; name?: string } | null }>;
   onAuthStateChange(
     handler: (event: string, user?: SupabaseUser | null) => void,
   ): () => void;
@@ -45,8 +58,8 @@ export const authRepository: AuthRepository = {
     }
     return data.user ?? null;
   },
-  async signOut() {
-    const { error } = await supabase.auth.signOut();
+  async signOut(options) {
+    const { error } = await supabase.auth.signOut(options);
     if (error) {
       throw new ServiceError(error.message ?? "Failed to sign out", { code: error.code, details: error });
     }
@@ -60,7 +73,23 @@ export const authRepository: AuthRepository = {
       }
       throw new ServiceError(error.message ?? "Failed to load session", { code: error.code, details: error });
     }
-    return { user: data.session?.user ?? null };
+    const session = data.session;
+    const createdAt = session ? (session as { created_at?: string }).created_at ?? null : null;
+    return {
+      user: session?.user ?? null,
+      expiresAt: session?.expires_at,
+      createdAt,
+    };
+  },
+  async refreshSessionSingleFlight() {
+    if (refreshSessionFlight) return refreshSessionFlight;
+    refreshSessionFlight = (async () => {
+      const { error } = await supabase.auth.refreshSession();
+      return { error: error ? { message: error.message, name: error.name } : null };
+    })().finally(() => {
+      refreshSessionFlight = null;
+    });
+    return refreshSessionFlight;
   },
   onAuthStateChange(handler) {
     const { data } = supabase.auth.onAuthStateChange((event, session) => {

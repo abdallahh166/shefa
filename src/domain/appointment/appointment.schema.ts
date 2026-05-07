@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 import { dateTimeStringSchema } from "../shared/date.schema";
 import { listParamsSchema } from "../shared/pagination.schema";
 import { uuidSchema } from "../shared/identifiers.schema";
@@ -55,6 +55,8 @@ export const appointmentCreateSchema = appointmentSchema
     duration_minutes: z.number().int().min(1).max(1440).optional(),
   });
 
-export const appointmentUpdateSchema = appointmentCreateSchema.partial();
+export const appointmentUpdateSchema = appointmentCreateSchema.partial().extend({
+  expected_updated_at: dateTimeStringSchema.optional(),
+});
 
 export const appointmentListParamsSchema = listParamsSchema;

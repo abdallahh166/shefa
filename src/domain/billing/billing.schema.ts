@@ -58,6 +58,7 @@ export const invoiceUpdateSchema = invoiceCreateSchema
     balance_due: z.coerce.number().min(0).optional(),
     paid_at: dateTimeStringSchema.optional().nullable(),
     voided_at: dateTimeStringSchema.optional().nullable(),
+    expected_updated_at: dateTimeStringSchema.optional(),
   });
 
 export const invoicePaymentSchema = z.object({
@@ -87,7 +88,17 @@ export const invoicePaymentCreateSchema = invoicePaymentSchema
     paid_at: dateTimeStringSchema.optional(),
     reference: z.string().trim().max(120).optional().nullable(),
     notes: z.string().trim().max(1000).optional().nullable(),
+    idempotency_key: z.string().trim().min(8).max(120).optional(),
   });
+
+export const invoicePaymentCommandResultSchema = z.object({
+  result_code: z.string(),
+  retryable: z.boolean(),
+  idempotency_replay: z.boolean(),
+  message: z.string().nullable(),
+  invoice: invoiceSchema.nullable(),
+  payment: invoicePaymentSchema.nullable(),
+});
 
 export const invoiceListParamsSchema = listParamsSchema;
 

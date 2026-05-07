@@ -36,7 +36,7 @@ function timeAgo(dateStr: string): string {
 
 export const NotificationCenter = () => {
   const { t } = useI18n();
-  const { user } = useAuth();
+  const { authMachineState, user } = useAuth();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [page, setPage] = useState(1);
@@ -65,13 +65,21 @@ export const NotificationCenter = () => {
   useEffect(() => { loadNotifications(); }, [loadNotifications]);
 
   useEffect(() => {
-    if (!user?.id) return;
-    const subscription = notificationService.subscribe(user.id, (payload) => {
-      setNotifications((prev) => [payload as Notification, ...prev]);
-      setTotal((prev) => prev + 1);
-    });
-    return () => { subscription.unsubscribe(); };
-  }, [user?.id]);
+    if (!user?.id || !user.tenantId || authMachineState !== "authenticated") return;
+
+    let subscription: { unsubscribe: () => void } | null = null;
+    const timer = window.setTimeout(() => {
+      subscription = notificationService.subscribe(user.id, (payload) => {
+        setNotifications((prev) => [payload as Notification, ...prev]);
+        setTotal((prev) => prev + 1);
+      });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+      subscription?.unsubscribe();
+    };
+  }, [authMachineState, user?.id, user?.tenantId]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 

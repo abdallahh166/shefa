@@ -74,10 +74,6 @@ export const appointmentQueueService = {
             details: { queueId: existing.id, status: existing.status },
           });
         }
-        throw new BusinessRuleError("This appointment already has a closed queue record", {
-          code: "APPOINTMENT_QUEUE_CLOSED",
-          details: { queueId: existing.id, status: existing.status },
-        });
       }
 
       const entry = appointmentQueueSchema.parse(

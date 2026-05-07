@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 import { dateStringSchema, dateTimeStringSchema } from "../shared/date.schema";
 import { listParamsSchema } from "../shared/pagination.schema";
 import { uuidSchema } from "../shared/identifiers.schema";
@@ -48,6 +48,8 @@ export const labResultCreateSchema = labResultSchema
     order_date: dateStringSchema.optional(),
   });
 
-export const labResultUpdateSchema = labResultCreateSchema.partial();
+export const labResultUpdateSchema = labResultCreateSchema.partial().extend({
+  expected_updated_at: dateTimeStringSchema.optional(),
+});
 
 export const labResultListParamsSchema = listParamsSchema;

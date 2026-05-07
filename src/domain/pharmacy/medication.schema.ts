@@ -33,7 +33,9 @@ export const medicationCreateSchema = medicationSchema
     status: medicationStatusEnum.optional(),
   });
 
-export const medicationUpdateSchema = medicationCreateSchema.partial();
+export const medicationUpdateSchema = medicationCreateSchema.partial().extend({
+  expected_updated_at: dateTimeStringSchema.optional(),
+});
 
 export const medicationListParamsSchema = listParamsSchema;
 

@@ -36,7 +36,7 @@ export interface LabRepository {
   listByPatient(patientId: string, tenantId: string, params?: LimitOffsetParams): Promise<LabOrderWithDoctor[]>;
   getById(id: string, tenantId: string): Promise<LabResult>;
   create(input: LabResultCreateInput, tenantId: string): Promise<LabResult>;
-  update(id: string, input: LabResultUpdateInput, tenantId: string): Promise<LabResult>;
+  update(id: string, input: LabResultUpdateInput, tenantId: string, expectedUpdatedAt?: string): Promise<LabResult | null>;
   archive(id: string, tenantId: string, userId: string): Promise<LabResult>;
   restore(id: string, tenantId: string): Promise<LabResult>;
 }
@@ -223,7 +223,7 @@ export const labRepository: LabRepository = {
 
     return assertOk(result) as LabResult;
   },
-  async update(id, input, tenantId) {
+  async update(id, input, tenantId, expectedUpdatedAt) {
     const payload: Record<string, unknown> = {};
 
     if (input.patient_id !== undefined) payload.patient_id = input.patient_id;
@@ -249,15 +249,22 @@ export const labRepository: LabRepository = {
       return assertOk(result) as LabResult;
     }
 
-    const result = await supabase
+    let query = supabase
       .from("lab_orders")
       .update(payload)
       .eq("id", id)
-      .eq("tenant_id", tenantId)
-      .select(LAB_COLUMNS)
-      .single();
-
-    return assertOk(result) as LabResult;
+      .eq("tenant_id", tenantId);
+    if (expectedUpdatedAt) {
+      query = query.eq("updated_at", expectedUpdatedAt);
+    }
+    const { data, error } = await query.select(LAB_COLUMNS).maybeSingle();
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to update lab order", {
+        code: error.code,
+        details: error,
+      });
+    }
+    return (data ?? null) as LabResult | null;
   },
   async archive(id, tenantId, userId) {
     const result = await supabase

@@ -1,7 +1,20 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { profileStorage } from "@/services/settings/profile.storage";
-import { authService } from "@/services/auth/auth.service";
+import { authListenerGuards, authService } from "@/services/auth/auth.service";
+import { assertAuthTransition, type AuthMachineState } from "@/services/auth/authStateMachine";
+import {
+  attachAuthSessionOrchestrator,
+  broadcastAuthEvent,
+  runAuthCleanupEvent,
+  runPrincipalBoundaryIfNeeded,
+  runTenantScopedCacheReset,
+} from "@/services/auth/authSessionOrchestrator";
+import { sessionVersionFromSupabaseUser } from "@/services/auth/sessionVersion";
+import { isAuthKillSwitchActive } from "@/services/auth/authKillSwitch";
+import { emitAuthMetric } from "@/services/auth/authMetrics";
+import { usePortalAuth } from "@/core/auth/portalAuthStore";
+import type { AuthTransitionEventV1 } from "@/services/auth/authSessionOrchestrator";
 
 export type GlobalRole = "super_admin";
 export type TenantRole = "clinic_admin" | "doctor" | "receptionist" | "nurse" | "accountant";
@@ -109,10 +122,13 @@ interface AuthState {
   supabaseUser: SupaUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  authMachineState: AuthMachineState;
+  sessionVersion: string | null;
   tenantOverride: TenantOverride;
   impersonationSession: ImpersonationSession;
   lastVerifiedAt: string | null;
   privilegedAuth: PrivilegedAuthState;
+  setAuthMachineState: (next: AuthMachineState) => void;
   setUser: (user: AppUser | null, supabaseUser?: SupaUser | null) => void;
   setLoading: (loading: boolean) => void;
   setPrivilegedAuth: (state: Partial<PrivilegedAuthState>) => void;
@@ -153,7 +169,7 @@ function getEffectiveRoles(user?: Pick<AppUser, "tenantRoles" | "globalRoles"> |
   return [...(user.globalRoles ?? []), ...(user.tenantRoles ?? [])];
 }
 
-function getDefaultPrivilegedAuthState(): PrivilegedAuthState {
+export function getDefaultPrivilegedAuthState(): PrivilegedAuthState {
   return {
     currentLevel: null,
     nextLevel: null,
@@ -207,6 +223,16 @@ export function buildPrivilegedSession(input: {
   };
 }
 
+let lastPrincipalKeyCommitted: string | null = null;
+let lastSessionVersionCommitted: string | null = null;
+
+export function principalKeyFromSnapshot(state: Pick<AuthState, "user" | "tenantOverride">) {
+  const u = state.user;
+  if (!u) return "anon:none";
+  const tid = state.tenantOverride?.id ?? u.tenantId ?? "none";
+  return `${u.id}:${tid}`;
+}
+
 export const useAuth = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -214,18 +240,32 @@ export const useAuth = create<AuthState>()(
       supabaseUser: null,
       isAuthenticated: false,
       isLoading: true,
+      authMachineState: "initializing",
+      sessionVersion: null,
       tenantOverride: null,
       impersonationSession: null,
       lastVerifiedAt: null,
       privilegedAuth: getDefaultPrivilegedAuthState(),
+      setAuthMachineState: (next) => {
+        const prev = get().authMachineState;
+        assertAuthTransition(prev, next);
+        const loading =
+          next === "initializing"
+          || next === "authenticating"
+          || next === "unauthenticated_pending_cleanup"
+          || next === "refreshing";
+        set({ authMachineState: next, isLoading: loading });
+      },
       setUser: (user, supabaseUser) => set({
         user,
         supabaseUser: supabaseUser ?? null,
         isAuthenticated: !!user,
         isLoading: false,
+        authMachineState: user ? "authenticated" : "unauthenticated",
         tenantOverride: isSuperAdmin(user) ? get().tenantOverride : null,
         impersonationSession: isSuperAdmin(user) ? get().impersonationSession : null,
         lastVerifiedAt: user ? get().lastVerifiedAt : null,
+        sessionVersion: user ? get().sessionVersion : null,
       }),
       setLoading: (isLoading) => set({ isLoading }),
       setPrivilegedAuth: (state) => set((current) => ({
@@ -236,16 +276,16 @@ export const useAuth = create<AuthState>()(
       })),
       clearPrivilegedAuth: () => set({ privilegedAuth: getDefaultPrivilegedAuthState() }),
       logout: async () => {
-        await authService.logout();
-        set({
-          user: null,
-          supabaseUser: null,
-          isAuthenticated: false,
-          tenantOverride: null,
-          impersonationSession: null,
-          lastVerifiedAt: null,
-          privilegedAuth: getDefaultPrivilegedAuthState(),
-        });
+        const trace = crypto.randomUUID();
+        const principalKey = principalKeyFromSnapshot(get());
+        get().setAuthMachineState("unauthenticated_pending_cleanup");
+        try {
+          await authService.logout(trace, principalKey);
+        } finally {
+          lastPrincipalKeyCommitted = null;
+          lastSessionVersionCommitted = null;
+          get().setAuthMachineState("unauthenticated");
+        }
       },
       hasPermission: (permission) => {
         const { user } = get();
@@ -260,10 +300,29 @@ export const useAuth = create<AuthState>()(
           : user.tenantRoles.includes(role as TenantRole);
       },
       setTenantOverride: (tenant) => {
+        const prevParts = {
+          userId: get().user?.id ?? "anon",
+          tenantId: get().tenantOverride?.id ?? get().user?.tenantId ?? "none",
+        };
         set({
           tenantOverride: tenant,
           impersonationSession: null,
         });
+        const u = get().supabaseUser;
+        const effTenant = tenant?.id ?? get().user?.tenantId ?? null;
+        const nextVer = sessionVersionFromSupabaseUser(u as any, effTenant, null);
+        const nextKey = principalKeyFromSnapshot(get());
+        if (get().isAuthenticated && prevParts.userId !== "anon") {
+          void runTenantScopedCacheReset({
+            previousPrincipalParts: prevParts,
+            authTraceId: crypto.randomUUID(),
+          });
+        }
+        if (nextVer) {
+          set({ sessionVersion: nextVer });
+          lastPrincipalKeyCommitted = nextKey;
+          lastSessionVersionCommitted = nextVer;
+        }
       },
       clearTenantOverride: () => {
         set({ tenantOverride: null, impersonationSession: null });
@@ -278,19 +337,53 @@ export const useAuth = create<AuthState>()(
         set({ lastVerifiedAt: verifiedAt ?? new Date().toISOString() });
       },
       initialize: async () => {
-        set({ isLoading: true });
+        get().setAuthMachineState("initializing");
+        if (isAuthKillSwitchActive()) {
+          emitAuthMetric("auth_kill_switch_activated", {});
+          const trace = crypto.randomUUID();
+          const pk = principalKeyFromSnapshot(get());
+          const tabId = (() => {
+            try {
+              let id = sessionStorage.getItem("shefaa_tab_id");
+              if (!id) {
+                id = crypto.randomUUID();
+                sessionStorage.setItem("shefaa_tab_id", id);
+              }
+              return id;
+            } catch {
+              return "tab";
+            }
+          })();
+          const ev: AuthTransitionEventV1 = {
+            v: 1,
+            eventId: crypto.randomUUID(),
+            originTabId: tabId,
+            principalKey: pk,
+            type: "BOUNDARY_RESET",
+            occurredAt: Date.now(),
+            authTraceId: trace,
+          };
+          await runAuthCleanupEvent(ev);
+          get().setAuthMachineState("reauth_required");
+          return;
+        }
         const timeout = new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("Auth timeout")), 8000)
         );
         try {
-          const sessionResult = await Promise.race([
-            authService.getSessionUser(),
-            timeout,
-          ]);
-          const supaUser = sessionResult as SupaUser | null;
+          const active = await Promise.race([authService.getActiveSession(), timeout]);
+          const supaUser = active.user as SupaUser | null;
+          const persistedId = get().user?.id;
+          if (supaUser && persistedId && persistedId !== supaUser.id) {
+            emitAuthMetric("unexpected_logout", { reason: "corrupted_session" });
+            const trace = crypto.randomUUID();
+            await authService.logout(trace, principalKeyFromSnapshot(get()));
+            get().setAuthMachineState("unauthenticated");
+            return;
+          }
           if (supaUser) {
             await Promise.race([
-              loadUserProfile(supaUser, set),
+              loadUserProfile(supaUser, { createdAt: active.createdAt ?? null }),
               timeout,
             ]);
             const { user, lastVerifiedAt } = get();
@@ -301,6 +394,8 @@ export const useAuth = create<AuthState>()(
               set({ lastVerifiedAt: new Date().toISOString() });
             }
           } else {
+            lastPrincipalKeyCommitted = null;
+            lastSessionVersionCommitted = null;
             set({
               user: null,
               supabaseUser: null,
@@ -309,9 +404,13 @@ export const useAuth = create<AuthState>()(
               impersonationSession: null,
               lastVerifiedAt: null,
               privilegedAuth: getDefaultPrivilegedAuthState(),
+              sessionVersion: null,
             });
+            get().setAuthMachineState("unauthenticated");
           }
         } catch {
+          lastPrincipalKeyCommitted = null;
+          lastSessionVersionCommitted = null;
           set({
             user: null,
             supabaseUser: null,
@@ -320,9 +419,9 @@ export const useAuth = create<AuthState>()(
             impersonationSession: null,
             lastVerifiedAt: null,
             privilegedAuth: getDefaultPrivilegedAuthState(),
+            sessionVersion: null,
           });
-        } finally {
-          set({ isLoading: false });
+          get().setAuthMachineState("unauthenticated");
         }
       },
     }),
@@ -341,12 +440,18 @@ export const useAuth = create<AuthState>()(
 
 async function loadUserProfile(
   supaUser: SupaUser,
-  set: (partial: Partial<AuthState>) => void
+  sessionMeta?: { createdAt?: string | null },
 ) {
   const isVerified = Boolean(supaUser.email_confirmed_at ?? supaUser.confirmed_at);
   if (!isVerified) {
-    await authService.logout().catch(() => undefined);
-    set({ user: null, supabaseUser: null, isAuthenticated: false });
+    await authService.logout(undefined, principalKeyFromSnapshot(useAuth.getState())).catch(() => undefined);
+    useAuth.setState({
+      user: null,
+      supabaseUser: null,
+      isAuthenticated: false,
+      sessionVersion: null,
+      authMachineState: "unauthenticated",
+    });
     return;
   }
   const { profile, roles } = await authService.loadUserProfile(supaUser.id);
@@ -379,16 +484,40 @@ async function loadUserProfile(
 
     nextUser.avatar = avatarUrl;
 
-    set({
+    const tenantOverride = isSuperAdmin(nextUser) ? useAuth.getState().tenantOverride : null;
+    const effTenant = tenantOverride?.id ?? nextUser.tenantId ?? null;
+    const nextKey = principalKeyFromSnapshot({ user: nextUser, tenantOverride });
+    const nextVer = sessionVersionFromSupabaseUser(supaUser as any, effTenant, sessionMeta?.createdAt ?? null);
+
+    if (nextVer && lastPrincipalKeyCommitted) {
+      await runPrincipalBoundaryIfNeeded({
+        prevPrincipalKey: lastPrincipalKeyCommitted,
+        nextPrincipalKey: nextKey,
+        prevSessionVersion: lastSessionVersionCommitted,
+        nextSessionVersion: nextVer,
+        authTraceId: crypto.randomUUID(),
+      });
+    }
+    if (nextVer) {
+      lastPrincipalKeyCommitted = nextKey;
+      lastSessionVersionCommitted = nextVer;
+    }
+
+    useAuth.setState({
       user: nextUser,
       supabaseUser: supaUser,
       isAuthenticated: true,
-      tenantOverride: isSuperAdmin(nextUser) ? useAuth.getState().tenantOverride : null,
+      tenantOverride,
       impersonationSession: isSuperAdmin(nextUser) ? useAuth.getState().impersonationSession : null,
       lastVerifiedAt: useAuth.getState().lastVerifiedAt,
+      sessionVersion: nextVer,
+      authMachineState: "authenticated",
+      isLoading: false,
     });
   } else {
-    set({
+    lastPrincipalKeyCommitted = null;
+    lastSessionVersionCommitted = null;
+    useAuth.setState({
       user: null,
       supabaseUser: null,
       isAuthenticated: false,
@@ -396,25 +525,113 @@ async function loadUserProfile(
       impersonationSession: null,
       lastVerifiedAt: null,
       privilegedAuth: getDefaultPrivilegedAuthState(),
+      sessionVersion: null,
+      authMachineState: "unauthenticated",
     });
+  }
+}
+
+let tokenRefreshCoalesce: ReturnType<typeof setTimeout> | null = null;
+
+function readTabIdForEvent() {
+  if (typeof sessionStorage === "undefined") return "ssr";
+  try {
+    let id = sessionStorage.getItem("shefaa_tab_id");
+    if (!id) {
+      id = crypto.randomUUID();
+      sessionStorage.setItem("shefaa_tab_id", id);
+    }
+    return id;
+  } catch {
+    return "tab";
   }
 }
 
 // Listen for auth changes
 authService.onAuthStateChange(async (event, sessionUser) => {
-  const { setUser, setLoading, markSessionVerified } = useAuth.getState();
+  const { setLoading, markSessionVerified, setAuthMachineState } = useAuth.getState();
+
+  if (event === "TOKEN_REFRESHED") {
+    if (tokenRefreshCoalesce) clearTimeout(tokenRefreshCoalesce);
+    tokenRefreshCoalesce = setTimeout(() => {
+      tokenRefreshCoalesce = null;
+      void (async () => {
+        const active = await authService.getActiveSession();
+        const effTenant = useAuth.getState().tenantOverride?.id ?? useAuth.getState().user?.tenantId ?? null;
+        const nextVer = sessionVersionFromSupabaseUser(active.user as any, effTenant, active.createdAt ?? null);
+        if (nextVer) {
+          useAuth.setState({ sessionVersion: nextVer });
+        }
+      })();
+    }, 150);
+    return;
+  }
+
   if (event === "SIGNED_IN" && sessionUser) {
     setLoading(true);
-    await loadUserProfile(sessionUser as SupaUser, (partial) => {
-      if (partial.user) {
-        setUser(partial.user, partial.supabaseUser);
-      } else {
-        setUser(null);
-      }
-    });
+    setAuthMachineState("authenticating");
+    const active = await authService.getActiveSession();
+    await loadUserProfile(sessionUser as SupaUser, { createdAt: active.createdAt ?? null });
     markSessionVerified();
     setLoading(false);
   } else if (event === "SIGNED_OUT") {
-    setUser(null);
+    if (authListenerGuards.suppressSignedOutCleanup) {
+      lastPrincipalKeyCommitted = null;
+      lastSessionVersionCommitted = null;
+      setAuthMachineState("unauthenticated");
+      return;
+    }
+    const pk = principalKeyFromSnapshot(useAuth.getState());
+    const trace = crypto.randomUUID();
+    const ev: AuthTransitionEventV1 = {
+      v: 1,
+      eventId: crypto.randomUUID(),
+      originTabId: readTabIdForEvent(),
+      principalKey: pk,
+      type: "SIGNED_OUT",
+      occurredAt: Date.now(),
+      authTraceId: trace,
+    };
+    await runAuthCleanupEvent(ev);
+    broadcastAuthEvent(ev);
+    lastPrincipalKeyCommitted = null;
+    lastSessionVersionCommitted = null;
+    setAuthMachineState("unauthenticated");
   }
+});
+
+attachAuthSessionOrchestrator({
+  getTabId: readTabIdForEvent,
+  getPrincipalKey: () => principalKeyFromSnapshot(useAuth.getState()),
+  getPrincipalParts: () => {
+    const u = useAuth.getState().user;
+    const tid = useAuth.getState().tenantOverride?.id ?? u?.tenantId ?? "none";
+    const uid = u?.id ?? "anon";
+    return { userId: uid, tenantId: tid };
+  },
+  resetAuthStores: async () => {
+    usePortalAuth.setState({ user: null, supabaseUser: null, isAuthenticated: false, isLoading: false });
+    useAuth.setState((s) => ({
+      ...s,
+      user: null,
+      supabaseUser: null,
+      isAuthenticated: false,
+      tenantOverride: null,
+      impersonationSession: null,
+      lastVerifiedAt: null,
+      privilegedAuth: getDefaultPrivilegedAuthState(),
+      sessionVersion: null,
+    }));
+    try {
+      await (useAuth as any).persist?.clearStorage?.();
+    } catch {
+      /* best-effort persisted auth cleanup */
+    }
+  },
+  setAuthMachineState: (next) => useAuth.getState().setAuthMachineState(next),
+  getAuthMachineState: () => useAuth.getState().authMachineState,
+  getAuthProjection: () => {
+    const { isAuthenticated, user } = useAuth.getState();
+    return { isAuthenticated, userId: user?.id ?? null };
+  },
 });

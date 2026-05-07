@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 import { buildPrivilegedSession, isSuperAdmin, useAuth, type Permission, type PrivilegedRoleTier } from "./authStore";
+import { isBlockingProtectedRouteState, isSafeModeState } from "@/services/auth/authStateMachine";
 import { useFeatureAccess, type Feature } from "@/core/subscription/useFeatureAccess";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/primitives/Button";
@@ -49,12 +50,16 @@ export const ProtectedRoute = ({
   requiredPrivilegedRole,
 }: ProtectedRouteProps) => {
   const { t } = useI18n(["auth", "common"]);
-  const { isAuthenticated, isLoading, hasPermission, user, lastVerifiedAt, privilegedAuth } = useAuth();
+  const { isAuthenticated, isLoading, hasPermission, user, lastVerifiedAt, privilegedAuth, authMachineState } = useAuth();
   const { hasFeature, requiredPlan, isLoading: featureLoading } = useFeatureAccess();
   const privilegedSession = buildPrivilegedSession({ user, lastVerifiedAt, privilegedAuth });
 
-  if (isLoading || (requiredFeature && featureLoading)) {
+  if (isLoading || isBlockingProtectedRouteState(authMachineState) || (requiredFeature && featureLoading)) {
     return <LoadingSkeleton />;
+  }
+
+  if (isSafeModeState(authMachineState)) {
+    return <Navigate to="/login" replace />;
   }
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;

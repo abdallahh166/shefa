@@ -80,9 +80,10 @@ export interface InsuranceRepository {
   getSummary(tenantId: string): Promise<InsuranceSummary>;
   getOperationsSummary(tenantId: string): Promise<InsuranceOperationsSummary>;
   listAssignableOwners(tenantId: string): Promise<InsuranceAssignableOwner[]>;
+  isAssignableOwner(userId: string, tenantId: string): Promise<boolean>;
   getById(id: string, tenantId: string): Promise<InsuranceClaim>;
   create(input: InsuranceClaimCreateInput, tenantId: string): Promise<InsuranceClaim>;
-  update(id: string, input: InsuranceClaimUpdateInput, tenantId: string): Promise<InsuranceClaim>;
+  update(id: string, input: InsuranceClaimUpdateInput, tenantId: string, expectedUpdatedAt?: string): Promise<InsuranceClaim | null>;
   archive(id: string, tenantId: string, userId: string): Promise<InsuranceClaim>;
   restore(id: string, tenantId: string): Promise<InsuranceClaim>;
 }
@@ -277,6 +278,34 @@ export const insuranceRepository: InsuranceRepository = {
       })
       .filter((profile): profile is InsuranceAssignableOwner => profile !== null);
   },
+  async isAssignableOwner(userId, tenantId) {
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("user_id")
+      .eq("user_id", userId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    if (profileError) {
+      throw new ServiceError(profileError.message ?? "Failed to validate insurance assignee", {
+        code: profileError.code,
+        details: profileError,
+      });
+    }
+    if (!profile) return false;
+
+    const { data: roles, error: rolesError } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
+    if (rolesError) {
+      throw new ServiceError(rolesError.message ?? "Failed to validate insurance assignee role", {
+        code: rolesError.code,
+        details: rolesError,
+      });
+    }
+    const allowedRoles = new Set(["clinic_admin", "accountant"]);
+    return (roles ?? []).some((r) => allowedRoles.has(r.role));
+  },
   async getById(id, tenantId) {
     const result = await supabase
       .from("insurance_claims")
@@ -319,7 +348,7 @@ export const insuranceRepository: InsuranceRepository = {
 
     return assertOk(result) as InsuranceClaim;
   },
-  async update(id, input, tenantId) {
+  async update(id, input, tenantId, expectedUpdatedAt) {
     const payload: Record<string, unknown> = {};
 
     if (input.patient_id !== undefined) payload.patient_id = input.patient_id;
@@ -352,15 +381,22 @@ export const insuranceRepository: InsuranceRepository = {
       return assertOk(result) as InsuranceClaim;
     }
 
-    const result = await supabase
+    let query = supabase
       .from("insurance_claims")
       .update(payload)
       .eq("id", id)
-      .eq("tenant_id", tenantId)
-      .select(CLAIM_COLUMNS)
-      .single();
-
-    return assertOk(result) as InsuranceClaim;
+      .eq("tenant_id", tenantId);
+    if (expectedUpdatedAt) {
+      query = query.eq("updated_at", expectedUpdatedAt);
+    }
+    const { data, error } = await query.select(CLAIM_COLUMNS).maybeSingle();
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to update insurance claim", {
+        code: error.code,
+        details: error,
+      });
+    }
+    return (data ?? null) as InsuranceClaim | null;
   },
   async archive(id, tenantId, userId) {
     const result = await supabase

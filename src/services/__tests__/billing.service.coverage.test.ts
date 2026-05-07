@@ -1,6 +1,19 @@
+import type { z } from "zod";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { invoiceSchema } from "@/domain/billing/billing.schema";
 import { billingRepository } from "@/services/billing/billing.repository";
 import { featureAccessService } from "@/services/subscription/featureAccess.service";
+
+type InvoiceRow = z.infer<typeof invoiceSchema>;
+
+type BillingEntitlementSnapshot = Awaited<ReturnType<typeof featureAccessService.assertFeatureAccess>>;
+
+const billingEntitlementSnapshot = {
+  plan: "enterprise",
+  status: "active",
+  isExpired: false,
+  flags: [],
+} satisfies BillingEntitlementSnapshot;
 
 const tenantId = "00000000-0000-0000-0000-000000000111";
 const userId = "00000000-0000-0000-0000-000000000222";
@@ -22,6 +35,7 @@ vi.mock("@/services/billing/billing.repository", () => ({
     getById: vi.fn(),
     listPayments: vi.fn(),
     create: vi.fn(),
+    postPaymentAtomic: vi.fn(),
     createPayment: vi.fn(),
     update: vi.fn(),
     archive: vi.fn(),
@@ -54,38 +68,39 @@ vi.mock("@/services/security/rateLimit.service", () => ({
 
 vi.mock("@/services/subscription/featureAccess.service", () => ({
   featureAccessService: {
-    assertFeatureAccess: vi.fn().mockResolvedValue(undefined),
+    assertFeatureAccess: vi.fn(),
   },
 }));
 
-const buildInvoice = (overrides: Record<string, unknown> = {}) => ({
-  id: invoiceId,
-  tenant_id: tenantId,
-  patient_id: patientId,
-  invoice_code: "INV-100",
-  service: "Consultation",
-  amount: 120,
-  amount_paid: 0,
-  balance_due: 120,
-  invoice_date: "2026-04-16",
-  due_date: "2026-04-20",
-  paid_at: null,
-  voided_at: null,
-  void_reason: null,
-  status: "pending",
-  deleted_at: null,
-  deleted_by: null,
-  created_at: "2026-04-16T08:00:00.000Z",
-  updated_at: "2026-04-16T08:00:00.000Z",
-  ...overrides,
-});
+const buildInvoice = (overrides: Partial<InvoiceRow> = {}): InvoiceRow =>
+  invoiceSchema.parse({
+    id: invoiceId,
+    tenant_id: tenantId,
+    patient_id: patientId,
+    invoice_code: "INV-100",
+    service: "Consultation",
+    amount: 120,
+    amount_paid: 0,
+    balance_due: 120,
+    invoice_date: "2026-04-16",
+    due_date: "2026-04-20",
+    paid_at: null,
+    voided_at: null,
+    void_reason: null,
+    status: "pending",
+    deleted_at: null,
+    deleted_by: null,
+    created_at: "2026-04-16T08:00:00.000Z",
+    updated_at: "2026-04-16T08:00:00.000Z",
+    ...overrides,
+  });
 
 describe("billingService permissions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
     emitDomainEvent.mockResolvedValue(undefined);
-    vi.mocked(featureAccessService, true).assertFeatureAccess.mockResolvedValue(undefined);
+    vi.mocked(featureAccessService, true).assertFeatureAccess.mockResolvedValue(billingEntitlementSnapshot);
   });
 
   it("blocks list when lacking billing permissions", async () => {
@@ -156,31 +171,42 @@ describe("billingService permissions", () => {
   it("posts a partial payment and keeps the invoice partially paid", async () => {
     vi.doMock("@/core/auth/authStore", () => ({
       useAuth: {
-        getState: () => ({ hasPermission: () => true }),
+        getState: () => ({
+          hasPermission: () => true,
+          user: { id: userId, tenantId, tenantRoles: ["clinic_admin"], globalRoles: [] },
+          tenantOverride: null,
+          sessionVersion: `${userId}:${tenantId}:1`,
+        }),
       },
     }));
 
     const repo = vi.mocked(billingRepository, true);
     repo.getById.mockResolvedValue(buildInvoice());
-    repo.createPayment.mockResolvedValue({
-      id: paymentId,
-      tenant_id: tenantId,
-      invoice_id: invoiceId,
-      patient_id: patientId,
-      amount: 40,
-      payment_method: "cash",
-      paid_at: "2026-04-16T09:00:00.000Z",
-      reference: "RCPT-1",
-      notes: "Front desk collected cash",
-      created_at: "2026-04-16T09:00:00.000Z",
-      created_by: userId,
+    repo.postPaymentAtomic.mockResolvedValue({
+      result_code: "OK",
+      retryable: false,
+      idempotency_replay: false,
+      message: "Payment posted",
+      invoice: buildInvoice({
+        amount_paid: 40,
+        balance_due: 80,
+        status: "partially_paid",
+        paid_at: null,
+      }),
+      payment: {
+        id: paymentId,
+        tenant_id: tenantId,
+        invoice_id: invoiceId,
+        patient_id: patientId,
+        amount: 40,
+        payment_method: "cash",
+        paid_at: "2026-04-16T09:00:00.000Z",
+        reference: "RCPT-1",
+        notes: "Front desk collected cash",
+        created_at: "2026-04-16T09:00:00.000Z",
+        created_by: userId,
+      },
     });
-    repo.update.mockResolvedValue(buildInvoice({
-      amount_paid: 40,
-      balance_due: 80,
-      status: "partially_paid",
-      paid_at: null,
-    }));
 
     const { billingService } = await import("@/services/billing/billing.service");
     const result = await billingService.postPayment(invoiceId, {
@@ -190,9 +216,8 @@ describe("billingService permissions", () => {
       reference: "RCPT-1",
     });
 
-    expect(repo.createPayment).toHaveBeenCalledWith(
+    expect(repo.postPaymentAtomic).toHaveBeenCalledWith(
       invoiceId,
-      patientId,
       expect.objectContaining({
         amount: 40,
         payment_method: "cash",
@@ -208,7 +233,12 @@ describe("billingService permissions", () => {
   it("emits InvoicePaid when a posted payment settles the invoice", async () => {
     vi.doMock("@/core/auth/authStore", () => ({
       useAuth: {
-        getState: () => ({ hasPermission: () => true }),
+        getState: () => ({
+          hasPermission: () => true,
+          user: { id: userId, tenantId, tenantRoles: ["clinic_admin"], globalRoles: [] },
+          tenantOverride: null,
+          sessionVersion: `${userId}:${tenantId}:1`,
+        }),
       },
     }));
 
@@ -218,25 +248,31 @@ describe("billingService permissions", () => {
       balance_due: 90,
       status: "partially_paid",
     }));
-    repo.createPayment.mockResolvedValue({
-      id: paymentId,
-      tenant_id: tenantId,
-      invoice_id: invoiceId,
-      patient_id: patientId,
-      amount: 90,
-      payment_method: "card",
-      paid_at: "2026-04-16T10:00:00.000Z",
-      reference: "CARD-100",
-      notes: null,
-      created_at: "2026-04-16T10:00:00.000Z",
-      created_by: userId,
+    repo.postPaymentAtomic.mockResolvedValue({
+      result_code: "OK",
+      retryable: false,
+      idempotency_replay: false,
+      message: "Payment posted",
+      invoice: buildInvoice({
+        amount_paid: 120,
+        balance_due: 0,
+        status: "paid",
+        paid_at: "2026-04-16T10:00:00.000Z",
+      }),
+      payment: {
+        id: paymentId,
+        tenant_id: tenantId,
+        invoice_id: invoiceId,
+        patient_id: patientId,
+        amount: 90,
+        payment_method: "card",
+        paid_at: "2026-04-16T10:00:00.000Z",
+        reference: "CARD-100",
+        notes: null,
+        created_at: "2026-04-16T10:00:00.000Z",
+        created_by: userId,
+      },
     });
-    repo.update.mockResolvedValue(buildInvoice({
-      amount_paid: 120,
-      balance_due: 0,
-      status: "paid",
-      paid_at: "2026-04-16T10:00:00.000Z",
-    }));
 
     const { billingService } = await import("@/services/billing/billing.service");
     const result = await billingService.postPayment(invoiceId, {
@@ -318,6 +354,7 @@ describe("billingService permissions", () => {
         void_reason: "Duplicate invoice created at reception",
       }),
       tenantId,
+      undefined,
     );
     expect(result.status).toBe("void");
     expect(result.balance_due).toBe(0);

@@ -4,6 +4,7 @@ import type {
   InvoiceListParams,
   InvoicePayment,
   InvoicePaymentCreateInput,
+  InvoicePaymentCommandResult,
   InvoiceSummary,
   InvoiceUpdateInput,
   InvoiceWithPatient,
@@ -44,7 +45,13 @@ export interface BillingRepository {
   listByPatient(patientId: string, tenantId: string, params?: LimitOffsetParams): Promise<Invoice[]>;
   listPayments(invoiceId: string, tenantId: string): Promise<InvoicePayment[]>;
   create(input: InvoiceCreateInput, tenantId: string): Promise<Invoice>;
-  update(id: string, input: InvoiceUpdateInput, tenantId: string): Promise<Invoice>;
+  update(id: string, input: InvoiceUpdateInput, tenantId: string, expectedUpdatedAt?: string): Promise<Invoice | null>;
+  postPaymentAtomic(
+    invoiceId: string,
+    input: InvoicePaymentCreateInput,
+    tenantId: string,
+    userId?: string | null
+  ): Promise<InvoicePaymentCommandResult>;
   createPayment(invoiceId: string, patientId: string, input: InvoicePaymentCreateInput, tenantId: string, userId?: string | null): Promise<InvoicePayment>;
   archive(id: string, tenantId: string, userId: string): Promise<Invoice>;
   restore(id: string, tenantId: string): Promise<Invoice>;
@@ -154,8 +161,8 @@ export const billingRepository: BillingRepository = {
 
     return assertOk(result) as Invoice;
   },
-  async getSummary(_tenantId) {
-    const { data, error } = await (supabase.rpc as any)("get_invoice_summary");
+  async getSummary(tenantId) {
+    const { data, error } = await (supabase.rpc as any)("get_invoice_summary", { _tenant_id: tenantId });
     if (error) {
       throw new ServiceError(error.message ?? "Failed to load invoice summary", {
         code: error.code,
@@ -270,7 +277,7 @@ export const billingRepository: BillingRepository = {
 
     return assertOk(result) as Invoice;
   },
-  async update(id, input, tenantId) {
+  async update(id, input, tenantId, expectedUpdatedAt) {
     const payload: Record<string, unknown> = {};
 
     if (input.patient_id !== undefined) payload.patient_id = input.patient_id;
@@ -296,15 +303,66 @@ export const billingRepository: BillingRepository = {
       return assertOk(result) as Invoice;
     }
 
-    const result = await supabase
+    let query = supabase
       .from("invoices")
       .update(payload)
       .eq("id", id)
-      .eq("tenant_id", tenantId)
-      .select(INVOICE_COLUMNS)
-      .single();
+      .eq("tenant_id", tenantId);
+    if (expectedUpdatedAt) {
+      query = query.eq("updated_at", expectedUpdatedAt);
+    }
+    const { data, error } = await query.select(INVOICE_COLUMNS).maybeSingle();
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to update invoice", {
+        code: error.code,
+        details: error,
+      });
+    }
+    return (data ?? null) as Invoice | null;
+  },
+  async postPaymentAtomic(invoiceId, input, tenantId, userId) {
+    const requestHash = [
+      invoiceId,
+      tenantId,
+      input.amount,
+      input.payment_method,
+      input.paid_at ?? "",
+      input.reference ?? "",
+      input.notes ?? "",
+    ].join("|");
 
-    return assertOk(result) as Invoice;
+    const { data, error } = await (supabase.rpc as any)("post_invoice_payment", {
+      p_invoice_id: invoiceId,
+      p_tenant_id: tenantId,
+      p_amount: input.amount,
+      p_payment_method: input.payment_method,
+      p_paid_at: input.paid_at ?? null,
+      p_reference: input.reference ?? null,
+      p_notes: input.notes ?? null,
+      p_idempotency_key: input.idempotency_key ?? null,
+      p_request_hash: requestHash,
+      p_user_id: userId ?? null,
+    });
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to post invoice payment", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    const row = (data as any)?.[0];
+    if (!row) {
+      throw new ServiceError("Payment command returned no result", { code: "PAYMENT_COMMAND_EMPTY_RESULT" });
+    }
+
+    return {
+      result_code: row.result_code,
+      retryable: Boolean(row.retryable),
+      idempotency_replay: Boolean(row.idempotency_replay),
+      message: row.message ?? null,
+      invoice: row.invoice ?? null,
+      payment: row.payment ?? null,
+    } as InvoicePaymentCommandResult;
   },
   async createPayment(invoiceId, patientId, input, tenantId, userId) {
     const payload: Record<string, unknown> = {

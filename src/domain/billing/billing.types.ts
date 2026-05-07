@@ -1,4 +1,4 @@
-﻿import type { z } from "zod";
+import type { z } from "zod";
 import {
   invoiceSchema,
   invoiceWithPatientSchema,
@@ -6,6 +6,7 @@ import {
   invoiceUpdateSchema,
   invoicePaymentSchema,
   invoicePaymentCreateSchema,
+  invoicePaymentCommandResultSchema,
   invoiceListParamsSchema,
   invoiceSummarySchema,
 } from "./billing.schema";
@@ -16,5 +17,6 @@ export type InvoiceCreateInput = z.infer<typeof invoiceCreateSchema>;
 export type InvoiceUpdateInput = z.infer<typeof invoiceUpdateSchema>;
 export type InvoicePayment = z.infer<typeof invoicePaymentSchema>;
 export type InvoicePaymentCreateInput = z.infer<typeof invoicePaymentCreateSchema>;
+export type InvoicePaymentCommandResult = z.infer<typeof invoicePaymentCommandResultSchema>;
 export type InvoiceListParams = z.infer<typeof invoiceListParamsSchema>;
 export type InvoiceSummary = z.infer<typeof invoiceSummarySchema>;

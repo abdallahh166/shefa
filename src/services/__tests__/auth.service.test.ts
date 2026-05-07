@@ -3,6 +3,14 @@ import { authService } from "@/services/auth/auth.service";
 import { authRepository } from "@/services/auth/auth.repository";
 import { rateLimitService } from "@/services/security/rateLimit.service";
 
+vi.mock("@/core/auth/authStore", () => ({
+  useAuth: {
+    getState: () => ({
+      setAuthMachineState: vi.fn(),
+    }),
+  },
+}));
+
 vi.mock("@/services/auth/auth.repository", () => ({
   authRepository: {
     signInWithPassword: vi.fn(),

@@ -39,6 +39,12 @@ vi.mock("@/services/settings/audit.service", () => ({
   },
 }));
 
+vi.mock("@/services/subscription/featureAccess.service", () => ({
+  featureAccessService: {
+    assertFeatureAccess: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 describe("labService permissions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -220,6 +226,7 @@ describe("labService permissions", () => {
         result: "11.2 g/dL | 12.0 - 16.0 | low",
       }),
       "00000000-0000-0000-0000-000000000111",
+      undefined,
     );
     expect(emitDomainEvent).toHaveBeenCalledWith(
       "LabResultUploaded",

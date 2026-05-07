@@ -13,11 +13,18 @@ vi.mock("@/services/insurance/insurance.repository", () => ({
     getSummary: vi.fn(),
     getOperationsSummary: vi.fn(),
     listAssignableOwners: vi.fn(),
+    isAssignableOwner: vi.fn(),
     getById: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     archive: vi.fn(),
     restore: vi.fn(),
+  },
+}));
+
+vi.mock("@/services/subscription/featureAccess.service", () => ({
+  featureAccessService: {
+    assertFeatureAccess: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -66,6 +73,7 @@ describe("insuranceService workflow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    vi.mocked(insuranceRepository.isAssignableOwner).mockResolvedValue(true);
   });
 
   it("blocks list when lacking billing permissions", async () => {
@@ -136,6 +144,7 @@ describe("insuranceService workflow", () => {
         denial_reason: null,
       }),
       tenantId,
+      undefined,
     );
   });
 
@@ -214,6 +223,7 @@ describe("insuranceService workflow", () => {
         resubmission_count: 2,
       }),
       tenantId,
+      undefined,
     );
   });
 
@@ -249,6 +259,7 @@ describe("insuranceService workflow", () => {
         payer_notes: "Payer asked for updated eligibility file",
       }),
       tenantId,
+      undefined,
     );
   });
 

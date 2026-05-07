@@ -1,5 +1,25 @@
-import { useAuth, buildPrivilegedSession, type PrivilegedAuthState } from "@/core/auth/authStore";
+import type { Factor } from "@supabase/supabase-js";
+import { useAuth, buildPrivilegedSession, type PrivilegedAuthState, type PrivilegedSession } from "@/core/auth/authStore";
 import { authService } from "./auth.service";
+
+type MfaFactorsState = {
+  all: Factor[];
+  verified: Factor[];
+  unverified: Factor[];
+};
+
+type PrivilegedRefreshResult = PrivilegedSession & {
+  factors: MfaFactorsState;
+};
+
+const emptyFactors: MfaFactorsState = {
+  all: [],
+  verified: [],
+  unverified: [],
+};
+
+let lastFactors: MfaFactorsState = emptyFactors;
+let refreshFlight: Promise<PrivilegedRefreshResult> | null = null;
 
 function normalizePrivilegedAuthState(input: {
   currentLevel: string | null;
@@ -22,17 +42,36 @@ export const privilegedSessionService = {
     return buildPrivilegedSession({ user, lastVerifiedAt, privilegedAuth });
   },
 
-  async refresh() {
+  getLastFactors() {
+    return lastFactors;
+  },
+
+  async refresh(): Promise<PrivilegedRefreshResult> {
+    if (refreshFlight) {
+      return refreshFlight;
+    }
+
+    refreshFlight = this.refreshNow().finally(() => {
+      refreshFlight = null;
+    });
+    return refreshFlight;
+  },
+
+  async refreshNow(): Promise<PrivilegedRefreshResult> {
     const { user, setPrivilegedAuth, clearPrivilegedAuth } = useAuth.getState();
     if (!user) {
       clearPrivilegedAuth();
-      return this.getSnapshot();
+      lastFactors = emptyFactors;
+      return { ...this.getSnapshot(), factors: lastFactors };
     }
 
-    const [assurance, factors] = await Promise.all([
-      authService.getMfaAssuranceLevel(),
-      authService.listMfaFactors(),
-    ]);
+    const assurance = await authService.getMfaAssuranceLevel();
+    const factors = await authService.listMfaFactors();
+    lastFactors = factors;
+
+    if (useAuth.getState().user?.id !== user.id) {
+      return { ...this.getSnapshot(), factors };
+    }
 
     setPrivilegedAuth(normalizePrivilegedAuthState({
       currentLevel: assurance.currentLevel,
@@ -41,6 +80,6 @@ export const privilegedSessionService = {
       unverifiedFactorCount: factors.unverified.length,
     }));
 
-    return this.getSnapshot();
+    return { ...this.getSnapshot(), factors };
   },
 };
