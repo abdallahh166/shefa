@@ -25,8 +25,8 @@ function createBrowserlessSuperAdminClient() {
 }
 
 function buildSupabaseStorageKey(supabaseUrl: string) {
-  const hostname = new URL(supabaseUrl).hostname;
-  return `sb-${hostname.split(".")[0]}-auth-token`;
+  void supabaseUrl;
+  return "shefaa-auth";
 }
 
 export function getSuperAdminConfig(): E2ESuperAdminConfig {

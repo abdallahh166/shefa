@@ -25,9 +25,9 @@ function createBrowserlessClinicClient() {
   });
 }
 
-function buildSupabaseStorageKey(supabaseUrl: string) {
-  const hostname = new URL(supabaseUrl).hostname;
-  return `sb-${hostname.split(".")[0]}-auth-token`;
+export function buildSupabaseStorageKey(supabaseUrl: string) {
+  void supabaseUrl;
+  return "shefaa-auth";
 }
 
 export function getClinicConfig(): E2EClinicConfig {
@@ -79,7 +79,7 @@ export async function loginToClinic(page: Page, config: E2EClinicConfig) {
   await page.getByTestId("login-email").fill(config.adminEmail);
   await page.getByTestId("login-password").fill(config.adminPassword);
   await page.getByTestId("login-submit").click();
-  await page.waitForLoadState("networkidle");
+  await page.waitForLoadState("domcontentloaded");
 
   try {
     await expect(page).toHaveURL(new RegExp(`/tenant/${config.clinicSlug}/`), { timeout: 10_000 });
@@ -100,7 +100,7 @@ export async function submitClinicLogin(page: Page, config: E2EClinicConfig) {
   await page.getByTestId("login-email").fill(config.adminEmail);
   await page.getByTestId("login-password").fill(config.adminPassword);
   await page.getByTestId("login-submit").click();
-  await page.waitForLoadState("networkidle");
+  await page.waitForLoadState("domcontentloaded");
 }
 
 export async function attachClinicSession(page: Page, config: E2EClinicConfig): Promise<Session> {

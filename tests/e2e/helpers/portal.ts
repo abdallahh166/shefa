@@ -64,8 +64,8 @@ export function hasPortalScopeProbeConfig(config = getPortalConfig()) {
 }
 
 export function buildSupabaseStorageKey(supabaseUrl: string) {
-  const hostname = new URL(supabaseUrl).hostname;
-  return `sb-${hostname.split(".")[0]}-auth-token`;
+  void supabaseUrl;
+  return "shefaa-auth";
 }
 
 function createBrowserlessClient(config: E2EPortalConfig) {

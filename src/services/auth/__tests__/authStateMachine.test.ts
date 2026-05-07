@@ -6,6 +6,15 @@ describe("authStateMachine", () => {
     expect(() => assertAuthTransition("authenticated", "authenticated")).not.toThrow();
   });
 
+  it("rejects invalid transitions in development and test runs", () => {
+    expect(() => assertAuthTransition("unauthenticated", "authenticated")).toThrow(
+      "Invalid auth transition",
+    );
+    expect(() => assertAuthTransition("reauth_required", "authenticated")).toThrow(
+      "Invalid auth transition",
+    );
+  });
+
   it("identifies blocking protected-route states", () => {
     expect(isBlockingProtectedRouteState("initializing")).toBe(true);
     expect(isBlockingProtectedRouteState("unauthenticated_pending_cleanup")).toBe(true);

@@ -7,7 +7,14 @@ const mockState = vi.hoisted(() => ({
   responseSingle: { data: {}, error: null } as MockResponse,
   responseRpc: { data: [], error: null } as MockResponse,
   responseAuth: {
-    data: { user: { id: "user-1", email: "user@example.com" }, session: { user: { id: "user-1" } } },
+    data: {
+      user: { id: "user-1", email: "user@example.com", created_at: "2026-03-01T00:00:00.000Z" },
+      session: {
+        user: { id: "user-1", email: "user@example.com", created_at: "2026-03-01T00:00:00.000Z" },
+        expires_at: 1_800_000_000,
+        created_at: "2026-03-01T00:00:00.000Z",
+      },
+    },
     error: null,
   } as MockResponse,
   responseFunctions: { data: {}, error: null } as MockResponse,
@@ -62,12 +69,27 @@ const mockSupabase = vi.hoisted(() => ({
     signInWithPassword: vi.fn(async () => mockState.responseAuth),
     signOut: vi.fn(async () => ({ error: null })),
     getSession: vi.fn(async () => mockState.responseAuth),
+    refreshSession: vi.fn(async () => ({ data: mockState.responseAuth.data, error: null })),
     onAuthStateChange: vi.fn((callback: (event: string, session: any) => void) => {
       callback("SIGNED_IN", mockState.responseAuth.data?.session ?? null);
       return { data: { subscription: { unsubscribe: vi.fn() } } };
     }),
     resetPasswordForEmail: vi.fn(async () => ({ error: null })),
     updateUser: vi.fn(async () => ({ error: null })),
+    mfa: {
+      getAuthenticatorAssuranceLevel: vi.fn(async () => ({
+        data: { currentLevel: "aal1", nextLevel: "aal1" },
+        error: null,
+      })),
+      listFactors: vi.fn(async () => ({
+        data: { totp: [], phone: [], webauthn: [] },
+        error: null,
+      })),
+      enroll: vi.fn(async () => ({ data: { id: "factor-1", type: "totp" }, error: null })),
+      challenge: vi.fn(async () => ({ data: { id: "challenge-1" }, error: null })),
+      verify: vi.fn(async () => ({ data: {}, error: null })),
+      unenroll: vi.fn(async () => ({ data: {}, error: null })),
+    },
   },
   functions: {
     invoke: vi.fn(async () => mockState.responseFunctions),
@@ -86,7 +108,7 @@ const mockSupabase = vi.hoisted(() => ({
     };
     return channel;
   }),
-  removeChannel: vi.fn(),
+  removeChannel: vi.fn(async () => ({ error: null })),
 }));
 
 vi.mock("@/services/supabase/client", () => ({ supabase: mockSupabase }));
@@ -138,7 +160,14 @@ describe("repositories smoke", () => {
     mockState.responseSingle = { data: {}, error: null };
     mockState.responseRpc = { data: [], error: null };
     mockState.responseAuth = {
-      data: { user: { id: userId, email: "user@example.com" }, session: { user: { id: userId } } },
+      data: {
+        user: { id: userId, email: "user@example.com", created_at: "2026-03-01T00:00:00.000Z" },
+        session: {
+          user: { id: userId, email: "user@example.com", created_at: "2026-03-01T00:00:00.000Z" },
+          expires_at: 1_800_000_000,
+          created_at: "2026-03-01T00:00:00.000Z",
+        },
+      },
       error: null,
     };
     mockState.responseFunctions = { data: {}, error: null };

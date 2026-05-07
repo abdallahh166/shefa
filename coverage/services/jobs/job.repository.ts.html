@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">61.11% </span>
+                <span class="strong">65% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>22/36</span>
+                <span class='fraction'>26/40</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">25% </span>
+                <span class="strong">16.66% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>1/4</span>
+                <span class='fraction'>1/6</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">61.11% </span>
+                <span class="strong">65% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>22/36</span>
+                <span class='fraction'>26/40</span>
             </div>
         
             
@@ -111,7 +111,12 @@
 <a name='L46'></a><a href='#L46'>46</a>
 <a name='L47'></a><a href='#L47'>47</a>
 <a name='L48'></a><a href='#L48'>48</a>
-<a name='L49'></a><a href='#L49'>49</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -120,12 +125,15 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -136,6 +144,8 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -159,7 +169,8 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { supabase } from "@/services/supabase/client";
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useAuth } from "@/core/auth/authStore";
+import { supabase } from "@/services/supabase/client";
 import { ServiceError } from "@/services/supabase/errors";
 import { getTenantContext } from "@/services/supabase/tenant";
 &nbsp;
@@ -169,38 +180,42 @@ export interface JobRepository {
 }
 &nbsp;
 async function enqueueJob(functionName: string, payload: Record&lt;string, unknown&gt;) {
-    const { tenantId } = getTenantContext();
-    const resolvedTenantId =
-      (payload as { tenant_id?: string; tenantId?: string })?.tenant_id ??
-      (payload as { tenantId?: string })?.<span class="branch-0 cbranch-no" title="branch not covered" >tenantId ??</span>
-<span class="cstat-no" title="statement not covered" >      tenantId;</span>
+  const { tenantId, userId } = getTenantContext();
+  const { user } = useAuth.getState();
+  const resolvedTenantId =
+    (payload as { tenant_id?: string; tenantId?: string })?.tenant_id ??
+    (payload as { tenantId?: string })?.<span class="branch-0 cbranch-no" title="branch not covered" >tenantId ??</span>
+<span class="cstat-no" title="statement not covered" >    tenantId;</span>
+  const initiatedAs = <span class="branch-0 cbranch-no" title="branch not covered" >user?.globalRoles?.includes(<span class="branch-0 cbranch-no" title="branch not covered" >"</span>super_admin") ? "super_admin" : "</span>tenant_user";
 &nbsp;
-    const { data, error } = await supabase
-      .from("jobs")
-      .insert({
-        tenant_id: resolvedTenantId,
-        type: functionName,
-        payload,
-      })
-      .select("id")
-      .single();
+  const { data, error } = await supabase
+    .from("jobs")
+    .insert({
+      tenant_id: resolvedTenantId,
+      type: functionName,
+      payload,
+      initiated_by: userId,
+      initiated_as: initiatedAs,
+    })
+    .select("id")
+    .single();
 &nbsp;
-    if (error) <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
-<span class="cstat-no" title="statement not covered" >      throw new ServiceError(error.message ?? "Failed to enqueue job", { code: error.code, details: error });</span>
-<span class="cstat-no" title="statement not covered" >    }</span>
+  if (error) <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
+<span class="cstat-no" title="statement not covered" >    throw new ServiceError(error.message ?? "Failed to enqueue job", { code: error.code, details: error });</span>
+<span class="cstat-no" title="statement not covered" >  }</span>
 &nbsp;
-    if (data?.id) <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
-<span class="cstat-no" title="statement not covered" >      const { error: invokeError } = await supabase.functions.invoke("job-worker", {</span>
-<span class="cstat-no" title="statement not covered" >        body: { job_id: data.id },</span>
+  if (data?.id) <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
+<span class="cstat-no" title="statement not covered" >    const { error: invokeError } = await supabase.functions.invoke("job-worker", {</span>
+<span class="cstat-no" title="statement not covered" >      body: { job_id: data.id },</span>
+<span class="cstat-no" title="statement not covered" >    });</span>
+<span class="cstat-no" title="statement not covered" >    if (invokeError) {</span>
+<span class="cstat-no" title="statement not covered" >      // Keep the job in the queue; worker can pick it up later.</span>
+<span class="cstat-no" title="statement not covered" >      throw new ServiceError(invokeError.message ?? "Failed to trigger job worker", {</span>
+<span class="cstat-no" title="statement not covered" >        code: invokeError.code,</span>
+<span class="cstat-no" title="statement not covered" >        details: invokeError,</span>
 <span class="cstat-no" title="statement not covered" >      });</span>
-<span class="cstat-no" title="statement not covered" >      if (invokeError) {</span>
-<span class="cstat-no" title="statement not covered" >        // Keep the job in the queue; worker can pick it up later.</span>
-<span class="cstat-no" title="statement not covered" >        throw new ServiceError(invokeError.message ?? "Failed to trigger job worker", {</span>
-<span class="cstat-no" title="statement not covered" >          code: invokeError.code,</span>
-<span class="cstat-no" title="statement not covered" >          details: invokeError,</span>
-<span class="cstat-no" title="statement not covered" >        });</span>
-<span class="cstat-no" title="statement not covered" >      }</span>
 <span class="cstat-no" title="statement not covered" >    }</span>
+<span class="cstat-no" title="statement not covered" >  }</span>
 }
 &nbsp;
 export const jobRepository: JobRepository = {
@@ -214,7 +229,7 @@ export const jobRepository: JobRepository = {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-04-16T18:03:26.182Z
+                at 2026-05-07T23:27:05.846Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

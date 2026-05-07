@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">83.33% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>20/24</span>
+                <span class='fraction'>27/27</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">50% </span>
+                <span class="strong">87.5% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>3/6</span>
+                <span class='fraction'>7/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>3/3</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">83.33% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>20/24</span>
+                <span class='fraction'>27/27</span>
             </div>
         
             
@@ -92,21 +92,17 @@
 <a name='L27'></a><a href='#L27'>27</a>
 <a name='L28'></a><a href='#L28'>28</a>
 <a name='L29'></a><a href='#L29'>29</a>
-<a name='L30'></a><a href='#L30'>30</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">2x</span>
@@ -114,18 +110,31 @@
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { z } from "zod";
 import { userPreferencesSchema, userPreferencesUpsertSchema } from "@/domain/settings/userPreferences.schema";
 import { uuidSchema } from "@/domain/shared/identifiers.schema";
 import { toServiceError } from "@/services/supabase/errors";
 import { userPreferencesRepository } from "./userPreferences.repository";
+import type { Locale } from "@/core/i18n/config";
 &nbsp;
 export const userPreferencesService = {
   async getByUserId(userId: string) {
@@ -133,21 +142,24 @@ export const userPreferencesService = {
       const parsedId = uuidSchema.parse(userId);
       const result = await userPreferencesRepository.getByUserId(parsedId);
       return result ? userPreferencesSchema.parse(<span class="branch-0 cbranch-no" title="branch not covered" >result) : null;</span>
-    } <span class="branch-0 cbranch-no" title="branch not covered" >catch (err) {</span>
-<span class="cstat-no" title="statement not covered" >      throw toServiceError(err, "Failed to load preferences");</span>
-<span class="cstat-no" title="statement not covered" >    }</span>
+    } catch (err) {
+      throw toServiceError(err, "Failed to load preferences");
+    }
   },
-  async upsert(input: { user_id: string; dark_mode: boolean }) {
+  async upsert(input: { user_id: string; dark_mode?: boolean; locale?: Locale }) {
     try {
       const parsed = userPreferencesUpsertSchema.parse(input);
       const result = await userPreferencesRepository.upsert(parsed);
       return userPreferencesSchema.parse(result);
-    } <span class="branch-0 cbranch-no" title="branch not covered" >catch (err) {</span>
-<span class="cstat-no" title="statement not covered" >      throw toServiceError(err, "Failed to save preferences");</span>
-<span class="cstat-no" title="statement not covered" >    }</span>
+    } catch (err) {
+      throw toServiceError(err, "Failed to save preferences");
+    }
   },
   async setDarkMode(userId: string, darkMode: boolean) {
     return this.upsert({ user_id: userId, dark_mode: darkMode });
+  },
+  async setLocale(userId: string, locale: Locale) {
+    return this.upsert({ user_id: userId, locale });
   },
 };
 &nbsp;</pre></td></tr></table></pre>
@@ -157,7 +169,7 @@ export const userPreferencesService = {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-04-16T18:03:26.182Z
+                at 2026-05-07T23:27:05.846Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

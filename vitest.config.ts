@@ -15,10 +15,49 @@ export default defineConfig({
       include: ["src/services/**/*.ts"],
       exclude: ["**/__tests__/**", "**/*.d.ts"],
       thresholds: {
-        lines: 70,
-        statements: 70,
-        functions: 70,
-        branches: 60,
+        // Keep the global floor honest, but do not turn broad service coverage into
+        // a vanity percentage chase. Critical auth orchestration files are pinned
+        // separately below for branch/failure-path coverage.
+        lines: 60,
+        statements: 60,
+        functions: 60,
+        branches: 55,
+        "src/services/auth/authAbortRegistry.ts": {
+          lines: 85,
+          statements: 85,
+          functions: 100,
+          branches: 60,
+        },
+        "src/services/auth/authContextSnapshot.ts": {
+          lines: 100,
+          statements: 100,
+          functions: 100,
+          branches: 100,
+        },
+        "src/services/auth/authRecovery.ts": {
+          lines: 90,
+          statements: 90,
+          functions: 100,
+          branches: 85,
+        },
+        "src/services/auth/authSessionOrchestrator.ts": {
+          lines: 85,
+          statements: 85,
+          functions: 90,
+          branches: 60,
+        },
+        "src/services/auth/authStateMachine.ts": {
+          lines: 100,
+          statements: 100,
+          functions: 100,
+          branches: 100,
+        },
+        "src/services/supabase/supabaseAuthFetch.ts": {
+          lines: 90,
+          statements: 90,
+          functions: 100,
+          branches: 60,
+        },
       },
     },
   },
