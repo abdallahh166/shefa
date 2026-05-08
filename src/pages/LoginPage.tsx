@@ -17,7 +17,7 @@ type AuthMode = "login" | "signup";
 type SlugStatus = "idle" | "checking" | "available" | "taken" | "invalid";
 
 export const LoginPage = () => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, authMachineState } = useAuth();
   const { t } = useI18n(["auth"]);
   const navigate = useNavigate();
   const [mode, setMode] = useState<AuthMode>("login");
@@ -33,14 +33,14 @@ export const LoginPage = () => {
   const captchaRequired = Boolean(captchaSiteKey);
 
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (isAuthenticated && user && authMachineState === "authenticated") {
       if (isSuperAdmin(user)) {
         navigate("/admin", { replace: true });
       } else {
         navigate(`/tenant/${user.tenantSlug}/dashboard`, { replace: true });
       }
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [authMachineState, isAuthenticated, user, navigate]);
 
   const handleSlugStatusChange = (status: SlugStatus, slug: string) => {
     setSlugStatus(status);

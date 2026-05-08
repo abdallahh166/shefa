@@ -176,6 +176,13 @@ describe("billingService permissions", () => {
           user: { id: userId, tenantId, tenantRoles: ["clinic_admin"], globalRoles: [] },
           tenantOverride: null,
           sessionVersion: `${userId}:${tenantId}:1`,
+          privilegedAuth: {
+            currentLevel: "aal1",
+            nextLevel: "aal2",
+            verifiedFactorCount: 0,
+            unverifiedFactorCount: 0,
+            loadedAt: new Date().toISOString(),
+          },
         }),
       },
     }));
@@ -238,6 +245,13 @@ describe("billingService permissions", () => {
           user: { id: userId, tenantId, tenantRoles: ["clinic_admin"], globalRoles: [] },
           tenantOverride: null,
           sessionVersion: `${userId}:${tenantId}:1`,
+          privilegedAuth: {
+            currentLevel: "aal1",
+            nextLevel: "aal2",
+            verifiedFactorCount: 0,
+            unverifiedFactorCount: 0,
+            loadedAt: new Date().toISOString(),
+          },
         }),
       },
     }));

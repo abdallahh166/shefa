@@ -15,6 +15,7 @@ import { isAuthKillSwitchActive } from "@/services/auth/authKillSwitch";
 import { emitAuthMetric } from "@/services/auth/authMetrics";
 import { usePortalAuth } from "@/core/auth/portalAuthStore";
 import type { AuthTransitionEventV1 } from "@/services/auth/authSessionOrchestrator";
+import { privilegedSessionService } from "@/services/auth/privilegedSession.service";
 
 export type GlobalRole = "super_admin";
 export type TenantRole = "clinic_admin" | "doctor" | "receptionist" | "nurse" | "accountant";
@@ -731,6 +732,17 @@ authService.onAuthStateChange(async (event, sessionUser) => {
     const active = await authService.getActiveSession();
     await loadUserProfile(sessionUser as SupaUser, { createdAt: active.createdAt ?? null });
     markSessionVerified();
+    try {
+      const refreshed = await privilegedSessionService.refreshNow();
+      const hasVerifiedFactor = refreshed.factors.verified.length > 0;
+      const isAal2 = refreshed.aal === "aal2";
+      if (hasVerifiedFactor && !isAal2) {
+        emitAuthMetric("mfa_challenge_required", { reason: "login" });
+        setAuthMachineState("mfa_required");
+      }
+    } catch {
+      // Best-effort: if we can't determine MFA status, don't block login.
+    }
     setLoading(false);
   } else if (event === "SIGNED_OUT") {
     if (authListenerGuards.suppressSignedOutCleanup) {

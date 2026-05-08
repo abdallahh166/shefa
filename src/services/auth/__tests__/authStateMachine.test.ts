@@ -20,6 +20,7 @@ describe("authStateMachine", () => {
     expect(isBlockingProtectedRouteState("unauthenticated_pending_cleanup")).toBe(true);
     expect(isBlockingProtectedRouteState("refreshing")).toBe(true);
     expect(isBlockingProtectedRouteState("authenticated")).toBe(false);
+    expect(isBlockingProtectedRouteState("mfa_required")).toBe(false);
   });
 
   it("identifies safe-mode states", () => {

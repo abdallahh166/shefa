@@ -5,6 +5,7 @@ export type AuthContextSnapshot = {
   userId: string;
   tenantId: string | null;
   sessionVersion: string;
+  assuranceLevel: string | null;
 };
 
 export class StaleAuthContextError extends Error {
@@ -16,12 +17,13 @@ export class StaleAuthContextError extends Error {
 }
 
 export function captureAuthContextSnapshot(): AuthContextSnapshot | null {
-  const { user, tenantOverride, sessionVersion } = useAuth.getState();
+  const { user, tenantOverride, sessionVersion, privilegedAuth } = useAuth.getState();
   if (!user?.id || !sessionVersion) return null;
   return {
     userId: user.id,
     tenantId: tenantOverride?.id ?? user.tenantId,
     sessionVersion,
+    assuranceLevel: privilegedAuth.currentLevel ?? null,
   };
 }
 
@@ -33,6 +35,7 @@ export function assertAuthContextFresh(snapshot: AuthContextSnapshot | null) {
     || cur.sessionVersion !== snapshot.sessionVersion
     || cur.userId !== snapshot.userId
     || cur.tenantId !== snapshot.tenantId
+    || cur.assuranceLevel !== snapshot.assuranceLevel
   ) {
     emitAuthMetric("stale_auth_context_rejected", { userId: snapshot.userId });
     throw new StaleAuthContextError();

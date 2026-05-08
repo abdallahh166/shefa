@@ -5,6 +5,7 @@ const snapshotHarness = vi.hoisted(() => ({
     user: null as null | { id: string; tenantId: string | null },
     tenantOverride: null as null | { id: string },
     sessionVersion: null as string | null,
+    privilegedAuth: { currentLevel: null as null | "aal1" | "aal2" },
   },
   metrics: [] as Array<{ name: string; payload: Record<string, unknown> }>,
 }));
@@ -34,6 +35,7 @@ describe("authContextSnapshot", () => {
       user: { id: "u1", tenantId: "tenant-1" },
       tenantOverride: null,
       sessionVersion: "u1:tenant-1:1",
+      privilegedAuth: { currentLevel: "aal1" },
     };
     snapshotHarness.metrics.length = 0;
   });
@@ -43,6 +45,7 @@ describe("authContextSnapshot", () => {
       userId: "u1",
       tenantId: "tenant-1",
       sessionVersion: "u1:tenant-1:1",
+      assuranceLevel: "aal1",
     });
 
     snapshotHarness.state.tenantOverride = { id: "tenant-override" };
@@ -51,6 +54,7 @@ describe("authContextSnapshot", () => {
       userId: "u1",
       tenantId: "tenant-override",
       sessionVersion: "u1:tenant-1:1",
+      assuranceLevel: "aal1",
     });
   });
 

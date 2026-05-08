@@ -78,6 +78,7 @@ function renderProtected(element: React.ReactNode, initialPath = "/protected") {
       <LocationProbe />
       <Routes>
         <Route path="/login" element={<div>login page</div>} />
+        <Route path="/mfa" element={<div>mfa page</div>} />
         <Route path="/security/privileged" element={<div>privileged page</div>} />
         <Route
           path="/protected"
@@ -128,6 +129,15 @@ describe("ProtectedRoute", () => {
     renderProtected(<ProtectedRoute><div>private content</div></ProtectedRoute>);
 
     expect(screen.getByTestId("location")).toHaveTextContent("/login");
+  });
+
+  it("redirects authenticated sessions requiring MFA to the MFA challenge flow", () => {
+    routeHarness.auth.authMachineState = "mfa_required";
+
+    renderProtected(<ProtectedRoute><div>private content</div></ProtectedRoute>);
+
+    expect(screen.getByTestId("location")).toHaveTextContent("/mfa");
+    expect(screen.queryByText("private content")).not.toBeInTheDocument();
   });
 
   it("redirects unauthenticated users to login", () => {

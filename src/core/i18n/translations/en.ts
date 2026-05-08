@@ -480,6 +480,15 @@ export const en = {
     resetPasswordDesc: "Enter your new password below.",
     passwordUpdated: "Password updated",
     passwordUpdatedDesc: "You can now log in with your new password.",
+
+    mfa: {
+      loginTitle: "Verify it's you",
+      loginDescription: "Enter the code from your authenticator app to finish signing in.",
+      oneTimeCode: "One-time code",
+      oneTimeCodePlaceholder: "123456",
+      verifyAndContinue: "Verify and continue",
+      loginFailedTitle: "Verification failed",
+    },
   },
   tutorial: {
     backToLogin: "Back to Login",

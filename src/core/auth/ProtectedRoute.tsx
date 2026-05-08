@@ -63,6 +63,10 @@ export const ProtectedRoute = ({
   }
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+
+  if (authMachineState === "mfa_required" || authMachineState === "mfa_verifying") {
+    return <Navigate to="/mfa" replace />;
+  }
   if (!isSuperAdmin(user) && user?.tenantStatus !== "active") {
     return (
       <div className="flex min-h-screen items-center justify-center px-6">

@@ -3,6 +3,8 @@ export type AuthMachineState =
   | "unauthenticated"
   | "unauthenticated_pending_cleanup"
   | "authenticating"
+  | "mfa_required"
+  | "mfa_verifying"
   | "authenticated"
   | "refreshing"
   | "reauth_required"
@@ -12,6 +14,7 @@ const ALLOWED: Record<AuthMachineState, AuthMachineState[]> = {
   initializing: [
     "unauthenticated",
     "authenticating",
+    "mfa_required",
     "authenticated",
     "reauth_required",
     "error",
@@ -19,9 +22,13 @@ const ALLOWED: Record<AuthMachineState, AuthMachineState[]> = {
   ],
   unauthenticated: ["authenticating", "initializing", "unauthenticated_pending_cleanup", "refreshing"],
   unauthenticated_pending_cleanup: ["unauthenticated", "error", "reauth_required"],
-  authenticating: ["authenticated", "unauthenticated", "error", "reauth_required", "unauthenticated_pending_cleanup"],
+  authenticating: ["mfa_required", "authenticated", "unauthenticated", "error", "reauth_required", "unauthenticated_pending_cleanup"],
+  mfa_required: ["mfa_verifying", "authenticated", "unauthenticated", "reauth_required", "error", "unauthenticated_pending_cleanup"],
+  mfa_verifying: ["authenticated", "mfa_required", "unauthenticated", "reauth_required", "error", "unauthenticated_pending_cleanup"],
   authenticated: [
     "refreshing",
+    "mfa_required",
+    "mfa_verifying",
     "unauthenticated",
     "unauthenticated_pending_cleanup",
     "reauth_required",

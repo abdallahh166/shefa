@@ -28,6 +28,7 @@ function lazyPage<TModule>(
 const LandingPage = lazyPage(() => import("./pages/LandingPage"), (m) => m.LandingPage, ["common", "landing", "auth"]);
 const AdminDashboardPage = lazyPage(() => import("./features/admin/AdminDashboardPage"), (m) => m.AdminDashboardPage, ["common", "admin"]);
 const LoginPage = lazyPage(() => import("./pages/LoginPage"), (m) => m.LoginPage, ["common", "auth"]);
+const MfaPage = lazyPage(() => import("./pages/MfaPage"), (m) => m.MfaPage, ["common", "auth"]);
 const ForgotPasswordPage = lazyPage(() => import("./pages/ForgotPasswordPage"), (m) => m.ForgotPasswordPage, ["common", "auth"]);
 const ResetPasswordPage = lazyPage(() => import("./pages/ResetPasswordPage"), (m) => m.ResetPasswordPage, ["common", "auth"]);
 const PrivilegedSecurityPage = lazyPage(() => import("./pages/PrivilegedSecurityPage"), (m) => m.PrivilegedSecurityPage, ["common", "auth", "settings"]);
@@ -74,6 +75,7 @@ const App = () => (
             <Suspense fallback={<div className="min-h-screen grid place-items-center text-sm text-muted-foreground">{translatePath("common.loading")}</div>}>
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
+                <Route path="/mfa" element={<MfaPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/security/privileged" element={<ProtectedRoute><PrivilegedSecurityPage /></ProtectedRoute>} />

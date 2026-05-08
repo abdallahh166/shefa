@@ -450,6 +450,15 @@
     resetPasswordDesc: "أدخل كلمة المرور الجديدة أدناه.",
     passwordUpdated: "تم تحديث كلمة المرور",
     passwordUpdatedDesc: "يمكنك الآن تسجيل الدخول باستخدام كلمة المرور الجديدة.",
+
+    mfa: {
+      loginTitle: "تحقق من هويتك",
+      loginDescription: "أدخل الرمز من تطبيق المصادقة لإكمال تسجيل الدخول.",
+      oneTimeCode: "رمز لمرة واحدة",
+      oneTimeCodePlaceholder: "123456",
+      verifyAndContinue: "تحقق والمتابعة",
+      loginFailedTitle: "فشل التحقق",
+    },
   },
   tutorial: {
     backToLogin: "العودة لتسجيل الدخول",
