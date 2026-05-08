@@ -1,6 +1,6 @@
 begin;
 
-select plan(11);
+select plan(13);
 
 set local role postgres;
 set local session_replication_role = replica;
@@ -201,6 +201,24 @@ select is(
   1::bigint,
   'Global search returns tenant-scoped patients only'
 );
+
+select throws_ok(
+  $$ select * from public.search_global('Patient', 10, '00000000-0000-0000-0000-000000000022'); $$,
+  '42501',
+  'Tenant mismatch for global search',
+  'Global search rejects explicit cross-tenant scope'
+);
+
+select set_config('request.jwt.claim.sub', '', true);
+
+select throws_ok(
+  $$ select * from public.search_global('Patient', 10); $$,
+  '42501',
+  'Missing tenant context for global search',
+  'Global search fails closed without tenant context'
+);
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000011', true);
 
 select is(
   (select count(*) from public.search_global('INV', 10)),

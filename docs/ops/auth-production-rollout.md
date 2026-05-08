@@ -2,7 +2,13 @@
 
 This runbook covers the deterministic auth bootstrap rollout and the operational signals that must stay healthy before expanding exposure.
 
+Before canary rollout, complete the staging gate in [Staging Production Validation](./staging-production-validation.md). Local unit, chaos, and DB checks are necessary, but they do not replace real Supabase Auth rotation, Realtime reconnect, storage, and RLS runtime validation.
+
 ## Rollout Sequence
+
+0. Staging production validation
+   - Complete the staging auth lifecycle, RLS adversarial, soak, CSP report-only, observability, and incident drill gates.
+   - Do not start production canary while any staging gate remains red.
 
 1. Internal users only
    - Enable for platform operators and test accounts.
@@ -47,6 +53,11 @@ Runtime health:
 - `auth_refresh_storm_detected`
 - Auth metric trend failure buckets
 
+HTTP auth boundary:
+- 401 responses trigger the centralized recovery path and replay the original request once.
+- 403 responses are treated as authorization denials and must not trigger refresh/recovery loops.
+- Auth token and logout endpoints are excluded from recovery recursion.
+
 ## Alert Thresholds
 
 Treat these as rollout blockers:
@@ -81,6 +92,7 @@ If auth degradation is user-visible or tenant-scoping confidence drops:
 
 Before each rollout stage:
 
+- Staging production validation is green for the current release candidate.
 - Auth bootstrap completes without transient authenticated UI from persisted state.
 - Supabase session is authoritative after refresh, restore, and tenant switch.
 - Boundary cleanup precedes principal adoption.

@@ -18,7 +18,10 @@
     "e2e:bootstrap": "node scripts/bootstrap-e2e.mjs",
     "pretest:e2e": "npm run e2e:bootstrap",
     "test:e2e": "playwright test",
+    "test:staging-auth": "playwright test -c playwright.staging-auth.config.ts",
+    "test:staging-auth:soak": "playwright test -c playwright.staging-auth.config.ts tests/staging-auth/soak",
     "test:load": "node scripts/load-test.mjs",
+    "security:csp:validate": "node scripts/validate-csp.mjs",
     "env:remote": "node scripts/switch-env.mjs remote",
     "env:status": "node scripts/switch-env.mjs status",
     "health:outbound": "node scripts/outbound-health.mjs"

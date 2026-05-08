@@ -18,6 +18,8 @@ const DURABLE_AUTH_METRICS = new Set([
   "auth_kill_switch_activated",
   "auth_bootstrap_completed",
   "auth_refresh_storm_detected",
+  "authorization_denied",
+  "auth_runtime_invariant_failed",
 ]);
 
 const FAILURE_AUTH_METRICS = new Set([
@@ -31,6 +33,7 @@ const FAILURE_AUTH_METRICS = new Set([
   "auth_queue_overflow",
   "auth_kill_switch_activated",
   "auth_refresh_storm_detected",
+  "auth_runtime_invariant_failed",
 ]);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

@@ -173,6 +173,24 @@ export const authService = {
     }
   },
 
+  async handleForbidden(params: { source: string; endpoint: string; authTraceId: string }) {
+    emitAuthMetric("authorization_denied", {
+      source: params.source,
+      endpoint: params.endpoint,
+      authTraceId: params.authTraceId,
+    });
+
+    if (isAuthKillSwitchActive()) {
+      emitAuthMetric("auth_kill_switch_activated", { authTraceId: params.authTraceId });
+      try {
+        useAuth.getState().setAuthMachineState("reauth_required");
+      } catch {
+        /* ignore */
+      }
+      throw new ServiceError("Authentication unavailable", { code: "AUTH_KILL_SWITCH" });
+    }
+  },
+
   async logout(authTraceId?: string, principalKey?: string) {
     authListenerGuards.suppressSignedOutCleanup = true;
     const trace = authTraceId ?? crypto.randomUUID();

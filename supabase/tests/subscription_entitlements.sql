@@ -1,6 +1,6 @@
 begin;
 
-select plan(18);
+select plan(22);
 
 set local role postgres;
 set local session_replication_role = replica;
@@ -294,6 +294,13 @@ select throws_ok(
   'Free-plan clinic admin cannot call billing summary RPC'
 );
 
+select throws_ok(
+  $$ select * from public.get_invoice_summary('10000000-0000-0000-0000-000000000002'); $$,
+  '42501',
+  'Tenant mismatch for invoice summary',
+  'Billing summary rejects explicit cross-tenant scope'
+);
+
 select set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000002', true);
 select is(
   (select total_count from public.get_invoice_summary()),
@@ -302,10 +309,24 @@ select is(
 );
 
 select throws_ok(
+  $$ select * from public.get_invoice_summary('10000000-0000-0000-0000-000000000005'); $$,
+  '42501',
+  'Tenant mismatch for invoice summary',
+  'Enabled billing RPC rejects another tenant parameter'
+);
+
+select throws_ok(
   $$ select * from public.get_report_overview(); $$,
   '42501',
   'Feature reports is not enabled for this tenant',
   'Reports RPC is blocked when advanced_reports is disabled'
+);
+
+select throws_ok(
+  $$ select * from public.get_report_overview('10000000-0000-0000-0000-000000000005'); $$,
+  '42501',
+  'Tenant mismatch for report overview',
+  'Reports RPC rejects explicit cross-tenant scope before entitlement checks'
 );
 
 select is(
@@ -333,6 +354,17 @@ select throws_ok(
   'Feature pharmacy is not enabled for this tenant',
   'Pharmacy summary RPC is blocked when pharmacy_module is disabled'
 );
+
+select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000001', true);
+
+select throws_ok(
+  $$ select * from public.get_invoice_summary(); $$,
+  '42501',
+  'Forbidden',
+  'Patient portal user cannot call billing summary RPC'
+);
+
+select set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000003', true);
 
 select is(
   (select count(*) from public.lab_orders),

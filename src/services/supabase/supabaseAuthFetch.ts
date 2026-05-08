@@ -51,7 +51,8 @@ function sanitizeEndpoint(urlStr: string): string {
 }
 
 /**
- * Fetch for Supabase: records latency, centralizes 401 recovery + single retry.
+ * Fetch for Supabase: records latency, centralizes 401 recovery + single retry,
+ * and routes 403 denials through one non-refreshing auth boundary.
  */
 export function createSupabaseAuthFetch(): typeof fetch {
   return async function supabaseAuthFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
@@ -64,7 +65,25 @@ export function createSupabaseAuthFetch(): typeof fetch {
     const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0;
     recordHttpLatencyMs(elapsed);
 
-    if (res.status !== 401 || isAuthTokenUrl(urlStr)) {
+    if (isAuthTokenUrl(urlStr)) {
+      return res;
+    }
+
+    if (res.status === 403) {
+      try {
+        const { authService } = await import("@/services/auth/auth.service");
+        await authService.handleForbidden({
+          source: "http",
+          endpoint: sanitizeEndpoint(urlStr),
+          authTraceId: crypto.randomUUID(),
+        });
+      } catch {
+        /* The original 403 is authoritative; callers should handle it without refresh churn. */
+      }
+      return res;
+    }
+
+    if (res.status !== 401) {
       return res;
     }
 

@@ -11,6 +11,7 @@ import { initializeI18nStore } from "./core/i18n/i18nStore";
 import { initializePrivilegedSessionLifecycle } from "./services/auth/privilegedSession.lifecycle";
 import { initAuthMultiTabSync, startAuthDriftWatcher } from "./services/auth/authSessionOrchestrator";
 import { authRepository } from "./services/auth/auth.repository";
+import { initAuthRuntimeInvariants } from "./services/auth/authRuntimeInvariants";
 
 // Apply theme class before anything renders (prevents flash)
 initTheme();
@@ -19,6 +20,7 @@ initSentry();
 
 initAuthMultiTabSync();
 initAuthOperationalTelemetry();
+initAuthRuntimeInvariants();
 startAuthDriftWatcher({
   getSession: () => authRepository.getSession(),
   refreshSessionSingleFlight: () => authRepository.refreshSessionSingleFlight(),
