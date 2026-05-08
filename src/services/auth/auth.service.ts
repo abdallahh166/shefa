@@ -51,7 +51,10 @@ async function runRefreshWithRetriesInternal(authTraceId: string) {
   for (let attempt = 0; attempt < 3; attempt++) {
     emitAuthMetric("refresh_attempt", { attempt, authTraceId });
     const { error } = await authRepository.refreshSessionSingleFlight();
-    if (!error) return;
+    if (!error) {
+      emitAuthMetric("refresh_succeeded", { attempt, authTraceId });
+      return;
+    }
     const msg = error.message ?? "";
     if (isInvalidRefreshTokenMessage(msg)) {
       emitAuthMetric("refresh_failed", { terminal: true, authTraceId });
@@ -102,6 +105,8 @@ export const authService = {
     const { error } = await authRepository.refreshSessionSingleFlight();
     if (error) {
       emitAuthMetric("refresh_failed", { phase: "preemptive" });
+    } else {
+      emitAuthMetric("refresh_succeeded", { phase: "preemptive" });
     }
   },
 
@@ -128,8 +133,12 @@ export const authService = {
           await Promise.resolve(authRepository.signOut()).catch(() => undefined);
           throw new AuthorizationError("This clinic is suspended or deactivated.");
         }
+        emitAuthMetric("login_succeeded", { userId: user.id });
       }
     } catch (err) {
+      emitAuthMetric("login_failed", {
+        errorCode: err instanceof Error ? err.message : "unknown",
+      });
       throw toServiceError(err, "Login failed");
     }
   },

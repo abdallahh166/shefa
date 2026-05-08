@@ -9,6 +9,7 @@ export const clientErrorLogSchema = z.object({
   request_id: uuidSchema.optional().nullable(),
   action_type: z.string().trim().max(100).optional().nullable(),
   resource_type: z.string().trim().max(100).optional().nullable(),
+  metadata: z.record(z.unknown()).optional().nullable(),
   message: z.string().trim().min(1).max(5000),
   stack: z.string().trim().max(10000).optional().nullable(),
   component_stack: z.string().trim().max(10000).optional().nullable(),

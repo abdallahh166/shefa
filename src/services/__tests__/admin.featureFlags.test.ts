@@ -17,6 +17,7 @@ const adminRepository = vi.hoisted(() => ({
   getRecentJobActivity: vi.fn(),
   getRecentSystemErrors: vi.fn(),
   getClientErrorTrend: vi.fn(),
+  getAuthMetricTrend: vi.fn(),
   updateSubscription: vi.fn(),
 }));
 

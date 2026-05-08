@@ -51,6 +51,7 @@ export function runAuthRecovery(fn: () => Promise<void>): Promise<void> {
       setTimeout(() => reject(new Error("RECOVERY_TIMEOUT")), MAX_AUTH_RECOVERY_MS);
     });
     await Promise.race([fn(), timeout]);
+    emitAuthMetric("auth_recovery_succeeded", {});
   })()
     .catch((err) => {
       emitAuthMetric("auth_recovery_failed", {

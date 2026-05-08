@@ -22,6 +22,7 @@ const adminRepository = vi.hoisted(() => ({
   getRecentActivity: vi.fn(),
   getRecentSystemErrors: vi.fn(),
   getClientErrorTrend: vi.fn(),
+  getAuthMetricTrend: vi.fn(),
   updateSubscription: vi.fn(),
   getTenantUsage: vi.fn(),
   retryJobs: vi.fn(),
@@ -202,6 +203,7 @@ describe("services smoke", () => {
     adminRepository.getRecentActivity.mockResolvedValue([]);
     adminRepository.getRecentSystemErrors.mockResolvedValue([]);
     adminRepository.getClientErrorTrend.mockResolvedValue([]);
+    adminRepository.getAuthMetricTrend.mockResolvedValue([]);
     adminRepository.updateSubscription.mockResolvedValue({
       id: recordId,
       tenant_id: tenantId,

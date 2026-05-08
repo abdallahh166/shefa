@@ -221,6 +221,7 @@ describe("repositories smoke", () => {
     await adminRepository.getRecentActivity();
     await adminRepository.getRecentSystemErrors();
     await adminRepository.getClientErrorTrend();
+    await adminRepository.getAuthMetricTrend();
     await adminRepository.updateSubscription(recordId, { plan: "pro" });
     await adminRepository.listTenantsPaged({ limit: 5, offset: 0 });
     await adminRepository.listTenantsPaged({ limit: 5, offset: 0, plan: "pro" });

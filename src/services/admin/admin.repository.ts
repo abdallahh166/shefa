@@ -1,5 +1,6 @@
 import type {
   AdminJobRetryInput,
+  AdminAuthMetricTrendPoint,
   AdminClientErrorTrendPoint,
   AdminMutationContext,
   AdminOperationsAlertSummary,
@@ -96,6 +97,7 @@ export interface AdminRepository {
   getRecentActivity(limit?: number, tenantId?: string): Promise<AdminRecentActivity[]>;
   getRecentSystemErrors(limit?: number, tenantId?: string): Promise<AdminRecentSystemError[]>;
   getClientErrorTrend(bucketMinutes?: number, bucketCount?: number, tenantId?: string): Promise<AdminClientErrorTrendPoint[]>;
+  getAuthMetricTrend(bucketMinutes?: number, bucketCount?: number, tenantId?: string): Promise<AdminAuthMetricTrendPoint[]>;
   getTenantUsage(tenantId: string): Promise<AdminTenantUsage>;
   retryJobs(input: AdminJobRetryInput & AdminMutationContext): Promise<AdminRecentJobActivity[]>;
 }
@@ -606,6 +608,21 @@ export const adminRepository: AdminRepository = {
     }
 
     return (Array.isArray(data) ? data : []) as AdminClientErrorTrendPoint[];
+  },
+  async getAuthMetricTrend(bucketMinutes = 15, bucketCount = 6, tenantId?: string) {
+    const { data, error } = await (supabase.rpc as any)("admin_auth_metric_trend", {
+      _bucket_minutes: bucketMinutes,
+      _bucket_count: bucketCount,
+      _tenant_id: tenantId ?? null,
+    });
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to load auth metric trend", {
+        code: error.code,
+        details: error,
+      });
+    }
+
+    return (Array.isArray(data) ? data : []) as AdminAuthMetricTrendPoint[];
   },
   async updateSubscription(id, input, context) {
     if (Object.keys(input).length === 0) {

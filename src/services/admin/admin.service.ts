@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   adminJobRetryInputSchema,
+  adminAuthMetricTrendPointSchema,
   adminClientErrorTrendPointSchema,
   adminOperationsDashboardResponseSchema,
   adminOperationsAlertsResponseSchema,
@@ -26,6 +27,7 @@ import {
   subscriptionStatusEnum,
 } from "@/domain/admin/admin.schema";
 import type {
+  AdminAuthMetricTrendPoint,
   AdminClientErrorTrendPoint,
   AdminMutationContext,
   AdminOperationsAlert,
@@ -151,6 +153,96 @@ function buildOperationsAlerts(summary: AdminOperationsAlertSummary): AdminOpera
     });
   }
 
+  if (summary.recent_auth_refresh_failure_count >= 3) {
+    alerts.push({
+      key: "auth_refresh_failures",
+      title: "Auth refresh failures",
+      description: `${summary.recent_auth_refresh_failure_count} session refresh failures were recorded in the last 15 minutes.`,
+      severity: summary.recent_auth_refresh_failure_count >= 8 ? "critical" : "warning",
+      count: summary.recent_auth_refresh_failure_count,
+    });
+  }
+
+  if (summary.recent_auth_recovery_failure_count > 0) {
+    alerts.push({
+      key: "auth_recovery_failures",
+      title: "Auth recovery failures",
+      description: `${summary.recent_auth_recovery_failure_count} auth recovery attempts failed before the user session converged.`,
+      severity: summary.recent_auth_recovery_failure_count >= 3 ? "critical" : "warning",
+      count: summary.recent_auth_recovery_failure_count,
+    });
+  }
+
+  if (summary.recent_unexpected_logouts_count >= 3) {
+    alerts.push({
+      key: "auth_unexpected_logouts",
+      title: "Unexpected logout spike",
+      description: `${summary.recent_unexpected_logouts_count} unexpected logout signals were recorded in the last 15 minutes.`,
+      severity: summary.recent_unexpected_logouts_count >= 8 ? "critical" : "warning",
+      count: summary.recent_unexpected_logouts_count,
+    });
+  }
+
+  if (summary.recent_auth_drift_count > 0) {
+    alerts.push({
+      key: "auth_drift",
+      title: "Auth drift detected",
+      description: `${summary.recent_auth_drift_count} sessions drifted from the Supabase SDK session and required intervention.`,
+      severity: "critical",
+      count: summary.recent_auth_drift_count,
+    });
+  }
+
+  if (summary.recent_stale_auth_rejects_count >= 3) {
+    alerts.push({
+      key: "auth_stale_rejects",
+      title: "Stale auth context rejects",
+      description: `${summary.recent_stale_auth_rejects_count} stale or corrupted persisted auth contexts were rejected.`,
+      severity: summary.recent_stale_auth_rejects_count >= 10 ? "critical" : "warning",
+      count: summary.recent_stale_auth_rejects_count,
+    });
+  }
+
+  if (summary.recent_auth_replay_rejects_count > 0) {
+    alerts.push({
+      key: "auth_replay_rejects",
+      title: "Auth event replay rejects",
+      description: `${summary.recent_auth_replay_rejects_count} stale or principal-mismatched auth events were rejected.`,
+      severity: "critical",
+      count: summary.recent_auth_replay_rejects_count,
+    });
+  }
+
+  if (summary.recent_auth_queue_overflows_count > 0) {
+    alerts.push({
+      key: "auth_queue_overflow",
+      title: "Auth recovery queue overflow",
+      description: `${summary.recent_auth_queue_overflows_count} recovery waiters exceeded the auth backpressure policy.`,
+      severity: "critical",
+      count: summary.recent_auth_queue_overflows_count,
+    });
+  }
+
+  if (summary.recent_auth_kill_switch_count > 0) {
+    alerts.push({
+      key: "auth_kill_switch",
+      title: "Auth kill switch active",
+      description: `${summary.recent_auth_kill_switch_count} auth kill-switch activations were reported by clients.`,
+      severity: "critical",
+      count: summary.recent_auth_kill_switch_count,
+    });
+  }
+
+  if (summary.recent_auth_refresh_storms_count > 0) {
+    alerts.push({
+      key: "auth_refresh_storms",
+      title: "Refresh storm detected",
+      description: `${summary.recent_auth_refresh_storms_count} clients crossed the refresh storm threshold.`,
+      severity: "critical",
+      count: summary.recent_auth_refresh_storms_count,
+    });
+  }
+
   return alerts.sort((left, right) => {
     const severityDelta = severityRank[right.severity] - severityRank[left.severity];
     if (severityDelta !== 0) return severityDelta;
@@ -187,6 +279,10 @@ function sortRecentAdminActivity(rows: AdminRecentActivity[]) {
 }
 
 function sortClientErrorTrend(rows: AdminClientErrorTrendPoint[]) {
+  return [...rows].sort((left, right) => new Date(left.bucket_start).getTime() - new Date(right.bucket_start).getTime());
+}
+
+function sortAuthMetricTrend(rows: AdminAuthMetricTrendPoint[]) {
   return [...rows].sort((left, right) => new Date(left.bucket_start).getTime() - new Date(right.bucket_start).getTime());
 }
 
@@ -437,6 +533,9 @@ export const adminService = {
       const clientErrorTrend = sortClientErrorTrend(
         z.array(adminClientErrorTrendPointSchema).parse(await adminRepository.getClientErrorTrend(15, 6, parsedTenantId)),
       );
+      const authMetricTrend = sortAuthMetricTrend(
+        z.array(adminAuthMetricTrendPointSchema).parse(await adminRepository.getAuthMetricTrend(15, 6, parsedTenantId)),
+      );
       const alertResponse = buildOperationsAlertResponse(summary);
 
       return adminOperationsDashboardResponseSchema.parse({
@@ -444,6 +543,7 @@ export const adminService = {
         recent_job_activity: recentJobActivity,
         recent_system_errors: recentSystemErrors,
         client_error_trend: clientErrorTrend,
+        auth_metric_trend: authMetricTrend,
       });
     } catch (err) {
       throw toServiceError(err, "Failed to load operations dashboard");

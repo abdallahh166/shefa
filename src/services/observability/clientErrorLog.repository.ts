@@ -14,6 +14,7 @@ export const clientErrorLogRepository: ClientErrorLogRepository = {
       request_id: input.request_id ?? null,
       action_type: input.action_type ?? null,
       resource_type: input.resource_type ?? null,
+      metadata: input.metadata ?? null,
       message: input.message,
       stack: input.stack ?? null,
       component_stack: input.component_stack ?? null,

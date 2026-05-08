@@ -215,6 +215,7 @@ export type Database = {
           created_at: string
           id: string
           message: string
+          metadata: Json | null
           request_id: string | null
           resource_type: string | null
           stack: string | null
@@ -229,6 +230,7 @@ export type Database = {
           created_at?: string
           id?: string
           message: string
+          metadata?: Json | null
           request_id?: string | null
           resource_type?: string | null
           stack?: string | null
@@ -243,6 +245,7 @@ export type Database = {
           created_at?: string
           id?: string
           message?: string
+          metadata?: Json | null
           request_id?: string | null
           resource_type?: string | null
           stack?: string | null

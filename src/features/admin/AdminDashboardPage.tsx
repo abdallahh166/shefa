@@ -32,6 +32,7 @@ import { queryKeys } from "@/services/queryKeys";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { requestReauthentication } from "@/features/auth/reauthPrompt";
 import type {
+  AdminAuthMetricTrendPoint,
   AdminClientErrorTrendPoint,
   AdminTenantFeatureFlag,
   AdminPricingPlan,
@@ -59,6 +60,12 @@ function updatePayloadFromAction(action: { field: "plan" | "status" | "billing_c
 
 function formatTrendBucketLabel(bucketStart: string, locale: "en" | "ar") {
   return formatDate(bucketStart, locale, "time");
+}
+
+function formatRate(success: number, failure: number, locale: "en" | "ar") {
+  const total = success + failure;
+  if (total === 0) return "100%";
+  return `${formatNumber(Math.round((success / total) * 100), locale)}%`;
 }
 
 export const AdminDashboardPage = () => {
@@ -1213,6 +1220,23 @@ export const AdminDashboardPage = () => {
 
   const trendPoints = operationsDashboard?.client_error_trend ?? [];
   const trendMax = trendPoints.reduce((max, point) => Math.max(max, point.error_count), 0);
+  const authTrendPoints = operationsDashboard?.auth_metric_trend ?? [];
+  const authTrendMax = authTrendPoints.reduce((max, point) => Math.max(max, point.metric_count), 0);
+  const loginSuccessRate = formatRate(
+    operationsSummary?.recent_auth_login_success_count ?? 0,
+    operationsSummary?.recent_auth_login_failure_count ?? 0,
+    locale,
+  );
+  const refreshSuccessRate = formatRate(
+    operationsSummary?.recent_auth_refresh_success_count ?? 0,
+    operationsSummary?.recent_auth_refresh_failure_count ?? 0,
+    locale,
+  );
+  const recoverySuccessRate = formatRate(
+    operationsSummary?.recent_auth_recovery_success_count ?? 0,
+    operationsSummary?.recent_auth_recovery_failure_count ?? 0,
+    locale,
+  );
 
   return (
     <div className="min-h-screen bg-background" dir={locale === "ar" ? "rtl" : "ltr"}>
@@ -1335,6 +1359,59 @@ export const AdminDashboardPage = () => {
                       accent={(operationsSummary?.recent_edge_failures_count ?? 0) > 0 ? "destructive" : "success"}
                       subtitle={t("admin.common.clientErrorsCount", {
                         count: formatNumber(operationsSummary?.recent_client_errors_count ?? 0, locale),
+                      })}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                    <StatCard
+                      title={t("admin.operations.loginSuccessRate")}
+                      value={loginSuccessRate}
+                      icon={Shield}
+                      accent={(operationsSummary?.recent_auth_login_failure_count ?? 0) > 0 ? "warning" : "success"}
+                      subtitle={t("admin.common.failuresCount", {
+                        count: formatNumber(operationsSummary?.recent_auth_login_failure_count ?? 0, locale),
+                      })}
+                    />
+                    <StatCard
+                      title={t("admin.operations.refreshSuccessRate")}
+                      value={refreshSuccessRate}
+                      icon={RotateCcw}
+                      accent={(operationsSummary?.recent_auth_refresh_failure_count ?? 0) >= 3 ? "destructive" : "success"}
+                      subtitle={t("admin.common.failuresCount", {
+                        count: formatNumber(operationsSummary?.recent_auth_refresh_failure_count ?? 0, locale),
+                      })}
+                    />
+                    <StatCard
+                      title={t("admin.operations.recoverySuccessRate")}
+                      value={recoverySuccessRate}
+                      icon={Activity}
+                      accent={(operationsSummary?.recent_auth_recovery_failure_count ?? 0) > 0 ? "warning" : "success"}
+                      subtitle={t("admin.common.failuresCount", {
+                        count: formatNumber(operationsSummary?.recent_auth_recovery_failure_count ?? 0, locale),
+                      })}
+                    />
+                    <StatCard
+                      title={t("admin.operations.authAnomalies")}
+                      value={formatNumber(
+                        (operationsSummary?.recent_auth_drift_count ?? 0)
+                          + (operationsSummary?.recent_stale_auth_rejects_count ?? 0)
+                          + (operationsSummary?.recent_auth_replay_rejects_count ?? 0),
+                        locale,
+                      )}
+                      icon={AlertTriangle}
+                      accent={
+                        ((operationsSummary?.recent_auth_drift_count ?? 0)
+                          + (operationsSummary?.recent_auth_replay_rejects_count ?? 0)) > 0
+                          ? "destructive"
+                          : (operationsSummary?.recent_stale_auth_rejects_count ?? 0) > 0
+                            ? "warning"
+                            : "success"
+                      }
+                      subtitle={t("admin.common.lastAuthSignal", {
+                        date: operationsSummary?.last_auth_signal_at
+                          ? formatDate(operationsSummary.last_auth_signal_at, locale, "datetime")
+                          : t("admin.operations.noAuthSignals"),
                       })}
                     />
                   </div>
@@ -1500,6 +1577,60 @@ export const AdminDashboardPage = () => {
               />
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              <StatCard
+                title={t("admin.operations.loginSuccessRate")}
+                value={loginSuccessRate}
+                icon={Shield}
+                accent={(operationsSummary?.recent_auth_login_failure_count ?? 0) > 0 ? "warning" : "success"}
+                subtitle={t("admin.common.failuresCount", {
+                  count: formatNumber(operationsSummary?.recent_auth_login_failure_count ?? 0, locale),
+                })}
+              />
+              <StatCard
+                title={t("admin.operations.refreshSuccessRate")}
+                value={refreshSuccessRate}
+                icon={RotateCcw}
+                accent={(operationsSummary?.recent_auth_refresh_failure_count ?? 0) >= 3 ? "destructive" : "success"}
+                subtitle={t("admin.common.failuresCount", {
+                  count: formatNumber(operationsSummary?.recent_auth_refresh_failure_count ?? 0, locale),
+                })}
+              />
+              <StatCard
+                title={t("admin.operations.recoverySuccessRate")}
+                value={recoverySuccessRate}
+                icon={Activity}
+                accent={(operationsSummary?.recent_auth_recovery_failure_count ?? 0) > 0 ? "warning" : "success"}
+                subtitle={t("admin.common.failuresCount", {
+                  count: formatNumber(operationsSummary?.recent_auth_recovery_failure_count ?? 0, locale),
+                })}
+              />
+              <StatCard
+                title={t("admin.operations.authAnomalies")}
+                value={formatNumber(
+                  (operationsSummary?.recent_auth_drift_count ?? 0)
+                    + (operationsSummary?.recent_stale_auth_rejects_count ?? 0)
+                    + (operationsSummary?.recent_auth_replay_rejects_count ?? 0)
+                    + (operationsSummary?.recent_unexpected_logouts_count ?? 0),
+                  locale,
+                )}
+                icon={AlertTriangle}
+                accent={
+                  ((operationsSummary?.recent_auth_drift_count ?? 0)
+                    + (operationsSummary?.recent_auth_replay_rejects_count ?? 0)
+                    + (operationsSummary?.recent_auth_queue_overflows_count ?? 0)) > 0
+                    ? "destructive"
+                    : (operationsSummary?.recent_stale_auth_rejects_count ?? 0) > 0
+                      ? "warning"
+                      : "success"
+                }
+                subtitle={t("admin.common.driftReplayRejects", {
+                  drift: formatNumber(operationsSummary?.recent_auth_drift_count ?? 0, locale),
+                  replay: formatNumber(operationsSummary?.recent_auth_replay_rejects_count ?? 0, locale),
+                })}
+              />
+            </div>
+
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               <div className="xl:col-span-2 rounded-2xl border bg-card p-5 space-y-4">
                 <div className="flex items-center justify-between gap-3">
@@ -1562,6 +1693,42 @@ export const AdminDashboardPage = () => {
                     })
                   ) : (
                     <p className="text-sm text-muted-foreground">{t("admin.operations.clientErrorTrendEmpty")}</p>
+                  )}
+                </div>
+
+                <div className="border-t pt-4 space-y-3">
+                  <div>
+                    <h3 className="font-semibold">{t("admin.operations.authMetricTrend")}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {t("admin.operations.authMetricTrendDescription")}
+                    </p>
+                  </div>
+                  {authTrendPoints.length ? (
+                    authTrendPoints.map((point: AdminAuthMetricTrendPoint) => {
+                      const width = authTrendMax > 0 ? Math.max(8, Math.round((point.metric_count / authTrendMax) * 100)) : 8;
+                      return (
+                        <div key={point.bucket_start} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>{formatTrendBucketLabel(point.bucket_start, locale)}</span>
+                            <span>{t("admin.common.authMetricsAndFailures", {
+                              metrics: formatNumber(point.metric_count, locale),
+                              failures: formatNumber(point.failure_count, locale),
+                            })}</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-muted">
+                            <div
+                              className={cn(
+                                "h-2 rounded-full transition-all",
+                                point.failure_count > 0 ? "bg-destructive" : "bg-primary",
+                              )}
+                              style={{ width: `${width}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{t("admin.operations.authMetricTrendEmpty")}</p>
                   )}
                 </div>
               </div>

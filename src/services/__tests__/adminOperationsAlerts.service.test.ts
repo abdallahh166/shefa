@@ -9,6 +9,7 @@ const adminRepository = vi.hoisted(() => ({
   getRecentJobActivity: vi.fn(),
   getRecentSystemErrors: vi.fn(),
   getClientErrorTrend: vi.fn(),
+  getAuthMetricTrend: vi.fn(),
   updateSubscription: vi.fn(),
 }));
 
@@ -33,6 +34,7 @@ describe("adminService operations alerts", () => {
     adminRepository.getRecentJobActivity.mockResolvedValue([]);
     adminRepository.getRecentSystemErrors.mockResolvedValue([]);
     adminRepository.getClientErrorTrend.mockResolvedValue([]);
+    adminRepository.getAuthMetricTrend.mockResolvedValue([]);
   });
 
   it("coerces RPC summary values and raises critical alerts", async () => {
@@ -45,9 +47,23 @@ describe("adminService operations alerts", () => {
       recent_job_failures_count: "3",
       recent_edge_failures_count: "6",
       recent_client_errors_count: "12",
+      recent_auth_login_success_count: "10",
+      recent_auth_login_failure_count: "1",
+      recent_auth_refresh_success_count: "15",
+      recent_auth_refresh_failure_count: "4",
+      recent_auth_recovery_success_count: "3",
+      recent_auth_recovery_failure_count: "1",
+      recent_auth_drift_count: "1",
+      recent_stale_auth_rejects_count: "0",
+      recent_auth_replay_rejects_count: "1",
+      recent_auth_queue_overflows_count: "0",
+      recent_unexpected_logouts_count: "3",
+      recent_auth_kill_switch_count: "0",
+      recent_auth_refresh_storms_count: "0",
       last_job_failure_at: "2026-04-15T10:00:00.000Z",
       last_edge_failure_at: "2026-04-15T10:02:00.000Z",
       last_client_error_at: "2026-04-15T10:03:00.000Z",
+      last_auth_signal_at: "2026-04-15T10:04:00.000Z",
     });
 
     const result = await adminService.getOperationsAlerts();
@@ -57,6 +73,7 @@ describe("adminService operations alerts", () => {
     expect(result.overall_severity).toBe("critical");
     expect(result.active_alerts.some((alert) => alert.key === "dead_letters" && alert.severity === "critical")).toBe(true);
     expect(result.active_alerts.some((alert) => alert.key === "queue_backlog" && alert.count === 52)).toBe(true);
+    expect(result.active_alerts.some((alert) => alert.key === "auth_drift" && alert.severity === "critical")).toBe(true);
   });
 
   it("returns a healthy state when there are no active signals", async () => {
@@ -72,6 +89,7 @@ describe("adminService operations alerts", () => {
       last_job_failure_at: null,
       last_edge_failure_at: null,
       last_client_error_at: null,
+      last_auth_signal_at: null,
     });
 
     const result = await adminService.getOperationsAlerts();
@@ -90,9 +108,23 @@ describe("adminService operations alerts", () => {
       recent_job_failures_count: 1,
       recent_edge_failures_count: 0,
       recent_client_errors_count: 3,
+      recent_auth_login_success_count: 6,
+      recent_auth_login_failure_count: 0,
+      recent_auth_refresh_success_count: 10,
+      recent_auth_refresh_failure_count: 1,
+      recent_auth_recovery_success_count: 1,
+      recent_auth_recovery_failure_count: 0,
+      recent_auth_drift_count: 0,
+      recent_stale_auth_rejects_count: 0,
+      recent_auth_replay_rejects_count: 0,
+      recent_auth_queue_overflows_count: 0,
+      recent_unexpected_logouts_count: 0,
+      recent_auth_kill_switch_count: 0,
+      recent_auth_refresh_storms_count: 0,
       last_job_failure_at: "2026-04-15T10:00:00.000Z",
       last_edge_failure_at: null,
       last_client_error_at: "2026-04-15T10:05:00.000Z",
+      last_auth_signal_at: "2026-04-15T10:05:00.000Z",
     });
     adminRepository.getRecentJobActivity.mockResolvedValue([
       {
@@ -134,6 +166,20 @@ describe("adminService operations alerts", () => {
         affected_tenants_count: 2,
       },
     ]);
+    adminRepository.getAuthMetricTrend.mockResolvedValue([
+      {
+        bucket_start: "2026-04-15T09:45:00.000Z",
+        metric_count: 2,
+        failure_count: 0,
+        affected_tenants_count: 1,
+      },
+      {
+        bucket_start: "2026-04-15T10:00:00.000Z",
+        metric_count: 5,
+        failure_count: 1,
+        affected_tenants_count: 2,
+      },
+    ]);
 
     const result = await adminService.getOperationsDashboard();
 
@@ -142,5 +188,6 @@ describe("adminService operations alerts", () => {
     expect(result.recent_system_errors[0].service).toBe("job-worker");
     expect(result.client_error_trend).toHaveLength(2);
     expect(result.client_error_trend[1].error_count).toBe(3);
+    expect(result.auth_metric_trend[1].failure_count).toBe(1);
   });
 });

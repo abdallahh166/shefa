@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import {
   adminClientErrorTrendPointSchema,
+  adminAuthMetricTrendPointSchema,
   adminOperationsDashboardResponseSchema,
   adminOperationsAlertsResponseSchema,
   adminOperationsAlertSchema,
@@ -43,6 +44,7 @@ export type AdminRecentJobActivity = z.infer<typeof adminRecentJobActivitySchema
 export type AdminRecentActivity = z.infer<typeof adminRecentActivitySchema>;
 export type AdminRecentSystemError = z.infer<typeof adminRecentSystemErrorSchema>;
 export type AdminClientErrorTrendPoint = z.infer<typeof adminClientErrorTrendPointSchema>;
+export type AdminAuthMetricTrendPoint = z.infer<typeof adminAuthMetricTrendPointSchema>;
 export type AdminOperationsDashboardResponse = z.infer<typeof adminOperationsDashboardResponseSchema>;
 export type AdminTenantUsage = z.infer<typeof adminTenantUsageSchema>;
 export type AdminJobRetryInput = z.infer<typeof adminJobRetryInputSchema>;

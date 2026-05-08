@@ -117,6 +117,17 @@ export type PrivilegedSession = {
   canAccessPrivilegedRoutes: boolean;
 };
 
+type PersistedAuthMetadataV1 = {
+  version: 1;
+  userId: string;
+  tenantId: string | null;
+  tenantOverride: TenantOverride;
+  impersonationSession: ImpersonationSession;
+  lastVerifiedAt: string | null;
+  sessionVersion: string | null;
+  checksum: string;
+};
+
 interface AuthState {
   user: AppUser | null;
   supabaseUser: SupaUser | null;
@@ -124,6 +135,9 @@ interface AuthState {
   isLoading: boolean;
   authMachineState: AuthMachineState;
   sessionVersion: string | null;
+  bootstrapSequenceId: string | null;
+  bootstrapCompleted: boolean;
+  persistedAuth: PersistedAuthMetadataV1 | null;
   tenantOverride: TenantOverride;
   impersonationSession: ImpersonationSession;
   lastVerifiedAt: string | null;
@@ -225,6 +239,89 @@ export function buildPrivilegedSession(input: {
 
 let lastPrincipalKeyCommitted: string | null = null;
 let lastSessionVersionCommitted: string | null = null;
+let startupAuthResolution: Promise<void> | null = null;
+let authBootstrapReady = false;
+
+const AUTH_PERSIST_VERSION = 2;
+
+function authChecksum(input: string) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+function persistedChecksumPayload(input: Omit<PersistedAuthMetadataV1, "checksum">) {
+  return JSON.stringify({
+    version: input.version,
+    userId: input.userId,
+    tenantId: input.tenantId,
+    tenantOverride: input.tenantOverride,
+    impersonationSession: input.impersonationSession,
+    lastVerifiedAt: input.lastVerifiedAt,
+    sessionVersion: input.sessionVersion,
+  });
+}
+
+function buildPersistedAuthMetadata(state: AuthState): PersistedAuthMetadataV1 | null {
+  if (!state.user) return null;
+  const metadata: Omit<PersistedAuthMetadataV1, "checksum"> = {
+    version: 1,
+    userId: state.user.id,
+    tenantId: state.tenantOverride?.id ?? state.user.tenantId ?? null,
+    tenantOverride: isSuperAdmin(state.user) ? state.tenantOverride : null,
+    impersonationSession: isSuperAdmin(state.user) ? state.impersonationSession : null,
+    lastVerifiedAt: state.lastVerifiedAt,
+    sessionVersion: state.sessionVersion,
+  };
+  return {
+    ...metadata,
+    checksum: authChecksum(persistedChecksumPayload(metadata)),
+  };
+}
+
+function validatePersistedAuthMetadata(
+  persistedAuth: PersistedAuthMetadataV1 | null,
+  supaUser: SupaUser,
+): PersistedAuthMetadataV1 | null {
+  if (!persistedAuth) return null;
+  if (persistedAuth.version !== 1) {
+    emitAuthMetric("stale_auth_context_rejected", { reason: "version" });
+    return null;
+  }
+
+  const { checksum, ...withoutChecksum } = persistedAuth;
+  if (checksum !== authChecksum(persistedChecksumPayload(withoutChecksum))) {
+    emitAuthMetric("stale_auth_context_rejected", { reason: "checksum" });
+    return null;
+  }
+
+  if (persistedAuth.userId !== supaUser.id) {
+    emitAuthMetric("stale_auth_context_rejected", { reason: "principal_mismatch" });
+    return null;
+  }
+
+  return persistedAuth;
+}
+
+function clearAuthenticatedProjection(set: (state: Partial<AuthState>) => void, bootstrapSequenceId?: string) {
+  set({
+    user: null,
+    supabaseUser: null,
+    isAuthenticated: false,
+    isLoading: true,
+    authMachineState: "initializing",
+    sessionVersion: null,
+    tenantOverride: null,
+    impersonationSession: null,
+    lastVerifiedAt: null,
+    privilegedAuth: getDefaultPrivilegedAuthState(),
+    bootstrapSequenceId: bootstrapSequenceId ?? null,
+    bootstrapCompleted: false,
+  });
+}
 
 export function principalKeyFromSnapshot(state: Pick<AuthState, "user" | "tenantOverride">) {
   const u = state.user;
@@ -242,6 +339,9 @@ export const useAuth = create<AuthState>()(
       isLoading: true,
       authMachineState: "initializing",
       sessionVersion: null,
+      bootstrapSequenceId: null,
+      bootstrapCompleted: false,
+      persistedAuth: null,
       tenantOverride: null,
       impersonationSession: null,
       lastVerifiedAt: null,
@@ -256,17 +356,23 @@ export const useAuth = create<AuthState>()(
           || next === "refreshing";
         set({ authMachineState: next, isLoading: loading });
       },
-      setUser: (user, supabaseUser) => set({
-        user,
-        supabaseUser: supabaseUser ?? null,
-        isAuthenticated: !!user,
-        isLoading: false,
-        authMachineState: user ? "authenticated" : "unauthenticated",
-        tenantOverride: isSuperAdmin(user) ? get().tenantOverride : null,
-        impersonationSession: isSuperAdmin(user) ? get().impersonationSession : null,
-        lastVerifiedAt: user ? get().lastVerifiedAt : null,
-        sessionVersion: user ? get().sessionVersion : null,
-      }),
+      setUser: (user, supabaseUser) => {
+        if (user && !authBootstrapReady) {
+          emitAuthMetric("stale_auth_context_rejected", { reason: "bootstrap_not_ready" });
+          return;
+        }
+        set({
+          user,
+          supabaseUser: supabaseUser ?? null,
+          isAuthenticated: !!user,
+          isLoading: false,
+          authMachineState: user ? "authenticated" : "unauthenticated",
+          tenantOverride: isSuperAdmin(user) ? get().tenantOverride : null,
+          impersonationSession: isSuperAdmin(user) ? get().impersonationSession : null,
+          lastVerifiedAt: user ? get().lastVerifiedAt : null,
+          sessionVersion: user ? get().sessionVersion : null,
+        });
+      },
       setLoading: (isLoading) => set({ isLoading }),
       setPrivilegedAuth: (state) => set((current) => ({
         privilegedAuth: {
@@ -337,63 +443,106 @@ export const useAuth = create<AuthState>()(
         set({ lastVerifiedAt: verifiedAt ?? new Date().toISOString() });
       },
       initialize: async () => {
-        get().setAuthMachineState("initializing");
-        if (isAuthKillSwitchActive()) {
-          emitAuthMetric("auth_kill_switch_activated", {});
-          const trace = crypto.randomUUID();
-          const pk = principalKeyFromSnapshot(get());
-          const tabId = (() => {
-            try {
-              let id = sessionStorage.getItem("shefaa_tab_id");
-              if (!id) {
-                id = crypto.randomUUID();
-                sessionStorage.setItem("shefaa_tab_id", id);
-              }
-              return id;
-            } catch {
-              return "tab";
-            }
-          })();
-          const ev: AuthTransitionEventV1 = {
-            v: 1,
-            eventId: crypto.randomUUID(),
-            originTabId: tabId,
-            principalKey: pk,
-            type: "BOUNDARY_RESET",
-            occurredAt: Date.now(),
-            authTraceId: trace,
-          };
-          await runAuthCleanupEvent(ev);
-          get().setAuthMachineState("reauth_required");
-          return;
-        }
-        const timeout = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Auth timeout")), 8000)
-        );
-        try {
-          const active = await Promise.race([authService.getActiveSession(), timeout]);
-          const supaUser = active.user as SupaUser | null;
-          const persistedId = get().user?.id;
-          if (supaUser && persistedId && persistedId !== supaUser.id) {
-            emitAuthMetric("unexpected_logout", { reason: "corrupted_session" });
+        if (startupAuthResolution) return startupAuthResolution;
+
+        authBootstrapReady = false;
+        const bootstrapSequenceId = crypto.randomUUID();
+        const bootstrapStartedAt = Date.now();
+        startupAuthResolution = (async () => {
+          clearAuthenticatedProjection(set, bootstrapSequenceId);
+          await Promise.resolve((useAuth as any).persist?.rehydrate?.()).catch(() => {
+            emitAuthMetric("stale_auth_context_rejected", { reason: "hydrate_failed" });
+          });
+          clearAuthenticatedProjection(set, bootstrapSequenceId);
+
+          if (isAuthKillSwitchActive()) {
+            emitAuthMetric("auth_kill_switch_activated", {});
             const trace = crypto.randomUUID();
-            await authService.logout(trace, principalKeyFromSnapshot(get()));
-            get().setAuthMachineState("unauthenticated");
+            const pk = principalKeyFromSnapshot(get());
+            const tabId = (() => {
+              try {
+                let id = sessionStorage.getItem("shefaa_tab_id");
+                if (!id) {
+                  id = crypto.randomUUID();
+                  sessionStorage.setItem("shefaa_tab_id", id);
+                }
+                return id;
+              } catch {
+                return "tab";
+              }
+            })();
+            const ev: AuthTransitionEventV1 = {
+              v: 1,
+              eventId: crypto.randomUUID(),
+              originTabId: tabId,
+              principalKey: pk,
+              type: "BOUNDARY_RESET",
+              occurredAt: Date.now(),
+              authTraceId: trace,
+            };
+            await runAuthCleanupEvent(ev);
+            set({ bootstrapCompleted: true });
+            emitAuthMetric("auth_bootstrap_completed", {
+              result: "kill_switch",
+              durationMs: Date.now() - bootstrapStartedAt,
+              bootstrapSequenceId,
+            });
+            get().setAuthMachineState("reauth_required");
             return;
           }
-          if (supaUser) {
-            await Promise.race([
-              loadUserProfile(supaUser, { createdAt: active.createdAt ?? null }),
-              timeout,
-            ]);
-            const { user, lastVerifiedAt } = get();
-            if (!user || !isSuperAdmin(user)) {
-              set({ tenantOverride: null, impersonationSession: null });
+
+          const timeout = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Auth timeout")), 8000)
+          );
+          try {
+            const active = await Promise.race([authService.getActiveSession(), timeout]);
+            const supaUser = active.user as SupaUser | null;
+            if (supaUser) {
+              const persistedAuth = validatePersistedAuthMetadata(get().persistedAuth, supaUser);
+              if (get().persistedAuth && !persistedAuth) {
+                set({ persistedAuth: null });
+              }
+              await Promise.race([
+                loadUserProfile(supaUser, {
+                  createdAt: active.createdAt ?? null,
+                  persistedAuth,
+                }),
+                timeout,
+              ]);
+              const { user, lastVerifiedAt } = get();
+              if (!user || !isSuperAdmin(user)) {
+                set({ tenantOverride: null, impersonationSession: null });
+              }
+              if (user && !lastVerifiedAt) {
+                set({ lastVerifiedAt: new Date().toISOString() });
+              }
+              emitAuthMetric("auth_bootstrap_completed", {
+                result: user ? "session_restored" : "profile_rejected",
+                durationMs: Date.now() - bootstrapStartedAt,
+                bootstrapSequenceId,
+              });
+            } else {
+              lastPrincipalKeyCommitted = null;
+              lastSessionVersionCommitted = null;
+              set({
+                user: null,
+                supabaseUser: null,
+                isAuthenticated: false,
+                tenantOverride: null,
+                impersonationSession: null,
+                lastVerifiedAt: null,
+                privilegedAuth: getDefaultPrivilegedAuthState(),
+                sessionVersion: null,
+                persistedAuth: null,
+              });
+              get().setAuthMachineState("unauthenticated");
+              emitAuthMetric("auth_bootstrap_completed", {
+                result: "no_session",
+                durationMs: Date.now() - bootstrapStartedAt,
+                bootstrapSequenceId,
+              });
             }
-            if (user && !lastVerifiedAt) {
-              set({ lastVerifiedAt: new Date().toISOString() });
-            }
-          } else {
+          } catch {
             lastPrincipalKeyCommitted = null;
             lastSessionVersionCommitted = null;
             set({
@@ -405,34 +554,34 @@ export const useAuth = create<AuthState>()(
               lastVerifiedAt: null,
               privilegedAuth: getDefaultPrivilegedAuthState(),
               sessionVersion: null,
+              persistedAuth: null,
             });
             get().setAuthMachineState("unauthenticated");
+            emitAuthMetric("auth_bootstrap_completed", {
+              result: "failure",
+              durationMs: Date.now() - bootstrapStartedAt,
+              bootstrapSequenceId,
+            });
+          } finally {
+            set({ bootstrapCompleted: true });
           }
-        } catch {
-          lastPrincipalKeyCommitted = null;
-          lastSessionVersionCommitted = null;
-          set({
-            user: null,
-            supabaseUser: null,
-            isAuthenticated: false,
-            tenantOverride: null,
-            impersonationSession: null,
-            lastVerifiedAt: null,
-            privilegedAuth: getDefaultPrivilegedAuthState(),
-            sessionVersion: null,
-          });
-          get().setAuthMachineState("unauthenticated");
-        }
+        })().finally(() => {
+          authBootstrapReady = true;
+          startupAuthResolution = null;
+        });
+
+        return startupAuthResolution;
       },
     }),
     {
       name: "medflow-auth",
+      version: AUTH_PERSIST_VERSION,
+      skipHydration: true,
+      migrate: () => ({
+        persistedAuth: null,
+      }),
       partialize: (state) => ({
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
-        tenantOverride: state.tenantOverride,
-        impersonationSession: state.impersonationSession,
-        lastVerifiedAt: state.lastVerifiedAt,
+        persistedAuth: buildPersistedAuthMetadata(state),
       }),
     }
   )
@@ -440,7 +589,7 @@ export const useAuth = create<AuthState>()(
 
 async function loadUserProfile(
   supaUser: SupaUser,
-  sessionMeta?: { createdAt?: string | null },
+  sessionMeta?: { createdAt?: string | null; persistedAuth?: PersistedAuthMetadataV1 | null },
 ) {
   const isVerified = Boolean(supaUser.email_confirmed_at ?? supaUser.confirmed_at);
   if (!isVerified) {
@@ -484,7 +633,9 @@ async function loadUserProfile(
 
     nextUser.avatar = avatarUrl;
 
-    const tenantOverride = isSuperAdmin(nextUser) ? useAuth.getState().tenantOverride : null;
+    const tenantOverride = isSuperAdmin(nextUser)
+      ? sessionMeta?.persistedAuth?.tenantOverride ?? useAuth.getState().tenantOverride
+      : null;
     const effTenant = tenantOverride?.id ?? nextUser.tenantId ?? null;
     const nextKey = principalKeyFromSnapshot({ user: nextUser, tenantOverride });
     const nextVer = sessionVersionFromSupabaseUser(supaUser as any, effTenant, sessionMeta?.createdAt ?? null);
@@ -508,8 +659,10 @@ async function loadUserProfile(
       supabaseUser: supaUser,
       isAuthenticated: true,
       tenantOverride,
-      impersonationSession: isSuperAdmin(nextUser) ? useAuth.getState().impersonationSession : null,
-      lastVerifiedAt: useAuth.getState().lastVerifiedAt,
+      impersonationSession: isSuperAdmin(nextUser)
+        ? sessionMeta?.persistedAuth?.impersonationSession ?? useAuth.getState().impersonationSession
+        : null,
+      lastVerifiedAt: sessionMeta?.persistedAuth?.lastVerifiedAt ?? useAuth.getState().lastVerifiedAt,
       sessionVersion: nextVer,
       authMachineState: "authenticated",
       isLoading: false,
@@ -550,6 +703,11 @@ function readTabIdForEvent() {
 // Listen for auth changes
 authService.onAuthStateChange(async (event, sessionUser) => {
   const { setLoading, markSessionVerified, setAuthMachineState } = useAuth.getState();
+
+  if (!authBootstrapReady) {
+    emitAuthMetric("auth_bootstrap_listener_suppressed", { event });
+    return;
+  }
 
   if (event === "TOKEN_REFRESHED") {
     if (tokenRefreshCoalesce) clearTimeout(tokenRefreshCoalesce);

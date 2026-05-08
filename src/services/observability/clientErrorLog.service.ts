@@ -9,6 +9,7 @@ export const clientErrorLogService = {
     request_id?: string | null;
     action_type?: string | null;
     resource_type?: string | null;
+    metadata?: Record<string, unknown> | null;
     message: string;
     stack?: string | null;
     component_stack?: string | null;

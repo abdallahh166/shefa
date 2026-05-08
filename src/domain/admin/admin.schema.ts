@@ -101,9 +101,23 @@ export const adminOperationsAlertSummarySchema = z.object({
   recent_job_failures_count: z.coerce.number().int().nonnegative(),
   recent_edge_failures_count: z.coerce.number().int().nonnegative(),
   recent_client_errors_count: z.coerce.number().int().nonnegative(),
+  recent_auth_login_success_count: z.coerce.number().int().nonnegative().default(0),
+  recent_auth_login_failure_count: z.coerce.number().int().nonnegative().default(0),
+  recent_auth_refresh_success_count: z.coerce.number().int().nonnegative().default(0),
+  recent_auth_refresh_failure_count: z.coerce.number().int().nonnegative().default(0),
+  recent_auth_recovery_success_count: z.coerce.number().int().nonnegative().default(0),
+  recent_auth_recovery_failure_count: z.coerce.number().int().nonnegative().default(0),
+  recent_auth_drift_count: z.coerce.number().int().nonnegative().default(0),
+  recent_stale_auth_rejects_count: z.coerce.number().int().nonnegative().default(0),
+  recent_auth_replay_rejects_count: z.coerce.number().int().nonnegative().default(0),
+  recent_auth_queue_overflows_count: z.coerce.number().int().nonnegative().default(0),
+  recent_unexpected_logouts_count: z.coerce.number().int().nonnegative().default(0),
+  recent_auth_kill_switch_count: z.coerce.number().int().nonnegative().default(0),
+  recent_auth_refresh_storms_count: z.coerce.number().int().nonnegative().default(0),
   last_job_failure_at: dateTimeStringSchema.nullable().optional(),
   last_edge_failure_at: dateTimeStringSchema.nullable().optional(),
   last_client_error_at: dateTimeStringSchema.nullable().optional(),
+  last_auth_signal_at: dateTimeStringSchema.nullable().optional(),
 });
 
 export const adminOperationsAlertSchema = z.object({
@@ -115,6 +129,15 @@ export const adminOperationsAlertSchema = z.object({
     "retrying_jobs",
     "queue_backlog",
     "client_errors",
+    "auth_refresh_failures",
+    "auth_recovery_failures",
+    "auth_unexpected_logouts",
+    "auth_drift",
+    "auth_stale_rejects",
+    "auth_replay_rejects",
+    "auth_queue_overflow",
+    "auth_kill_switch",
+    "auth_refresh_storms",
   ]),
   title: z.string().trim().min(1).max(120),
   description: z.string().trim().min(1).max(240),
@@ -181,10 +204,18 @@ export const adminClientErrorTrendPointSchema = z.object({
   affected_tenants_count: z.coerce.number().int().nonnegative(),
 });
 
+export const adminAuthMetricTrendPointSchema = z.object({
+  bucket_start: dateTimeStringSchema,
+  metric_count: z.coerce.number().int().nonnegative(),
+  failure_count: z.coerce.number().int().nonnegative(),
+  affected_tenants_count: z.coerce.number().int().nonnegative(),
+});
+
 export const adminOperationsDashboardResponseSchema = adminOperationsAlertsResponseSchema.extend({
   recent_job_activity: z.array(adminRecentJobActivitySchema),
   recent_system_errors: z.array(adminRecentSystemErrorSchema),
   client_error_trend: z.array(adminClientErrorTrendPointSchema),
+  auth_metric_trend: z.array(adminAuthMetricTrendPointSchema).default([]),
 });
 
 export const adminTenantUsageSchema = z.object({

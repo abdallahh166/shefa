@@ -6,6 +6,7 @@ import { useAuth } from "./core/auth/authStore";
 import { initTheme } from "./hooks/useDarkMode";
 import { initEventHandlers } from "./core/events";
 import { initSentry } from "./core/observability/sentry";
+import { initAuthOperationalTelemetry } from "./core/observability/authOperationalTelemetry";
 import { initializeI18nStore } from "./core/i18n/i18nStore";
 import { initializePrivilegedSessionLifecycle } from "./services/auth/privilegedSession.lifecycle";
 import { initAuthMultiTabSync, startAuthDriftWatcher } from "./services/auth/authSessionOrchestrator";
@@ -14,8 +15,10 @@ import { authRepository } from "./services/auth/auth.repository";
 // Apply theme class before anything renders (prevents flash)
 initTheme();
 void initializeI18nStore();
+initSentry();
 
 initAuthMultiTabSync();
+initAuthOperationalTelemetry();
 startAuthDriftWatcher({
   getSession: () => authRepository.getSession(),
   refreshSessionSingleFlight: () => authRepository.refreshSessionSingleFlight(),
@@ -24,6 +27,5 @@ startAuthDriftWatcher({
 useAuth.getState().initialize();
 initializePrivilegedSessionLifecycle();
 void initEventHandlers();
-initSentry();
 
 createRoot(document.getElementById("root")!).render(<App />);

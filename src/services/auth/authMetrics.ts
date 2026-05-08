@@ -1,4 +1,4 @@
-type AuthMetricPayload = Record<string, string | number | boolean | undefined>;
+export type AuthMetricPayload = Record<string, string | number | boolean | undefined>;
 
 const listeners = new Set<(name: string, payload: AuthMetricPayload) => void>();
 
