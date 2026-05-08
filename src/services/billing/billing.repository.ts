@@ -16,12 +16,14 @@ import { assertOk } from "@/services/supabase/query";
 
 const INVOICE_COLUMNS =
   "id, tenant_id, patient_id, invoice_code, service, amount, amount_paid, balance_due, invoice_date, due_date, paid_at, voided_at, void_reason, status, deleted_at, deleted_by, created_at, updated_at";
-const INVOICE_WITH_PATIENT_COLUMNS = `${INVOICE_COLUMNS}, patients(full_name)`;
+/** Must match FK name on `invoices(patient_id)` → `patients(id)` (disambiguates from composite `invoices_patient_tenant_fk`). */
+const INVOICES_PATIENT_FK = "invoices_patient_id_fkey";
+const INVOICE_WITH_PATIENT_COLUMNS = `${INVOICE_COLUMNS}, patients!${INVOICES_PATIENT_FK}(full_name)`;
 const PAYMENT_COLUMNS =
   "id, tenant_id, invoice_id, patient_id, amount, payment_method, paid_at, reference, notes, created_at, created_by";
 
 const SEARCH_COLUMNS = ["invoice_code", "service", "status"];
-const SEARCH_COLUMNS_WITH_RELATIONS = [...SEARCH_COLUMNS, "patients.full_name"];
+const SEARCH_COLUMNS_WITH_RELATIONS = [...SEARCH_COLUMNS, `patients!${INVOICES_PATIENT_FK}.full_name`];
 const SORTABLE_COLUMNS = new Set([
   "invoice_date",
   "due_date",
