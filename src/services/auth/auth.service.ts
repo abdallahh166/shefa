@@ -336,6 +336,26 @@ export const authService = {
       throw toServiceError(err, "Failed to remove MFA factor");
     }
   },
+  async generateMfaRecoveryCodes(count = 10) {
+    try {
+      const parsedCount = z.number().int().min(8).max(20).parse(count);
+      const codes = await authRepository.generateMfaRecoveryCodes(parsedCount);
+      emitAuthMetric("recovery_codes_generated", { count: codes.length });
+      return codes;
+    } catch (err) {
+      throw toServiceError(err, "Failed to generate recovery codes");
+    }
+  },
+  async consumeMfaRecoveryCode(code: string) {
+    try {
+      const trimmed = z.string().trim().min(8).max(64).parse(code);
+      const ok = await authRepository.consumeMfaRecoveryCode(trimmed);
+      if (ok) emitAuthMetric("recovery_code_used", {});
+      return ok;
+    } catch (err) {
+      throw toServiceError(err, "Failed to use recovery code");
+    }
+  },
   async registerClinic(input: {
     clinicName: string;
     fullName: string;

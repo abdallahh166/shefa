@@ -47,6 +47,8 @@ export interface AuthRepository {
   challengeMfaFactor(factorId: string): Promise<{ id: string }>;
   verifyTotpFactor(input: { factorId: string; challengeId: string; code: string }): Promise<void>;
   unenrollMfaFactor(factorId: string): Promise<void>;
+  generateMfaRecoveryCodes(count?: number): Promise<string[]>;
+  consumeMfaRecoveryCode(code: string): Promise<boolean>;
   registerClinic(payload: Record<string, unknown>): Promise<unknown>;
 }
 
@@ -230,6 +232,27 @@ export const authRepository: AuthRepository = {
         details: error,
       });
     }
+  },
+  async generateMfaRecoveryCodes(count = 10) {
+    const { data, error } = await supabase.rpc("generate_mfa_recovery_codes", { p_count: count });
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to generate recovery codes", {
+        code: error.code,
+        details: error,
+      });
+    }
+    const rows = (data ?? []) as { plain_code?: string | null }[];
+    return rows.map((r) => String(r.plain_code ?? "").trim()).filter(Boolean);
+  },
+  async consumeMfaRecoveryCode(code) {
+    const { data, error } = await supabase.rpc("consume_mfa_recovery_code", { p_code: code });
+    if (error) {
+      throw new ServiceError(error.message ?? "Failed to use recovery code", {
+        code: error.code,
+        details: error,
+      });
+    }
+    return Boolean(data);
   },
   async registerClinic(payload) {
     const { data, error } = await supabase.functions.invoke("register-clinic", { body: payload });

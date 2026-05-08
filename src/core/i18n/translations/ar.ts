@@ -458,6 +458,12 @@
       oneTimeCodePlaceholder: "123456",
       verifyAndContinue: "تحقق والمتابعة",
       loginFailedTitle: "فشل التحقق",
+      useRecoveryCode: "استخدام رمز استرداد",
+      useTotpCode: "استخدام رمز المصادقة",
+      recoveryCodeLabel: "رمز الاسترداد",
+      recoveryCodePlaceholder: "XXXX-XXXX-XXXX",
+      recoveryLoginHint: "رموز الاسترداد لمرة واحدة. بعد الاستخدام يُفضّل استخدام تطبيق المصادقة لاحقاً.",
+      recoveryInvalid: "رمز الاسترداد غير صالح أو تم استخدامه مسبقاً.",
     },
   },
   tutorial: {

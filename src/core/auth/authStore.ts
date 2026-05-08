@@ -194,6 +194,12 @@ export function getDefaultPrivilegedAuthState(): PrivilegedAuthState {
   };
 }
 
+function assuranceForSessionVersion(aal: { currentLevel: string | null }): AuthenticatorAssuranceLevel {
+  const c = aal.currentLevel;
+  if (c === "aal1" || c === "aal2") return c;
+  return null;
+}
+
 function isRecentAuthStillValid(user: AppUser | null, lastVerifiedAt: string | null) {
   if (!user || !lastVerifiedAt) return false;
   const primaryRole = getPrimaryRole(user);
@@ -417,7 +423,8 @@ export const useAuth = create<AuthState>()(
         });
         const u = get().supabaseUser;
         const effTenant = tenant?.id ?? get().user?.tenantId ?? null;
-        const nextVer = sessionVersionFromSupabaseUser(u as any, effTenant, null);
+        const privAal = get().privilegedAuth.currentLevel;
+        const nextVer = sessionVersionFromSupabaseUser(u as any, effTenant, null, privAal);
         const nextKey = principalKeyFromSnapshot(get());
         if (get().isAuthenticated && prevParts.userId !== "anon") {
           void runTenantScopedCacheReset({
@@ -639,7 +646,19 @@ async function loadUserProfile(
       : null;
     const effTenant = tenantOverride?.id ?? nextUser.tenantId ?? null;
     const nextKey = principalKeyFromSnapshot({ user: nextUser, tenantOverride });
-    const nextVer = sessionVersionFromSupabaseUser(supaUser as any, effTenant, sessionMeta?.createdAt ?? null);
+    let assuranceLevel: AuthenticatorAssuranceLevel = null;
+    try {
+      const aal = await authService.getMfaAssuranceLevel();
+      assuranceLevel = assuranceForSessionVersion(aal);
+    } catch {
+      assuranceLevel = null;
+    }
+    const nextVer = sessionVersionFromSupabaseUser(
+      supaUser as any,
+      effTenant,
+      sessionMeta?.createdAt ?? null,
+      assuranceLevel,
+    );
 
     if (nextVer && lastPrincipalKeyCommitted) {
       await runPrincipalBoundaryIfNeeded({
@@ -717,7 +736,19 @@ authService.onAuthStateChange(async (event, sessionUser) => {
       void (async () => {
         const active = await authService.getActiveSession();
         const effTenant = useAuth.getState().tenantOverride?.id ?? useAuth.getState().user?.tenantId ?? null;
-        const nextVer = sessionVersionFromSupabaseUser(active.user as any, effTenant, active.createdAt ?? null);
+        let assuranceLevel: AuthenticatorAssuranceLevel = null;
+        try {
+          const aal = await authService.getMfaAssuranceLevel();
+          assuranceLevel = assuranceForSessionVersion(aal);
+        } catch {
+          assuranceLevel = null;
+        }
+        const nextVer = sessionVersionFromSupabaseUser(
+          active.user as any,
+          effTenant,
+          active.createdAt ?? null,
+          assuranceLevel,
+        );
         if (nextVer) {
           useAuth.setState({ sessionVersion: nextVer });
         }

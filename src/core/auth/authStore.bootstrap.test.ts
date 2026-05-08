@@ -16,6 +16,7 @@ vi.mock("@/services/auth/auth.service", () => ({
       profile: authStoreHarness.profile,
       roles: authStoreHarness.roles,
     })),
+    getMfaAssuranceLevel: vi.fn(async () => ({ currentLevel: null, nextLevel: null })),
     logout: vi.fn(async () => undefined),
     onAuthStateChange: vi.fn((handler) => {
       authStoreHarness.authHandler = handler;
@@ -49,9 +50,11 @@ vi.mock("@/services/auth/authMetrics", () => ({
 }));
 
 vi.mock("@/services/auth/sessionVersion", () => ({
-  sessionVersionFromSupabaseUser: vi.fn((user, tenantId, createdAt) =>
-    user?.id ? `${user.id}:${tenantId ?? "none"}:${createdAt ?? "created"}` : null,
-  ),
+  sessionVersionFromSupabaseUser: vi.fn((user, tenantId, createdAt, assurance) => {
+    if (!user?.id) return null;
+    const tag = assurance === "aal2" ? "2" : assurance === "aal1" ? "1" : "0";
+    return `${user.id}:${tenantId ?? "none"}:${createdAt ?? "created"}:${tag}`;
+  }),
 }));
 
 vi.mock("@/core/auth/portalAuthStore", () => ({

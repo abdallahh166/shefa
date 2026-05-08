@@ -1,14 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Shield, KeyRound, Loader2, AlertTriangle, CheckCircle2, RefreshCcw, Trash2 } from "lucide-react";
+import { Shield, KeyRound, Loader2, AlertTriangle, CheckCircle2, RefreshCcw, Trash2, Copy } from "lucide-react";
 import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Inputs";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuth, buildPrivilegedSession } from "@/core/auth/authStore";
 import { useI18n } from "@/core/i18n/i18nStore";
 import { toast } from "@/hooks/use-toast";
 import { authService } from "@/services/auth/auth.service";
 import { auditLogService } from "@/services/settings/audit.service";
 import { privilegedSessionService } from "@/services/auth/privilegedSession.service";
+import { emitAuthMetric } from "@/services/auth/authMetrics";
 
 type EnrollmentState = {
   factorId: string;
@@ -37,7 +46,7 @@ function toQrCodeDataUrl(svgMarkup: string) {
 }
 
 export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProps) => {
-  const { t } = useI18n(["auth"]);
+  const { t } = useI18n(["auth", "common"]);
   const { user, lastVerifiedAt, privilegedAuth } = useAuth();
   const privilegedSession = useMemo(
     () => buildPrivilegedSession({ user, lastVerifiedAt, privilegedAuth }),
@@ -51,6 +60,8 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
   const [enrollment, setEnrollment] = useState<EnrollmentState | null>(null);
   const [sessionVerificationFactorId, setSessionVerificationFactorId] = useState<string | null>(null);
   const [removingFactorId, setRemovingFactorId] = useState<string | null>(null);
+  const [recoveryCodesDisplay, setRecoveryCodesDisplay] = useState<string[] | null>(null);
+  const [regeneratingRecovery, setRegeneratingRecovery] = useState(false);
 
   const reloadState = useCallback(async () => {
     const state = await privilegedSessionService.refresh();
@@ -58,7 +69,7 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
   }, []);
 
   useEffect(() => {
-    if (!user || !privilegedSession.isPrivileged) return;
+    if (!user) return;
     let cancelled = false;
     setLoading(true);
     void reloadState()
@@ -74,27 +85,20 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
     return () => {
       cancelled = true;
     };
-  }, [privilegedSession.isPrivileged, reloadState, t, user]);
+  }, [reloadState, t, user]);
 
   if (!user) return null;
 
-  if (!privilegedSession.isPrivileged) {
-    return mode === "page" ? (
-      <div className="mx-auto max-w-2xl rounded-2xl border bg-card p-8 text-center shadow-sm">
-        <Shield className="mx-auto mb-4 h-10 w-10 text-muted-foreground" />
-        <h1 className="text-2xl font-semibold">{t("auth.mfa.noSetupTitle")}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {t("auth.mfa.noSetupDescription")}
-        </p>
-      </div>
-    ) : null;
-  }
+  const enrollScope = privilegedSession.isPrivileged ? "privileged" : "user";
 
   const handleStartEnrollment = async () => {
     setLoading(true);
+    emitAuthMetric("mfa_enroll_started", { scope: enrollScope });
     try {
       const data = await authService.enrollTotpFactor({
-        friendlyName: `${user.name} ${privilegedSession.roleTier}`,
+        friendlyName: privilegedSession.isPrivileged
+          ? `${user.name} ${privilegedSession.roleTier}`
+          : `${user.name} (${user.email})`,
         issuer: "MedFlow",
       });
       setEnrollment({
@@ -106,21 +110,37 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
       await auditLogService.logEvent({
         tenant_id: toAuditTenantId(user),
         user_id: user.id,
-        action: "privileged_mfa_enrollment_started",
-        action_type: "privileged_mfa_enrollment_started",
+        action: privilegedSession.isPrivileged ? "privileged_mfa_enrollment_started" : "mfa_enrollment_started",
+        action_type: privilegedSession.isPrivileged ? "privileged_mfa_enrollment_started" : "mfa_enrollment_started",
         entity_type: "auth_mfa_factor",
         entity_id: data.id,
         resource_type: "auth_mfa_factor",
         details: {
           role_tier: privilegedSession.roleTier,
           factor_type: "totp",
+          scope: enrollScope,
         },
       });
     } catch (err) {
+      emitAuthMetric("mfa_enroll_failed", { scope: enrollScope });
       const message = err instanceof Error ? err.message : t("common.error");
       toast({ title: t("common.error"), description: message, variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const issueRecoveryCodesAfterEnrollment = async () => {
+    try {
+      const codes = await authService.generateMfaRecoveryCodes(10);
+      if (codes.length) setRecoveryCodesDisplay(codes);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("common.error");
+      toast({
+        title: t("auth.mfa.recoveryCodesIssueFailedTitle"),
+        description: message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -130,27 +150,51 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
     try {
       await authService.verifyTotpFactor({ factorId: enrollment.factorId, code });
       await reloadState();
+      emitAuthMetric("mfa_enroll_succeeded", { scope: enrollScope });
       await auditLogService.logEvent({
         tenant_id: toAuditTenantId(user),
         user_id: user.id,
-        action: "privileged_mfa_enrolled",
-        action_type: "privileged_mfa_enrolled",
+        action: privilegedSession.isPrivileged ? "privileged_mfa_enrolled" : "mfa_enrolled",
+        action_type: privilegedSession.isPrivileged ? "privileged_mfa_enrolled" : "mfa_enrolled",
         entity_type: "auth_mfa_factor",
         entity_id: enrollment.factorId,
         resource_type: "auth_mfa_factor",
         details: {
           role_tier: privilegedSession.roleTier,
           factor_type: "totp",
+          scope: enrollScope,
         },
       });
       setEnrollment(null);
       setCode("");
       toast({ title: t("auth.mfa.enabledToast") });
+      await issueRecoveryCodesAfterEnrollment();
     } catch (err) {
+      emitAuthMetric("mfa_enroll_failed", { scope: enrollScope, phase: "verify" });
       const message = err instanceof Error ? err.message : t("common.error");
       toast({ title: t("common.error"), description: message, variant: "destructive" });
     } finally {
       setVerifying(false);
+    }
+  };
+
+  const handleRegenerateRecoveryCodes = async () => {
+    const ok = typeof window !== "undefined"
+      ? window.confirm(t("auth.mfa.regenerateRecoveryConfirm"))
+      : true;
+    if (!ok) return;
+    setRegeneratingRecovery(true);
+    try {
+      const codes = await authService.generateMfaRecoveryCodes(10);
+      if (codes.length) {
+        setRecoveryCodesDisplay(codes);
+        toast({ title: t("auth.mfa.recoveryCodesRegeneratedToast") });
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("common.error");
+      toast({ title: t("common.error"), description: message, variant: "destructive" });
+    } finally {
+      setRegeneratingRecovery(false);
     }
   };
 
@@ -163,8 +207,8 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
       await auditLogService.logEvent({
         tenant_id: toAuditTenantId(user),
         user_id: user.id,
-        action: "privileged_mfa_session_verified",
-        action_type: "privileged_mfa_session_verified",
+        action: privilegedSession.isPrivileged ? "privileged_mfa_session_verified" : "mfa_session_verified",
+        action_type: privilegedSession.isPrivileged ? "privileged_mfa_session_verified" : "mfa_session_verified",
         entity_type: "auth_mfa_factor",
         entity_id: sessionVerificationFactorId,
         resource_type: "auth_mfa_factor",
@@ -172,6 +216,7 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
           role_tier: privilegedSession.roleTier,
           factor_type: "totp",
           assurance_level: "aal2",
+          scope: enrollScope,
         },
       });
       setSessionCode("");
@@ -193,13 +238,14 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
       await auditLogService.logEvent({
         tenant_id: toAuditTenantId(user),
         user_id: user.id,
-        action: "privileged_mfa_reset",
-        action_type: "privileged_mfa_reset",
+        action: privilegedSession.isPrivileged ? "privileged_mfa_reset" : "mfa_factor_removed",
+        action_type: privilegedSession.isPrivileged ? "privileged_mfa_reset" : "mfa_factor_removed",
         entity_type: "auth_mfa_factor",
         entity_id: factorId,
         resource_type: "auth_mfa_factor",
         details: {
           role_tier: privilegedSession.roleTier,
+          scope: enrollScope,
         },
       });
       if (sessionVerificationFactorId === factorId) {
@@ -215,41 +261,95 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
     }
   };
 
+  const verifiedFactors = factors.filter((f) => f.status === "verified");
+
+  const copyRecoveryCodes = async () => {
+    if (!recoveryCodesDisplay?.length) return;
+    try {
+      await navigator.clipboard.writeText(recoveryCodesDisplay.join("\n"));
+      toast({ title: t("auth.mfa.recoveryCodesCopied") });
+    } catch {
+      toast({ title: t("common.error"), variant: "destructive" });
+    }
+  };
+
   return (
     <div className="space-y-5">
+      <Dialog
+        open={recoveryCodesDisplay !== null}
+        onOpenChange={(open) => {
+          if (!open) setRecoveryCodesDisplay(null);
+        }}
+      >
+        <DialogContent className="max-w-lg" hideClose={false}>
+          <DialogHeader>
+            <DialogTitle>{t("auth.mfa.recoveryCodesTitle")}</DialogTitle>
+            <DialogDescription>{t("auth.mfa.recoveryCodesWarning")}</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-48 overflow-y-auto rounded-xl border bg-muted/40 p-3 font-mono text-sm">
+            {(recoveryCodesDisplay ?? []).map((line) => (
+              <div key={line}>{line}</div>
+            ))}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => void copyRecoveryCodes()}>
+              <Copy className="h-4 w-4" />
+              {t("auth.mfa.copyRecoveryCodes")}
+            </Button>
+            <Button type="button" onClick={() => setRecoveryCodesDisplay(null)}>
+              {t("auth.mfa.recoveryCodesSaved")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className={mode === "page" ? "mx-auto max-w-3xl rounded-3xl border bg-card p-8 shadow-sm" : ""}>
         <div className="flex flex-col gap-4 rounded-2xl border bg-muted/20 p-5 md:flex-row md:items-start md:justify-between">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">{t("auth.mfa.sessionTitle")}</h2>
+              <h2 className="text-lg font-semibold">
+                {privilegedSession.isPrivileged ? t("auth.mfa.sessionTitle") : t("auth.mfa.accountSecurityTitle")}
+              </h2>
             </div>
             <p className="text-sm text-muted-foreground">
-              {privilegedSession.roleTier === "super_admin"
-                ? t("auth.mfa.superAdminDescription")
-                : t("auth.mfa.clinicAdminDescription")}
+              {privilegedSession.isPrivileged
+                ? privilegedSession.roleTier === "super_admin"
+                  ? t("auth.mfa.superAdminDescription")
+                  : t("auth.mfa.clinicAdminDescription")
+                : t("auth.mfa.accountSecurityDescription")}
             </p>
           </div>
-          <div className="flex items-center gap-2 rounded-full border bg-background px-3 py-1.5 text-sm">
-            {privilegedSession.canAccessPrivilegedRoutes ? (
-              <>
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                <span>{t("auth.mfa.sessionReady")}</span>
-              </>
-            ) : (
-              <>
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                <span>{t("auth.mfa.sessionActionRequired")}</span>
-              </>
-            )}
-          </div>
+          {privilegedSession.isPrivileged ? (
+            <div className="flex items-center gap-2 rounded-full border bg-background px-3 py-1.5 text-sm">
+              {privilegedSession.canAccessPrivilegedRoutes ? (
+                <>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <span>{t("auth.mfa.sessionReady")}</span>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <span>{t("auth.mfa.sessionActionRequired")}</span>
+                </>
+              )}
+            </div>
+          ) : null}
         </div>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border p-4">
-            <div className="text-sm text-muted-foreground">{t("auth.mfa.roleTier")}</div>
-            <div className="mt-1 font-medium capitalize">{privilegedSession.roleTier?.replace("_", " ")}</div>
-          </div>
+        <div
+          className={
+            privilegedSession.isPrivileged
+              ? "mt-5 grid gap-4 md:grid-cols-3"
+              : "mt-5 grid gap-4 md:grid-cols-2"
+          }
+        >
+          {privilegedSession.isPrivileged ? (
+            <div className="rounded-2xl border p-4">
+              <div className="text-sm text-muted-foreground">{t("auth.mfa.roleTier")}</div>
+              <div className="mt-1 font-medium capitalize">{privilegedSession.roleTier?.replace("_", " ")}</div>
+            </div>
+          ) : null}
           <div className="rounded-2xl border p-4">
             <div className="text-sm text-muted-foreground">{t("auth.mfa.currentAssurance")}</div>
             <div className="mt-1 font-medium uppercase">{privilegedSession.aal ?? "aal1"}</div>
@@ -268,17 +368,30 @@ export const PrivilegedMfaPanel = ({ mode = "embedded" }: PrivilegedMfaPanelProp
                 {t("auth.mfa.authenticatorDescription")}
               </p>
             </div>
-            <Button type="button" variant="outline" onClick={() => void reloadState()} disabled={loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-              {t("auth.mfa.refresh")}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {verifiedFactors.length > 0 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleRegenerateRecoveryCodes()}
+                  disabled={regeneratingRecovery || loading}
+                >
+                  {regeneratingRecovery ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                  {t("auth.mfa.regenerateRecoveryCodes")}
+                </Button>
+              ) : null}
+              <Button type="button" variant="outline" onClick={() => void reloadState()} disabled={loading}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                {t("auth.mfa.refresh")}
+              </Button>
+            </div>
           </div>
 
           <div className="mt-4 space-y-3">
             {factors.length === 0 && !enrollment ? (
               <div className="rounded-2xl border border-dashed p-5">
                 <p className="text-sm text-muted-foreground">
-                  {t("auth.mfa.notEnrolled")}
+                  {privilegedSession.isPrivileged ? t("auth.mfa.notEnrolled") : t("auth.mfa.notEnrolledOptional")}
                 </p>
                 <Button
                   type="button"

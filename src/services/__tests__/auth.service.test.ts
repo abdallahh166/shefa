@@ -41,6 +41,8 @@ vi.mock("@/services/auth/auth.repository", () => ({
     getProfileByUserId: vi.fn(),
     getRolesByUserId: vi.fn(),
     getMfaAssuranceLevel: vi.fn(),
+    generateMfaRecoveryCodes: vi.fn(),
+    consumeMfaRecoveryCode: vi.fn(),
     registerClinic: vi.fn(),
   },
   isTransientAuthNetworkError: (error: { message?: string | null; name?: string }) => {
@@ -215,5 +217,34 @@ describe("authService recovery and boundary cleanup", () => {
       principalKey: "u1:tenant-1",
       authTraceId: "trace-logout",
     }));
+  });
+});
+
+describe("authService MFA recovery codes", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authServiceHarness.metrics.length = 0;
+  });
+
+  it("generateMfaRecoveryCodes validates count and emits metric", async () => {
+    repo.generateMfaRecoveryCodes.mockResolvedValue(["AAAA-BBBB-CCCC"]);
+    await expect(authService.generateMfaRecoveryCodes(10)).resolves.toEqual(["AAAA-BBBB-CCCC"]);
+    expect(repo.generateMfaRecoveryCodes).toHaveBeenCalledWith(10);
+    expect(authServiceHarness.metrics).toContainEqual({
+      name: "recovery_codes_generated",
+      payload: { count: 1 },
+    });
+  });
+
+  it("consumeMfaRecoveryCode emits when successful", async () => {
+    repo.consumeMfaRecoveryCode.mockResolvedValue(true);
+    await expect(authService.consumeMfaRecoveryCode("AAAA-BBBB-CCCC")).resolves.toBe(true);
+    expect(authServiceHarness.metrics).toContainEqual({ name: "recovery_code_used", payload: {} });
+  });
+
+  it("consumeMfaRecoveryCode does not emit metric when server returns false", async () => {
+    repo.consumeMfaRecoveryCode.mockResolvedValue(false);
+    await expect(authService.consumeMfaRecoveryCode("AAAA-BBBB-CCCC")).resolves.toBe(false);
+    expect(authServiceHarness.metrics.some((m) => m.name === "recovery_code_used")).toBe(false);
   });
 });

@@ -488,6 +488,12 @@ export const en = {
       oneTimeCodePlaceholder: "123456",
       verifyAndContinue: "Verify and continue",
       loginFailedTitle: "Verification failed",
+      useRecoveryCode: "Use a recovery code instead",
+      useTotpCode: "Use authenticator code",
+      recoveryCodeLabel: "Recovery code",
+      recoveryCodePlaceholder: "XXXX-XXXX-XXXX",
+      recoveryLoginHint: "Recovery codes are one-time. After use, prefer your authenticator app next time.",
+      recoveryInvalid: "That recovery code is not valid or was already used.",
     },
   },
   tutorial: {
