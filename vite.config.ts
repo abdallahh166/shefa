@@ -28,6 +28,9 @@ export default defineConfig(({ mode }) => {
     "https://fonts.gstatic.com",
   ].filter(Boolean);
 
+  // Note: do not add `frame-ancestors` here. It is only applied when CSP is delivered as an
+  // HTTP header; in <meta http-equiv> browsers ignore it and log a console warning. Set it
+  // on your CDN / reverse proxy instead (see docs/production-hardening.md).
   const productionCsp = [
     "default-src 'self'",
     "base-uri 'none'",
@@ -37,7 +40,6 @@ export default defineConfig(({ mode }) => {
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https:",
     `connect-src ${connectParts.join(" ")}`,
-    "frame-ancestors 'self'",
   ].join("; ");
 
   return {
