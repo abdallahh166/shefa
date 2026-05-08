@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { create } from "zustand";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/core/auth/authStore";
@@ -237,6 +237,10 @@ export function useI18n(
     void ensureNamespaces(namespaces);
   }, [namespaceKey, namespaces]);
 
+  const t = useCallback((path: string, options?: Record<string, unknown>) => {
+    return translatePath(path, options);
+  }, [locale]);
+
   return {
     i18n: boundI18n,
     locale,
@@ -245,8 +249,7 @@ export function useI18n(
     isHydrated,
     setLocale,
     setCalendarType,
-    t: (path: string, options?: Record<string, unknown>) =>
-      translatePath(path, options),
+    t,
   };
 }
 

@@ -43,6 +43,14 @@ let storageListener: ((e: StorageEvent) => void) | null = null;
 let leaseHeartbeat: ReturnType<typeof setInterval> | null = null;
 let driftTimer: ReturnType<typeof setInterval> | null = null;
 
+function principalPartsFromKey(principalKey: string): { userId: string; tenantId: string } {
+  const [userId, tenantId] = principalKey.split(":");
+  return {
+    userId: userId || "anon",
+    tenantId: tenantId || "none",
+  };
+}
+
 function pruneMap(map: Map<string, number>, ttlMs: number) {
   const now = Date.now();
   for (const [k, t] of map) {
@@ -147,6 +155,27 @@ function clearTenantScopedStorageLeaderOnly(parts: { userId: string; tenantId: s
   }
 }
 
+function clearAllPrincipalScopedPreferencesLeaderOnly() {
+  if (typeof localStorage === "undefined") return;
+  if (!tryAcquireOrRenewLease() && !isLeaderLeaseHolder()) return;
+
+  const toRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k) continue;
+    if (k.startsWith("lang:") || k.startsWith("calendar:")) {
+      toRemove.push(k);
+    }
+  }
+  for (const k of toRemove) {
+    try {
+      localStorage.removeItem(k);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 function isDuplicateEvent(eventId: string): boolean {
   pruneMap(processedEvents, EVENT_DEDUP_TTL_MS);
   if (processedEvents.has(eventId)) return true;
@@ -180,6 +209,15 @@ async function runPerTabBoundaryReset(event: AuthTransitionEventV1, parts: { use
     tryAcquireOrRenewLease();
   }
   if (isLeaderLeaseHolder()) {
+    if (
+      event.type === "USER_CHANGED"
+      || event.type === "SIGNED_OUT"
+      || event.type === "BOUNDARY_RESET"
+    ) {
+      // These transitions can leave behind scoped keys from a different principal (user/tenant).
+      // Clearing all principal-scoped preference keys avoids cross-user leakage.
+      clearAllPrincipalScopedPreferencesLeaderOnly();
+    }
     clearTenantScopedStorageLeaderOnly(parts);
   }
   if (import.meta.env.DEV) {
@@ -229,7 +267,7 @@ async function ingestAuthEvent(event: AuthTransitionEventV1, fromBroadcast: bool
     }
   }
 
-  const parts = h.getPrincipalParts();
+  const parts = principalPartsFromKey(event.principalKey);
   const cleanupKey = `${event.principalKey}:${event.eventId}`;
   emitAuthMetric("principal_change", {
     type: event.type,
@@ -253,7 +291,7 @@ export async function runAuthCleanupEvent(event: AuthTransitionEventV1): Promise
   if (!h) return;
   if (shouldRejectReplay(event.occurredAt)) return;
   if (isDuplicateEvent(event.eventId)) return;
-  const parts = h.getPrincipalParts();
+  const parts = principalPartsFromKey(event.principalKey);
   const cleanupKey = `${event.principalKey}:${event.eventId}`;
   await runCleanupOnce(cleanupKey, async () => {
     await runPerTabBoundaryReset(event, parts);
