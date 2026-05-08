@@ -1,5 +1,10 @@
-import { useAuth } from "@/core/auth/authStore";
+import { selectEffectiveTenantId, useAuth } from "@/core/auth/authStore";
 import { AuthorizationError, ServiceError } from "./errors";
+
+/** Same as {@link selectEffectiveTenantId} using current auth snapshot (non-React callers). */
+export function getEffectiveTenantId(): string | null {
+  return selectEffectiveTenantId(useAuth.getState());
+}
 
 export function getTenantContext() {
   const { user, tenantOverride } = useAuth.getState();

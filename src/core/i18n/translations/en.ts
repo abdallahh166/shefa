@@ -274,6 +274,9 @@ export const en = {
     invoiceCreated: "Invoice created",
     invoiceMarkedPaid: "Invoice marked as paid",
     markAsPaid: "Mark as Paid",
+    tenantContextRequiredTitle: "Clinic context required",
+    tenantContextRequiredDescription:
+      "Choose a clinic workspace (tenant access mode for platform admins) before invoices can load.",
   },
   pharmacy: {
     title: "Pharmacy",

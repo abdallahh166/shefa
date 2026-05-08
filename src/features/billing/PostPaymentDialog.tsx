@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useI18n } from "@/core/i18n/i18nStore";
-import { useAuth } from "@/core/auth/authStore";
+import { selectEffectiveTenantId, useAuth } from "@/core/auth/authStore";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/primitives/Button";
 import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from "@/components/primitives/Inputs";
@@ -63,7 +63,7 @@ const getPaymentMethodLabel = (method: string, t: (path: string, options?: Recor
 
 export const PostPaymentDialog = ({ invoice, open, onClose, onSuccess }: PostPaymentDialogProps) => {
   const { t, locale, calendarType } = useI18n();
-  const { user } = useAuth();
+  const billingTenantId = useAuth(selectEffectiveTenantId);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     amount: invoice ? String(invoice.balance_due ?? invoice.amount) : "",
@@ -74,9 +74,9 @@ export const PostPaymentDialog = ({ invoice, open, onClose, onSuccess }: PostPay
   });
 
   const paymentHistoryQuery = useQuery({
-    queryKey: queryKeys.billing.payments(invoice?.id ?? "", user?.tenantId),
+    queryKey: queryKeys.billing.payments(invoice?.id ?? "", billingTenantId ?? undefined),
     queryFn: async () => billingService.listPayments(invoice!.id),
-    enabled: open && !!invoice?.id && !!user?.tenantId,
+    enabled: open && !!invoice?.id && !!billingTenantId,
   });
 
   const outstandingBalance = useMemo(

@@ -10,11 +10,12 @@ import { PermissionGuard } from "@/core/auth/PermissionGuard";
 import { PageContainer, SectionHeader } from "@/components/layout/AppLayout";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { DollarSign, CreditCard, FileText, TrendingUp, Plus, Ban, Wallet } from "lucide-react";
 import { NewInvoiceModal } from "./NewInvoiceModal";
 import { PostPaymentDialog } from "./PostPaymentDialog";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
-import { useAuth } from "@/core/auth/authStore";
+import { selectEffectiveTenantId, useAuth } from "@/core/auth/authStore";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { formatDate, formatCurrency } from "@/shared/utils/formatDate";
@@ -44,7 +45,7 @@ const getStatusLabel = (status: string, t: (path: string, options?: Record<strin
 
 export const BillingPage = () => {
   const { t, locale } = useI18n();
-  const { user } = useAuth();
+  const effectiveTenantId = useAuth(selectEffectiveTenantId);
   const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceWithPatient | null>(null);
@@ -63,15 +64,15 @@ export const BillingPage = () => {
   useRealtimeSubscription(["invoices"]);
 
   const listArgs = useMemo(() => ({
-    tenantId: user?.tenantId,
+    tenantId: effectiveTenantId ?? undefined,
     page,
     pageSize,
     search: searchTerm.trim() || undefined,
     filters: statusFilter ? { status: statusFilter } : undefined,
     sort: { column: sort.column, ascending: sort.direction === "asc" },
-  }), [page, pageSize, searchTerm, sort.column, sort.direction, statusFilter, user?.tenantId]);
+  }), [page, pageSize, searchTerm, sort.column, sort.direction, statusFilter, effectiveTenantId]);
 
-  const { data: listPage, isLoading } = useQuery({
+  const listQuery = useQuery({
     queryKey: queryKeys.billing.list(listArgs),
     queryFn: async () => billingService.listPagedWithRelations({
       page,
@@ -80,8 +81,10 @@ export const BillingPage = () => {
       filters: statusFilter ? { status: statusFilter } : undefined,
       sort: { column: sort.column, ascending: sort.direction === "asc" },
     }),
-    enabled: !!user?.tenantId,
+    enabled: !!effectiveTenantId,
   });
+
+  const { data: listPage, isLoading } = listQuery;
 
   useEffect(() => {
     setPage(1);
@@ -94,17 +97,21 @@ export const BillingPage = () => {
   const monthEnd = toDateKey(monthEndDate);
   const monthKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
 
-  const { data: invoiceSummary = { total_count: 0, paid_count: 0, paid_amount: 0, pending_amount: 0 } } = useQuery({
-    queryKey: queryKeys.billing.summary(user?.tenantId),
-    enabled: !!user?.tenantId,
+  const summaryQuery = useQuery({
+    queryKey: queryKeys.billing.summary(effectiveTenantId ?? undefined),
+    enabled: !!effectiveTenantId,
     queryFn: async () => billingService.getSummary(),
   });
 
-  const { data: invoicesThisMonth = 0 } = useQuery({
-    queryKey: queryKeys.billing.monthCount(user?.tenantId, monthKey),
-    enabled: !!user?.tenantId,
+  const { data: invoiceSummary = { total_count: 0, paid_count: 0, paid_amount: 0, pending_amount: 0 } } = summaryQuery;
+
+  const monthQuery = useQuery({
+    queryKey: queryKeys.billing.monthCount(effectiveTenantId ?? undefined, monthKey),
+    enabled: !!effectiveTenantId,
     queryFn: async () => billingService.countInRange(monthStart, monthEnd),
   });
+
+  const { data: invoicesThisMonth = 0 } = monthQuery;
 
   const invoices = listPage?.data ?? [];
   const totalInvoices = listPage?.count ?? 0;
@@ -117,8 +124,12 @@ export const BillingPage = () => {
     ? Math.round((totalRevenue / totalCollectedAndOutstanding) * 100)
     : 0;
 
+  const billingError =
+    listQuery.error ?? summaryQuery.error ?? monthQuery.error;
+  const billingErrorMessage = billingError instanceof Error ? billingError.message : String(billingError ?? "");
+
   const invalidateInvoices = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.billing.root(user?.tenantId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.billing.root(effectiveTenantId ?? undefined) });
   };
 
   const handleVoidInvoice = async () => {
@@ -249,6 +260,20 @@ export const BillingPage = () => {
           </PermissionGuard>
         )}
       />
+
+      {!effectiveTenantId ? (
+        <Alert variant="destructive">
+          <AlertTitle>{t("billing.tenantContextRequiredTitle")}</AlertTitle>
+          <AlertDescription>{t("billing.tenantContextRequiredDescription")}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {(listQuery.isError || summaryQuery.isError || monthQuery.isError) && billingErrorMessage ? (
+        <Alert variant="destructive">
+          <AlertTitle>{t("common.error")}</AlertTitle>
+          <AlertDescription>{billingErrorMessage}</AlertDescription>
+        </Alert>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard title={t("billing.totalRevenue")} value={formatCurrency(totalRevenue, locale)} icon={DollarSign} />

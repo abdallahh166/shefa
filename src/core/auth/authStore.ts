@@ -337,6 +337,14 @@ export function principalKeyFromSnapshot(state: Pick<AuthState, "user" | "tenant
   return `${u.id}:${tid}`;
 }
 
+/** Tenant id for tenant-scoped modules (React Query keys, `enabled`). Matches {@link getTenantContext} when APIs are allowed. */
+export function selectEffectiveTenantId(state: Pick<AuthState, "user" | "tenantOverride">): string | null {
+  const { user, tenantOverride } = state;
+  if (!user?.id) return null;
+  if (user.globalRoles.includes("super_admin")) return tenantOverride?.id ?? null;
+  return user.tenantId ?? null;
+}
+
 export const useAuth = create<AuthState>()(
   persist(
     (set, get) => ({

@@ -27,8 +27,22 @@ export const invoiceSchema = z.object({
   updated_at: dateTimeStringSchema,
 });
 
+function normalizeEmbeddedPatient(raw: unknown): unknown {
+  if (raw == null) return null;
+  if (Array.isArray(raw)) return raw[0] ?? null;
+  return raw;
+}
+
 export const invoiceWithPatientSchema = invoiceSchema.extend({
-  patients: z.object({ full_name: z.string().trim().min(1) }).optional().nullable(),
+  patients: z.preprocess(
+    normalizeEmbeddedPatient,
+    z
+      .object({
+        full_name: z.union([z.string(), z.null()]).optional(),
+      })
+      .optional()
+      .nullable(),
+  ),
 });
 
 export const invoiceCreateSchema = invoiceSchema

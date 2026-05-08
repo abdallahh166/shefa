@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useI18n } from "@/core/i18n/i18nStore";
-import { useAuth } from "@/core/auth/authStore";
+import { selectEffectiveTenantId, useAuth } from "@/core/auth/authStore";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/primitives/Button";
@@ -21,8 +21,7 @@ interface NewInvoiceModalProps {
 
 export const NewInvoiceModal = ({ open, onClose, onSuccess }: NewInvoiceModalProps) => {
   const { t } = useI18n(["billing"]);
-  const { user } = useAuth();
-  const tenantId = user?.tenantId;
+  const tenantId = useAuth(selectEffectiveTenantId);
   const [loading, setLoading] = useState(false);
   const [patientSearch, setPatientSearch] = useState("");
   const debouncedPatientSearch = useDebouncedValue(patientSearch, 300);

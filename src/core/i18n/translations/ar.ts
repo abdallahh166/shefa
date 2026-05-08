@@ -248,6 +248,9 @@
     invoiceCreated: "تم إنشاء الفاتورة",
     invoiceMarkedPaid: "تم وضع الفاتورة كمدفوعة",
     markAsPaid: "اعتبارها مدفوعة",
+    tenantContextRequiredTitle: "يلزم سياق العيادة",
+    tenantContextRequiredDescription:
+      "اختر مساحة عمل العيادة (وضع الوصول للعيادة لمديري المنصة) قبل تحميل الفواتير.",
   },
   pharmacy: {
     title: "الصيدلية",
