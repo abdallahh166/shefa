@@ -38,6 +38,11 @@ function reportInvariant(name: string, details: Record<string, string | number |
   }
 }
 
+/** Keys written while logged out (`i18nStore` / cache). Harmless next to authenticated-scoped keys. */
+function isPreAuthSentinelScope(keyTenantId: string, keyUserId: string) {
+  return keyTenantId === "public" && keyUserId === "anon";
+}
+
 function scopedStorageViolations(userId: string | null, tenantId: string | null) {
   if (typeof window === "undefined") return [];
 
@@ -51,6 +56,7 @@ function scopedStorageViolations(userId: string | null, tenantId: string | null)
     if (!match) continue;
 
     const [, keyTenantId, keyUserId] = match;
+    if (isPreAuthSentinelScope(keyTenantId, keyUserId)) continue;
     if (!tenantId || !userId || keyTenantId !== tenantId || keyUserId !== userId) {
       violations.push(key);
     }
